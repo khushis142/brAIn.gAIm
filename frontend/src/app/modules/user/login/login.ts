@@ -14,16 +14,24 @@ export class Login {
   private fromBuilder = inject(FormBuilder);
   protected loginForm = this.fromBuilder.group({
     username: this.fromBuilder.control<string | null>(null, Validators.required),
-    password: this.fromBuilder.control<string | null>(null, Validators.required),
+    password: this.fromBuilder.control<string | null>(null, [
+      Validators.required
+    ]),
   })
   protected readonly error = signal('');
   protected readonly submitting = signal(false);
 
   protected submit(): void {
     this.error.set('');
+    this.loginForm.markAllAsTouched();
+    if (this.loginForm.invalid) {
+      return;
+    }
+
     this.submitting.set(true);
     const { username, password } = this.loginForm.getRawValue();
     if (username === null || password === null) {
+      this.submitting.set(false);
       return;
     }
 

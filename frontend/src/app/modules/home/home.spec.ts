@@ -40,7 +40,7 @@ describe('Home', () => {
       home.onTouchEnd({ changedTouches: [{ clientY: 200 }] } as unknown as TouchEvent);
     };
 
-    home.item.set({ type: 'game', id: 'g', title: 'Quiz', url: 'quiz.js', round_id: 'r', data: {} });
+    home.item.set({ type: 'game', id: 'g', title: 'Quiz', url: 'quiz.js', round_id: 'r', data: { context: 'Quiz' } });
     swipeUp();
     expect(next).not.toHaveBeenCalled();
 

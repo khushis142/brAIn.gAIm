@@ -1,7 +1,88 @@
-# Game Authoring Guide
+# Game Authoring Guide: Frontend and Backend
 
-Games are JavaScript files executed inside a sandboxed iframe. They do not
-import Angular code and cannot access the host page directly.
+This is the complete authoring contract for games in the feed. A game is a
+fixed JavaScript file plus a configuration file. The JavaScript is published
+once and does not change per player. Each time the feed serves the game, the
+backend asks an LLM to create fresh `data` from the player's study projects,
+validates that data, and the frontend starts the fixed game with it.
+
+The frontend executes the game in a sandboxed iframe. The backend owns game
+registration, schema validation, and publishing. Both sides must follow the
+contract in this document.
+
+## What to deliver
+
+Create one directory per game:
+
+```text
+my-game/
+|- game.js       # fixed game code written against this runtime
+`- config.json   # data schema and LLM instructions
+```
+
+The backend publishes `game.js` and registers the game metadata. It does not
+generate a new JavaScript file for each player.
+
+## Backend configuration
+
+Each game must include a `config.json` like this:
+
+```json
+{
+  "context": "Create short biology quiz data about the player's study notes.",
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "questions"],
+    "properties": {
+      "context": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "questions": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prompt", "options", "answer"],
+          "properties": {
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": { "type": "string", "minLength": 1, "maxLength": 60 }
+            },
+            "answer": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+`input_schema` is JSON Schema Draft 2020-12. It describes exactly what the
+game reads from `api.data`. The backend validates every LLM response against
+this schema. An invalid response is retried once; if it is still invalid, the
+feed serves a video instead of starting the game.
+
+The schema must require `context` as a non-empty string. This field is the
+short description of the learning topic or situation supplied to the game and
+is also the context the LLM uses when filling the other fields. The top-level
+`context` in `config.json` is different: it is the English instruction given
+to the LLM. Explain the game, every generated field, the difficulty, and rules
+JSON Schema cannot express. For example, say that `answer` is the index of
+the only correct option.
+
+Put every hard limit in the schema: `required`, `minItems`, `maxItems`,
+`minLength`, `maxLength`, `minimum`, `maximum`, and `enum`. Keep schemas small
+and mostly flat. Use `additionalProperties: false` on objects and do not use
+`$ref`. Text must fit on a phone-sized canvas, so string length limits are
+important.
 
 ## Required registration
 
@@ -9,6 +90,7 @@ Every game must register exactly once:
 
 ```js
 registerGame({
+  renderer: '2d',
   init(api) {},
   update(dt, input) {},
   render(ctx) {},
@@ -20,9 +102,40 @@ The required hooks are:
 - `init(api)`: called once before the game loop starts.
 - `update(dt, input)`: called once per animation frame. `dt` is elapsed time in
   seconds and is clamped by the runtime.
-- `render(ctx)`: draws one frame using the 2D canvas context.
+- `render(ctx)`: draws one frame using the selected rendering context.
 
 Optional hooks are `resize(width, height)` and `destroy()`.
+
+## Rendering modes and 3D support
+
+Games use the 2D renderer by default. A game that needs GPU rendering can opt
+into WebGL by declaring:
+
+```js
+registerGame({
+  renderer: 'webgl',
+  init(api) {},
+  update(dt, input) {},
+  render(gl) {},
+});
+```
+
+For `renderer: 'webgl'`, the runtime requests WebGL2 first and falls back to
+WebGL. The selected mode is available as `api.renderer`, and `render(gl)`
+receives the WebGL rendering context. The runtime clears the color and depth
+buffers and updates the viewport before each frame. A game owns shaders,
+buffers, matrices, camera logic, and all other 3D rendering code.
+
+For the default `renderer: '2d'`, `render(ctx)` receives a
+`CanvasRenderingContext2D`; the runtime resets and restores its drawing state
+around each frame. Do not use 2D methods with a WebGL context or WebGL methods
+with a 2D context.
+
+WebGL context loss ends the session with an error. Games should release GPU
+resources in `destroy()` and be prepared for the session to be recreated. The
+iframe remains sandboxed and the Content Security Policy still prevents normal
+network access, so WebGL libraries and assets must be bundled or supplied by a
+future approved asset system. The existing 200 KB source limit still applies.
 
 ## Inputs
 
@@ -125,11 +238,15 @@ function init(gameApi) {
   });
 }
 
+let previousKeys = {};
+
 function update(dt, input) {
   if (finished) return;
 
   time += dt;
-  if (input.keys.Space) {
+  const spacePressed = input.keys.Space && !previousKeys.Space;
+  previousKeys = { ...input.keys };
+  if (spacePressed) {
     finished = true;
     api.submitResult({
       score: Math.floor(time * 10),
@@ -247,6 +364,52 @@ host defaults.
 The design object is JSON-compatible and extensible. Unknown fields are ignored
 by the current host and may be supported by a future protocol version. Text is
 displayed as text, not interpreted as markup.
+
+## Rules for `game.js`
+
+All learning content must come from `api.data`. Do not hard-code questions,
+answers, study topics, or player-specific content in the JavaScript file. The
+file is fixed and reused for every player.
+
+Treat `api.data` as untrusted LLM output. The backend schema validates its
+shape, but strings can still contain unexpected content. Draw values as canvas
+text or pass them to the safe text fields of `setUiDesign`; never turn them
+into JavaScript, HTML, CSS, URLs, or dynamic script sources.
+
+Be defensive about rules JSON Schema cannot express. For example, skip a
+question when its answer index is outside the options array, when options are
+duplicates, or when a required gameplay relationship is invalid. Do not throw:
+an uncaught game error ends the session.
+
+`input.keys` is the current held state for `ArrowUp`, `ArrowDown`, `ArrowLeft`,
+`ArrowRight`, and `Space`. For one-shot actions, detect a transition from
+`false` to `true` by comparing the current state with a previous snapshot. For
+continuous movement, use the held state directly. The runtime clears keys when
+focus or page visibility changes.
+
+Keep a round between 20 and 60 seconds because games appear between videos in
+a swipe feed. Submit a result with `api.submitResult({ score, ... })` when the
+round ends. `score` must be a finite number; additional result fields must be
+JSON-compatible.
+
+The game source must be at most 200 KB (204,800 UTF-8 bytes) and must not
+contain `</script` in any letter casing. The backend publisher rejects files that violate these rules,
+and the frontend checks them again before constructing the iframe. The host
+embeds the source in an inline script, so this restriction is required even
+when the source appears inside a JavaScript comment.
+
+## Publishing
+
+Give the complete game directory to the backend team. They publish it with:
+
+```sh
+python -m app.seed_game my-game --title "My game" --owner <username>
+```
+
+Publishing validates the config and code, including the required `context`,
+the presence of `registerGame(`, the source-size limit, and the absence of
+`</script`. It uploads `game.js` to the CDN and registers the game. Game titles
+must be unique.
 
 ## Lifecycle and limitations
 

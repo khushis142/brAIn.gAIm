@@ -16,8 +16,7 @@ describe('App', () => {
           useValue: { health: () => of({}), cdnHealth: () => of({}), isAuthenticated: () => true },
         },
       ],
-    })
-      .compileComponents();
+    }).compileComponents();
   });
 
   it('should create the app', () => {
@@ -30,13 +29,18 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('brAIn.gAIn');
+    expect(compiled.querySelector('.brand .logo-light')?.getAttribute('alt')).toBe('brAIn.gAIn');
+    expect(compiled.querySelector('.brand .logo-dark')?.getAttribute('src')).toBe(
+      '/assets/brAIngAIm_white.webp',
+    );
   });
 
   it('shows healthy backend status in the header', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.health-badge')?.getAttribute('aria-label')).toBe('Backend: Healthy');
+    expect(compiled.querySelector('.health-badge')?.getAttribute('aria-label')).toBe(
+      'Backend: Healthy',
+    );
   });
 });

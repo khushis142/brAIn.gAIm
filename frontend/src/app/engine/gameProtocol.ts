@@ -1,6 +1,8 @@
 /** Version of the host/game contract. Increase when the contract changes incompatibly. */
 export const GAME_PROTOCOL_VERSION = 2;
 
+export type GameRenderer = '2d' | 'webgl';
+
 /** Contract shared between the host app and the sandboxed runtime. */
 
 export interface GameCustomData {
@@ -52,6 +54,7 @@ export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
   readonly height: number;
   readonly username: string;
   readonly data: CustomData;
+  readonly renderer: GameRenderer;
   submitResult(result: GameResult): void;
   setUiDesign(design: GameUiDesign): void;
 }
@@ -98,14 +101,16 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
 }
 
 export interface InputState {
+  /** Current held state. Games should detect one-shot actions as key transitions. */
   keys: Record<string, boolean>;
 }
 
 /** What a game has to provide (hooks marked with ? are optional). */
 export interface GameModule<CustomData extends GameCustomData = GameCustomData> {
+  readonly renderer?: GameRenderer;
   init(api: GameApi<CustomData>): void;
   update(dt: number, input: InputState): void;
-  render(ctx: CanvasRenderingContext2D): void;
+  render(ctx: CanvasRenderingContext2D | WebGLRenderingContext): void;
   resize?(width: number, height: number): void;
   destroy?(): void;
 }

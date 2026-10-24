@@ -1,0 +1,36 @@
+<div class="modal-backdrop" (click)="close()">
+  <section
+    class="interest-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="interest-dialog-title"
+    (click)="$event.stopPropagation()"
+  >
+    <h3 id="interest-dialog-title">Add Interests</h3>
+    <form (ngSubmit)="submit()">
+      <label for="interest">Interest</label>
+      <input
+        id="interest"
+        name="interest"
+        type="text"
+        [(ngModel)]="interest"
+        required
+        autofocus
+        placeholder="e.g. astronomy"
+      />
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+      <div class="dialog-actions">
+        <button class="cancel-button" type="button" (click)="close()">Cancel</button>
+        <button
+          class="add-interest-button"
+          type="submit"
+          [disabled]="!interest.trim() || submitting()"
+        >
+          {{ submitting() ? 'Saving...' : 'Add Interests' }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>

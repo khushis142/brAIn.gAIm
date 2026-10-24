@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { GameCustomData } from '../engine/gameProtocol';
 
 export interface UserCreate {
   username: string;
@@ -11,11 +12,11 @@ export interface UserCreate {
 export interface UserRead {
   id: string;
   username: string;
-  field: string;
+  interests: string;
 }
 
 export interface UserUpdate {
-  field: string;
+  interests: string;
 }
 
 export interface Token {
@@ -42,10 +43,20 @@ export interface GameItem {
   url: string;
   round_id: string;
   /** Generated input for this round; pass it to GameSession.start as `data` */
-  data: Record<string, unknown>;
+  data?: GameCustomData;
 }
 
 export type FeedItem = VideoItem | GameItem;
+
+export interface ContentRead {
+  id: string;
+  kind: 'video' | 'game';
+  title: string;
+  tags: string[];
+  owner: string;
+  url: string;
+  created_at: string;
+}
 
 export interface ScoreCreate {
   score: number;
@@ -132,6 +143,12 @@ export class ApiService {
 
   listFields(): Observable<StudyFieldRead[]> {
     return this.http.get<StudyFieldRead[]>(this.url('fields'));
+  }
+
+  listContent(kind?: ContentRead['kind'], limit = 100): Observable<ContentRead[]> {
+    let params = new HttpParams().set('limit', limit);
+    if (kind) params = params.set('kind', kind);
+    return this.http.get<ContentRead[]>(this.url('content'), { params });
   }
 
   nextItem(): Observable<FeedItem> {

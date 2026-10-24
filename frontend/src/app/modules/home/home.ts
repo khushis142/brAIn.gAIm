@@ -48,7 +48,7 @@ export class Home {
   );
 
   private busy = false;
-  private username?: Promise<string>;
+  private username: string | null = null;
   private touchStartY: number | null = null;
 
   constructor() {
@@ -111,7 +111,9 @@ export class Home {
 
   private async show(item: FeedItem): Promise<void> {
     // Download game code before swapping, so a failed download keeps the current item
-    const gameCode = item.type === 'game' ? await loadGameCode(item.url) : null;
+    const gameItem = item.type === 'game' ? item : null;
+    const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
+    if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
 
     this.session()?.stop();
     this.item.set(item);
@@ -119,26 +121,15 @@ export class Home {
     if (gameCode !== null && item.type === 'game') {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
-        username: await this.loadUsername(),
-        // The backend generates `data` for every round; the quiz reads its questions from it
-        data: { context: item.title, ...item.data },
+        username: this.username ?? '',
+        data: gameItem?.data ?? {
+          context: `"${item.title}", a short game in a learning feed.`,
+        },
         width: host.clientWidth,
         height: host.clientHeight,
       });
     }
   }
-
-  /** Loads the logged-in user's name once and reuses it for every game. */
-  private loadUsername(): Promise<string> {
-    this.username ??= firstValueFrom(this.api.getMe()).then(
-      (user) => user.username,
-      () => 'player',
-    );
-    return this.username;
-  }
-
-
-
 }
 
 async function loadGameCode(url: string): Promise<string> {
@@ -155,4 +146,3 @@ function describeError(err: unknown): string {
   }
   return err instanceof Error ? err.message : String(err);
 }
-
