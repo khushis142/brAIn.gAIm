@@ -67,7 +67,8 @@ Grant it directly in the database:
 - **Content**: the CDN only stores files. All metadata (owner, kind, title, field,
   tags) lives in the `content` table, keyed by the CDN file id. Study fields are a
   table seeded by migrations; adding a field means adding a migration.
-- **Migrations**: Alembic. After changing `app/models.py`:
+- **Migrations**: Alembic. After changing a model in `app/models/` (one module per domain;
+  re-export new models in `app/models/__init__.py` so autogenerate sees them):
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.
 
 ## Deployment
