@@ -35,12 +35,10 @@ async def _get_owned(session: SessionDep, content_id: uuid.UUID, user: User) -> 
 
 
 @router.post("", response_model=ContentRead, status_code=status.HTTP_201_CREATED)
-async def register_content(
+async def register_video(
     body: ContentCreate, user: CurrentUser, session: SessionDep
 ) -> ContentRead:
-    if body.kind == "game" and not user.is_developer:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only developers can publish games")
-    content = Content(**body.model_dump(), owner_id=user.id)
+    content = Content(**body.model_dump(), kind="video", owner_id=user.id)
     session.add(content)
     try:
         await session.commit()

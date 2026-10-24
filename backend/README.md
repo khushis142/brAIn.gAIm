@@ -39,7 +39,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | POST   | `/auth/token`                |      | OAuth2 password form → bearer JWT          |
 | GET    | `/users/me`                  | ✓    | Current user                               |
 | PATCH  | `/users/me`                  | ✓    | `{interests}`: free text, `null` clears    |
-| POST   | `/content`                   | ✓    | Register a CDN upload: `{id, filename, kind, title, tags}`; games: developers only |
+| POST   | `/content`                   | ✓    | Register an uploaded video: `{id, filename, title, tags}` |
 | GET    | `/content`                   |      | List, filters `kind`, `tag`, `owner`; `limit`/`offset` |
 | GET    | `/content/{id}`              |      | One item with `url`                        |
 | PATCH  | `/content/{id}`              | ✓    | Owner only: `{title?, tags?}`              |
@@ -57,12 +57,12 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 
 **Uploading:** the client uploads the file to the [CDN](https://github.com/brAIn-gAIm/CDN)
 (`POST /api/v1/files`), then registers the returned `id` and `filename` with
-`POST /content`. Videos must be `.mp4`, games `.js`/`.mjs`. Every `url` in this API
-is built from `CDN_BASE_URL` and the id; client-supplied URLs are never stored.
+`POST /content`. Videos must be `.mp4`. Every `url` in this API is built from
+`CDN_BASE_URL` and the id; client-supplied URLs are never stored.
 
-**Developers:** only users with `is_developer` (shown in `/users/me`) may publish games.
-Grant it directly in the database:
-`UPDATE users SET is_developer = true WHERE username = '<name>';`
+**Games** cannot be registered through the API: they are JS that runs in the app, so only
+server-side code creates them (the AI generator, and a seed step for hand-made reference
+games), after validation.
 
 ### Bruno collection
 

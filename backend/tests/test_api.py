@@ -6,12 +6,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text, update
+from sqlalchemy import select, text
 
 from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
 from app.main import app
-from app.models import Base, User
+from app.models import Base, Content, User
 
 pytestmark = pytest.mark.skipif(
     "TEST_DATABASE_URL" not in os.environ, reason="TEST_DATABASE_URL not set"
@@ -51,24 +51,20 @@ async def _auth(client: AsyncClient, username: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
-async def _make_developer(username: str) -> None:
+async def _create_game(owner: str) -> str:
+    """Games are created by server code only (generator, seeding), never via the API."""
     async with SessionLocal() as session:
-        await session.execute(
-            update(User).where(User.username == username).values(is_developer=True)
+        owner_id = await session.scalar(select(User.id).where(User.username == owner))
+        game = Content(
+            id=uuid.uuid4(), kind="game", filename="game.js", title="a game", owner_id=owner_id
         )
+        session.add(game)
         await session.commit()
+        return str(game.id)
 
 
-async def _register(
-    client: AsyncClient, headers: dict[str, str], kind: str, **extra: object
-) -> dict:
-    body = {
-        "id": str(uuid.uuid4()),
-        "filename": "clip.mp4" if kind == "video" else "game.js",
-        "kind": kind,
-        "title": f"a {kind}",
-        **extra,
-    }
+async def _register(client: AsyncClient, headers: dict[str, str], **extra: object) -> dict:
+    body = {"id": str(uuid.uuid4()), "filename": "clip.mp4", "title": "a video", **extra}
     res = await client.post("/content", json=body, headers=headers)
     assert res.status_code == 201, res.text
     return res.json()
@@ -79,7 +75,6 @@ async def test_register_login_and_interests(client: AsyncClient) -> None:
     me = (await client.get("/users/me", headers=headers)).json()
     assert me["username"] == "alice"
     assert me["interests"] is None
-    assert me["is_developer"] is False
 
     set_ = await client.patch(
         "/users/me", json={"interests": "  Rust and robotics "}, headers=headers
@@ -102,7 +97,7 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     owner = await _auth(client, "uploader")
     other = await _auth(client, "stranger")
 
-    item = await _register(client, owner, "video", tags=[" Physics ", "physics", "Beams"])
+    item = await _register(client, owner, tags=[" Physics ", "physics", "Beams"])
     assert item["owner"] == "uploader"
     assert item["tags"] == ["physics", "beams"]
     assert item["url"] == f"https://cdn.test/files/{item['id']}/clip.mp4"
@@ -112,10 +107,10 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     assert [c["id"] for c in listed] == [item["id"]]
 
     # Duplicate id, wrong file type, path tricks, no auth.
-    dup = {"id": item["id"], "filename": "clip.mp4", "kind": "video", "title": "t"}
+    dup = {"id": item["id"], "filename": "clip.mp4", "title": "t"}
     assert (await client.post("/content", json=dup, headers=owner)).status_code == 409
-    for kind, filename in [("video", "game.js"), ("game", "clip.mp4"), ("video", "../x.mp4")]:
-        body = {"id": str(uuid.uuid4()), "filename": filename, "kind": kind, "title": "t"}
+    for filename in ["game.js", "notes.pdf", "../x.mp4"]:
+        body = {"id": str(uuid.uuid4()), "filename": filename, "title": "t"}
         assert (await client.post("/content", json=body, headers=owner)).status_code == 422
     assert (await client.post("/content", json=dup)).status_code == 401
 
@@ -129,15 +124,13 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     assert (await client.get(path)).status_code == 404
 
 
-async def test_only_developers_publish_games(client: AsyncClient) -> None:
+async def test_games_cannot_be_registered_via_api(client: AsyncClient) -> None:
     headers = await _auth(client, "regular")
     game = {"id": str(uuid.uuid4()), "filename": "g.js", "kind": "game", "title": "t"}
-    assert (await client.post("/content", json=game, headers=headers)).status_code == 403
-    await _register(client, headers, "video")  # videos stay open to everyone
-
-    await _make_developer("regular")
-    assert (await client.get("/users/me", headers=headers)).json()["is_developer"] is True
-    assert (await client.post("/content", json=game, headers=headers)).status_code == 201
+    assert (await client.post("/content", json=game, headers=headers)).status_code == 422
+    # A game-looking request with a video file is still just a video.
+    video = await _register(client, headers, kind="game")
+    assert video["kind"] == "video"
 
 
 async def test_feed_requires_auth(client: AsyncClient) -> None:
@@ -148,9 +141,8 @@ async def test_feed_requires_auth(client: AsyncClient) -> None:
 
 async def test_feed_interleaves_games(client: AsyncClient) -> None:
     creator = await _auth(client, "creator")
-    await _make_developer("creator")
-    videos = {(await _register(client, creator, "video"))["id"] for _ in range(2)}
-    await _register(client, creator, "game")
+    videos = {(await _register(client, creator))["id"] for _ in range(2)}
+    await _create_game("creator")
 
     headers = await _auth(client, "carol")
     items = [
@@ -171,9 +163,8 @@ async def test_feed_without_content(client: AsyncClient) -> None:
 async def test_leaderboard_keeps_best_score_per_user(client: AsyncClient) -> None:
     erin = await _auth(client, "erin")
     frank = await _auth(client, "frank")
-    await _make_developer("erin")
-    game = (await _register(client, erin, "game"))["id"]
-    video = (await _register(client, erin, "video"))["id"]
+    game = await _create_game("erin")
+    video = (await _register(client, erin))["id"]
     for headers, score in [(erin, 10), (erin, 30), (frank, 20)]:
         res = await client.post(f"/games/{game}/scores", json={"score": score}, headers=headers)
         assert res.status_code == 204

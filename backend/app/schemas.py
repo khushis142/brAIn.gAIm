@@ -7,8 +7,8 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validat
 
 Kind = Literal["video", "game"]
 
-# File types the frontend can play/run, per kind (the CDN accepts more).
-_EXTENSIONS: dict[str, set[str]] = {"video": {".mp4"}, "game": {".js", ".mjs"}}
+# Videos the frontend can play (the CDN accepts more).
+_VIDEO_EXTENSIONS = {".mp4"}
 # Project attachments: documents and images. No SVG, it can carry scripts.
 _ATTACHMENT_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".txt", ".md", ".csv"}
 
@@ -40,7 +40,6 @@ class UserRead(BaseModel):
     id: uuid.UUID
     username: str
     interests: str | None
-    is_developer: bool
 
 
 class Token(BaseModel):
@@ -61,17 +60,20 @@ Tags = Annotated[
 
 
 class ContentCreate(BaseModel):
-    """Registers a file the client already uploaded to the CDN."""
+    """Registers a video the client already uploaded to the CDN.
+
+    Games are never registered through the API: they are JS that runs in the app, so only
+    server-side code (generator, seeding) creates them.
+    """
 
     id: uuid.UUID = Field(description="File id returned by the CDN upload")
     filename: str = Field(min_length=1, max_length=255, description="As returned by the CDN")
-    kind: Kind
     title: str = Field(min_length=1, max_length=200)
     tags: Tags = []
 
     @model_validator(mode="after")
     def _check_filename(self) -> Self:
-        _check_cdn_filename(self.filename, _EXTENSIONS[self.kind], f"a {self.kind}")
+        _check_cdn_filename(self.filename, _VIDEO_EXTENSIONS, "a video")
         return self
 
 
