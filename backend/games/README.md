@@ -6,7 +6,9 @@ projects, the backend validates it, and the frontend starts the game with it.
 
 How games run (lifecycle, `registerGame`, canvas, UI design) is defined by the frontend in
 [`Frontend/docs/game-authoring.md`](https://github.com/brAIn-gAIm/Frontend/blob/main/docs/game-authoring.md)
-(protocol v2). This page adds what the backend needs. `example-quiz/` is a complete,
+(protocol v2). This page adds what the backend needs. Besides reviewed games, the backend's
+generator can write games itself (`app/generator/games.py`); they follow the same rules and
+pass the same checks. `example-quiz/` is a complete,
 working reference; copy it to start. `chain-snake/` is a larger one: an action game on
 ordered sequences with a bitmap font, effects, touch controls and per-item results.
 

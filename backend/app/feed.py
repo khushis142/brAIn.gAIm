@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal
 from app.generator.inputs import GameConfig, InputGenerationError, generate_input
-from app.generator.llm import get_llm
+from app.generator.llm import LLMError, get_llm
 from app.generator.preconditions import PreconditionError, run_preconditions
 from app.models import Content, GameRound, Impression, Project, User
 
@@ -116,7 +116,7 @@ async def _prepare_round(session: AsyncSession, user_id: uuid.UUID) -> GameRound
     try:
         data = await generate_input(get_llm(), config, await _project_materials(session, user_id))
         assets = await run_preconditions(config.preconditions, data)
-    except (InputGenerationError, PreconditionError):
+    except (InputGenerationError, LLMError, PreconditionError):
         logger.exception("preparing a round of game %s failed", game.id)
         return None
     return GameRound(user_id=user_id, game_id=game.id, input=data, assets=assets)
