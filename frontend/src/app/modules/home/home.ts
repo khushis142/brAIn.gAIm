@@ -255,13 +255,16 @@ export class Home {
   private async submitScore(game: GameItem, score: number): Promise<void> {
     try {
       // The backend rejects negative scores, but the finished game should still count
-      const { newly_unlocked } = await firstValueFrom(
+      const { newly_unlocked, newly_unlocked_avatars } = await firstValueFrom(
         this.api.submitScore(game.id, { score: Math.max(0, score), round_id: game.round_id }),
       );
-      if (newly_unlocked.length === 0) return;
+      if (newly_unlocked.length === 0 && newly_unlocked_avatars.length === 0) return;
       await this.zombie.load();
       if (this.item() === game) {
-        this.unlockedNames.set(newly_unlocked.map((id) => this.zombie.accessoryName(id)));
+        this.unlockedNames.set([
+          ...newly_unlocked_avatars.map((id) => `${this.zombie.avatarName(id)} avatar`),
+          ...newly_unlocked.map((id) => this.zombie.accessoryName(id)),
+        ]);
       }
     } catch (err) {
       // A lost score must not interrupt the feed

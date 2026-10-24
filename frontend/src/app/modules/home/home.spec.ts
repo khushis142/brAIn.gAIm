@@ -15,7 +15,12 @@ describe('Home', () => {
       providers: [
         {
           provide: ApiService,
-          useValue: { nextItem: () => NEVER, getMyZombie: () => NEVER, listAccessories: () => NEVER },
+          useValue: {
+            nextItem: () => NEVER,
+            getMyZombie: () => NEVER,
+            listAccessories: () => NEVER,
+            listAvatars: () => NEVER,
+          },
         },
         { provide: GAME_RUNTIME_SOURCE, useValue: '' },
       ],
