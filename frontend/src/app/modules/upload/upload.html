@@ -73,10 +73,21 @@
           [disabled]="busy() || flashcardsRequested()"
           [class.processing]="processingFlashcards()"
           [class.requested]="flashcardsRequested()"
+          [attr.aria-label]="
+            processingFlashcards() ? 'Wissen wird extrahiert' : 'Wissen extrahieren'
+          "
           (click)="processKnowledge()"
         >
           <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
-          <span>Wissen extrahieren</span>
+          @if (processingFlashcards()) {
+            <span class="bouncing-label" aria-hidden="true">
+              @for (letter of extractingLabel; track $index) {
+                <span [style.--letter-index]="$index">{{ letter === ' ' ? '\u00a0' : letter }}</span>
+              }
+            </span>
+          } @else {
+            <span>Wissen extrahieren</span>
+          }
         </button>
       </div>
     }

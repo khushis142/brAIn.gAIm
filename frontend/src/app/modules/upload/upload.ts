@@ -51,6 +51,7 @@ function toFile(attachment: AttachmentRead): UploadedFile {
 export class Upload implements OnInit {
   private readonly api = inject(ApiService);
   private readonly userService = inject(UserService);
+  protected readonly extractingLabel = [...'Wissen wird extrahiert'];
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly selectedId = signal<string | null>(null);

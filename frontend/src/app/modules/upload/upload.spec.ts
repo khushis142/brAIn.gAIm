@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
-import { ApiService, ProjectRead } from '../../core/api.service';
+import { of, Subject } from 'rxjs';
+import { ApiService, ProjectFlashcardRead, ProjectRead } from '../../core/api.service';
 import { UserService } from '../user/service/user-service';
 import { Upload } from './upload';
 
@@ -221,14 +221,31 @@ describe('Upload', () => {
 
   it('locks the flashcard button after processing for the current page visit', async () => {
     const button = el.querySelector('.process-button') as HTMLButtonElement;
+    const response = new Subject<ProjectFlashcardRead[]>();
+    api['processProjectFlashcards'].mockReturnValue(response);
     button.click();
     fixture.detectChanges();
     expect(button.disabled).toBe(true);
     expect(button.classList.contains('processing')).toBe(true);
+    expect(button.getAttribute('aria-label')).toBe('Wissen wird extrahiert');
+    expect(el.querySelectorAll('.bouncing-label > span').length).toBe(
+      'Wissen wird extrahiert'.length,
+    );
+
+    response.next([
+      {
+        id: 'card-1',
+        title: 'Was ist Wissen?',
+        body: 'Lernen.',
+        created_at: '2026-10-24T22:16:27.214712Z',
+      },
+    ]);
+    response.complete();
     await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
     expect(button.disabled).toBe(true);
     expect(button.classList.contains('processing')).toBe(false);
     expect(button.classList.contains('requested')).toBe(true);
+    expect(button.textContent).toContain('Wissen extrahieren');
   });
 });

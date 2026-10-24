@@ -46,6 +46,32 @@
   background: #2e9c5b;
 }
 
+.bouncing-label {
+  display: inline-flex;
+  white-space: pre;
+}
+
+.bouncing-label > span {
+  animation: letter-bounce 700ms ease-in-out infinite alternate;
+  animation-delay: calc(var(--letter-index) * 45ms);
+}
+
+@keyframes letter-bounce {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bouncing-label > span {
+    animation: none;
+  }
+}
+
 .process-button.requested:not(.processing) {
   background: var(--control);
   color: var(--muted);
