@@ -1,69 +1,37 @@
-## Writing a game
+# brAIn.gAIn Frontend
 
-Games for the sandboxed engine must call `registerGame()` and implement `init`,
-`update`, and `render`. The host supplies the username and game-specific input
-data during startup, and the game reports a numeric score through
-`api.submitResult({ score })`.
+Angular 21 single-page application for the **brAIn.gAIn** short-video and interactive mini-game learning feed.
 
-See [docs/game-authoring.md](docs/game-authoring.md) for the complete contract,
-an example, and lifecycle guidance.
+## Features & Routes
 
-# Braingain
+All application routes (except `/login` and `/register`) are protected by the `requireAuth` route guard (`src/app/core/auth.guard.ts`).
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.4.
+| Route | Component | Description |
+|---|---|---|
+| `/` | `Home` (`src/app/modules/home/`) | Vertical swipe / `ArrowDown` learning feed interleaving short MP4 videos (custom timeline scrubber, play/pause bubble, double-tap brain-burst likes) and sandboxed iframe learning games (`GameEngineService` / `GameSession`). |
+| `/upload` | `Upload` (`src/app/modules/upload/`) | Study project workspace: create, rename, delete, and color-code project folders, upload study attachments (PDF, images, text, Markdown, CSV) to the CDN, and select the active study project for mini-games. |
+| `/video-upload` | `VideoUpload` (`src/app/modules/video-upload/`) | MP4 video uploader (up to 500 MB) to the CDN and content registration with title and tags on the Backend. |
+| `/settings` | `Settings` (`src/app/modules/settings/`) | User profile view, study interests editor (`InterestsDialog`), and logout. |
+| `/login` | `Login` (`src/app/modules/user/login/`) | OAuth2 password login returning a bearer JWT stored in `localStorage` (`braingain-token`). |
+| `/register` | `Register` (`src/app/modules/user/register/`) | Account registration and automatic login. |
 
-## Development server
+## Sandboxed Game Engine (`src/app/engine/` & `src/assets/game-runtime.js`)
 
-To start a local development server, run:
+Games run inside an isolated `<iframe sandbox="allow-scripts">` (opaque origin, strict Content-Security-Policy, heartbeat watchdog). Games call `registerGame()` and implement `init(api)`, `update(dt, input)`, and `render(ctx)` (with optional `resize`, `contextLost`, `contextRestored`, and `destroy` hooks).
 
-```bash
-ng serve
-```
+See [`docs/game-authoring.md`](docs/game-authoring.md) for the complete protocol v2 contract, input state (`input.keys[code].{held, justPressed, justReleased}` and `input.pointer`), WebGL helpers, and UI design hooks.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Development & Testing
 
 ```bash
-ng generate component component-name
+npm ci
+npm start                  # ng serve on http://localhost:4200/
+npm run build              # production build to dist/braingain/browser
+npm test -- --watch=false  # Vitest unit test suite
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Deployment
 
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- `version.txt` tracks the semantic version (`0.2.7`). Pushing a change to `version.txt` on `main` triggers `.github/workflows/release-and-build.yaml` to publish `ghcr.io/brain-gaim/frontend:<version>`.
+- `Dockerfile` builds the Angular app with Node 22 and serves it with `nginx:1.31-alpine` (`nginx.conf`), reverse-proxying `/api/` to `http://backend:8000` and `/cdn/` to `http://cdn:8080`.
+- `docker-compose.yaml` deploys the container on port `8080:80` attached to the `braingain` Docker network.

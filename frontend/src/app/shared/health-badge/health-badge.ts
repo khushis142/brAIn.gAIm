@@ -1,4 +1,4 @@
-import { Component, input, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, inject, input, OnDestroy, OnInit, signal } from '@angular/core';
 import { ApiService } from '../../core/api.service';
 
 @Component({
@@ -7,6 +7,7 @@ import { ApiService } from '../../core/api.service';
   templateUrl: './health-badge.html',
 })
 export class HealthBadge implements OnDestroy, OnInit {
+  private readonly api = inject(ApiService);
   readonly service = input<'Backend' | 'CDN'>('Backend');
   readonly icon = input('dns');
   protected readonly status = signal<'Checking' | 'Healthy' | 'Unavailable'>('Checking');
@@ -16,8 +17,6 @@ export class HealthBadge implements OnDestroy, OnInit {
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private popupTimer: ReturnType<typeof setTimeout> | null = null;
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor(private readonly api: ApiService) {}
 
   ngOnInit(): void {
     const health = this.service() === 'CDN' ? this.api.cdnHealth() : this.api.health();

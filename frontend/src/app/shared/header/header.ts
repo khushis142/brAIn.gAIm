@@ -14,7 +14,6 @@ import { HealthBadge } from '../health-badge/health-badge';
   templateUrl: './header.html',
 })
 export class Header {
-  protected readonly title = signal('brAIn.gAIn');
   protected readonly isDarkMode = signal(false);
 
   constructor() {

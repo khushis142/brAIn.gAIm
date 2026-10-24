@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, inject, input, output, signal } from '@angular/core';
 
 export const FOLDER_COLORS = [
   '#ffc800',
@@ -34,6 +34,10 @@ export class ProjectFolder {
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private longPressed = false;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.cancelPress());
+  }
 
   protected startPress(): void {
     if (this.isNew()) {

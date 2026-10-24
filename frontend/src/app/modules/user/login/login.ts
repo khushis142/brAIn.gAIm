@@ -1,23 +1,23 @@
 import { Component, inject, signal } from '@angular/core';
-import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { UserService } from '../service/user-service';
 
 @Component({
-  imports: [FormsModule, RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule],
   selector: 'app-login',
   styleUrl: './login.css',
   templateUrl: './login.html',
 })
 export class Login {
   private readonly userService = inject(UserService);
-  private fromBuilder = inject(FormBuilder);
-  protected loginForm = this.fromBuilder.group({
-    username: this.fromBuilder.control<string | null>(null, Validators.required),
-    password: this.fromBuilder.control<string | null>(null, [
+  private readonly formBuilder = inject(FormBuilder);
+  protected loginForm = this.formBuilder.group({
+    username: this.formBuilder.control<string | null>(null, Validators.required),
+    password: this.formBuilder.control<string | null>(null, [
       Validators.required
     ]),
-  })
+  });
   protected readonly error = signal('');
   protected readonly submitting = signal(false);
 

@@ -849,12 +849,6 @@
       canvas.addEventListener('webglcontextlost', onWebGlContextLost);
       canvas.addEventListener('webglcontextrestored', onWebGlContextRestored);
     }
-    if (renderer === 'webgl') {
-      canvas.addEventListener('webglcontextlost', (event) => {
-        event.preventDefault();
-        fail(new Error('WebGL context was lost'));
-      });
-    }
 
     game = candidate;
     try {

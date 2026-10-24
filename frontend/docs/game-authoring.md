@@ -604,11 +604,12 @@ question when its answer index is outside the options array, when options are
 duplicates, or when a required gameplay relationship is invalid. Do not throw:
 an uncaught game error ends the session.
 
-`input.keys` is the current held state for `ArrowUp`, `ArrowDown`, `ArrowLeft`,
-`ArrowRight`, and `Space`. For one-shot keyboard actions, detect a transition
-from `false` to `true` by comparing the current state with a previous snapshot.
-For continuous movement, use the held state directly. The runtime clears keys
-when focus or page visibility changes.
+`input.keys` holds `KeyState` objects (`{ held, justPressed, justReleased }`)
+for `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`. For
+one-shot keyboard actions, check `input.keys.Space.justPressed` (or
+`input.keys.ArrowLeft?.justPressed`). For continuous movement, check
+`input.keys.ArrowLeft?.held`. The runtime clears keys when focus or page
+visibility changes.
 
 Mobile and pointer input is available through `input.pointer`:
 

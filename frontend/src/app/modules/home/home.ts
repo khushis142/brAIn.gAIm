@@ -84,7 +84,7 @@ export class Home {
   private playbackBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private playerControlsTimer: ReturnType<typeof setTimeout> | null = null;
   private tapStart: { x: number; y: number } | null = null;
-  private lastTapAt = 0;
+  private lastTapAt = -Infinity;
   private nextBurstId = 0;
   private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -96,11 +96,19 @@ export class Home {
     });
     inject(DestroyRef).onDestroy(() => {
       this.session()?.destroy();
-      if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
-      if (this.playbackBubbleTimer !== null) clearTimeout(this.playbackBubbleTimer);
-      if (this.playerControlsTimer !== null) clearTimeout(this.playerControlsTimer);
-      if (this.singleTapTimer !== null) clearTimeout(this.singleTapTimer);
+      this.clearTimers();
     });
+  }
+
+  private clearTimers(): void {
+    if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
+    if (this.playbackBubbleTimer !== null) clearTimeout(this.playbackBubbleTimer);
+    if (this.playerControlsTimer !== null) clearTimeout(this.playerControlsTimer);
+    if (this.singleTapTimer !== null) clearTimeout(this.singleTapTimer);
+    this.seekTimestampTimer = null;
+    this.playbackBubbleTimer = null;
+    this.playerControlsTimer = null;
+    this.singleTapTimer = null;
   }
 
   protected async next(): Promise<void> {
@@ -174,7 +182,7 @@ export class Home {
     if (this.singleTapTimer !== null) clearTimeout(this.singleTapTimer);
     this.singleTapTimer = null;
     // Double tap only likes, never unlikes; the button does that.
-    this.lastTapAt = 0;
+    this.lastTapAt = -Infinity;
     this.setLiked(current.id, true);
     const burst = { id: this.nextBurstId++, x: event.offsetX, y: event.offsetY };
     this.bursts.update((all) => [...all, burst]);
@@ -263,6 +271,14 @@ export class Home {
     if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
 
     this.session()?.stop();
+    this.clearTimers();
+    this.currentTime.set(0);
+    this.duration.set(0);
+    this.isPlaying.set(true);
+    this.isSeeking.set(false);
+    this.arePlayerControlsVisible.set(false);
+    this.playbackBubble.set(null);
+    this.bursts.set([]);
     this.item.set(item);
 
     if (gameCode !== null && item.type === 'game') {

@@ -1,7 +1,8 @@
 // collect-men/game.js: answer questions by choosing one of three lanes.
-let THREE, GLTFLoader, cloneModel, renderer, scene, camera, playerModel, playerModels, playerMixers, playerAnimation, sideDecorations, treeMixers, treeAnimation, laneModels, groundStripes, clock, api;
-let playerLane, previousKeys, worldZ, wallTimer, walls, score, gameOver;
+let THREE, GLTFLoader, cloneModel, renderer, scene, camera, playerModel, playerModels, playerMixers, playerAnimation, sideDecorations, treeMixers, treeAnimation, laneModels, api;
+let playerLane, worldZ, wallTimer, walls, score, gameOver;
 let username, context, difficulty;
+const objectUrls = [];
 const MODEL_URL = '/assets/games/collect-men/assets/Gingerbreadman.glb';
 const TREE_MODEL_URL = '/assets/games/collect-men/assets/tree.glb';
 const FLOOR_MODEL_URL = '/assets/games/collect-men/assets/floor.glb';
@@ -42,14 +43,12 @@ function init(gameApi) {
 
 function reset() {
   playerLane = 0;
-  previousKeys = {};
   worldZ = 0;
   wallTimer = 0;
   walls = [];
   sideDecorations = [];
   treeMixers = [];
   laneModels = [];
-  groundStripes = [];
   score = 3;
   playerModels = [];
   playerMixers = [];
@@ -64,11 +63,10 @@ function reset() {
 
 function update(dt, input) {
   if (gameOver) return;
-  const leftPressed = input.keys.ArrowLeft && !previousKeys.ArrowLeft;
-  const rightPressed = input.keys.ArrowRight && !previousKeys.ArrowRight;
+  const leftPressed = Boolean(input.keys.ArrowLeft?.justPressed);
+  const rightPressed = Boolean(input.keys.ArrowRight?.justPressed);
   if (leftPressed) playerLane = Math.max(-1, playerLane - 1);
   if (rightPressed) playerLane = Math.min(1, playerLane + 1);
-  previousKeys = { ...input.keys };
   worldZ += WORLD_SPEED * dt;
 
   if (feedbackTimer > 0) {
@@ -218,7 +216,6 @@ function setupThree(context3d) {
   camera = new THREE.PerspectiveCamera(60, api.width / api.height, 0.1, 100);
   camera.position.set(0, 4, 8);
   camera.lookAt(0, 0, -4);
-  clock = new THREE.Clock();
   scene.add(new THREE.HemisphereLight(0x9fc7ff, 0x18223d, 2));
   const light = new THREE.DirectionalLight(0xffffff, 2);
   light.position.set(2, 6, 4);
@@ -285,7 +282,9 @@ function requestAsset(path) {
         reject(new Error('Invalid model response'));
         return;
       }
-      resolve(URL.createObjectURL(new Blob([event.data.data], { type: 'model/gltf-binary' })));
+      const url = URL.createObjectURL(new Blob([event.data.data], { type: 'model/gltf-binary' }));
+      objectUrls.push(url);
+      resolve(url);
     };
     window.addEventListener('message', onMessage);
     window.parent.postMessage({ type: 'asset-request', path }, '*');
@@ -361,9 +360,7 @@ function drawSceneGeometry() {
     stripe.userData.collectMenBaseZ = z;
     stripe.position.set(0, -1, z);
     scene.add(stripe);
-    groundStripes.push(stripe);
   }
-
 }
 
 function createLaneModels(floorTemplate) {
@@ -531,19 +528,17 @@ async function bootstrapThree() {
     init,
     update(dt, input) {
       animateThree(dt);
-      updateGame(dt, input);
+      update(dt, input);
     },
     render,
     destroy,
   });
 }
 
-function updateGame(dt, input) {
-  update(dt, input);
-}
-
 function destroy() {
   if (ui) ui.remove();
+  for (const url of objectUrls) URL.revokeObjectURL(url);
+  objectUrls.length = 0;
   for (const playerMixer of playerMixers) playerMixer.stopAllAction();
   for (const treeMixer of treeMixers) treeMixer.stopAllAction();
   if (renderer) renderer.dispose();
@@ -556,7 +551,6 @@ function destroy() {
   treeMixers = [];
   treeAnimation = null;
   laneModels = [];
-  groundStripes = [];
 }
 
 bootstrapThree().catch((error) => {
