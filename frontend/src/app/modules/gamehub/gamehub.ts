@@ -11,7 +11,7 @@ import {
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, ContentRead, LeaderboardEntry } from '../../core/api.service';
-import { GamePlayer } from '../../shared/game-player/game-player';
+import { GamePlayable, GamePlayer } from '../../shared/game-player/game-player';
 
 @Component({
   imports: [
@@ -38,7 +38,7 @@ export class Gamehub implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly searchQuery = signal('');
   protected readonly selectedTag = signal<string | null>(null);
-  protected readonly selectedGame = signal<ContentRead | null>(null);
+  protected readonly selectedGame = signal<(ContentRead & Partial<GamePlayable>) | null>(null);
 
   // Leaderboard state for the modal/card view
   protected readonly activeLeaderboardGame = signal<ContentRead | null>(null);
@@ -80,8 +80,8 @@ export class Gamehub implements OnInit {
       const playId = params.get('play');
       if (playId) {
         const found = this.games().find((g) => g.id === playId);
-        if (found) {
-          this.selectedGame.set(found);
+        if (found && this.selectedGame()?.id !== playId) {
+          void this.selectGame(found);
         }
       } else {
         this.selectedGame.set(null);
@@ -101,10 +101,10 @@ export class Gamehub implements OnInit {
       if (playId) {
         const found = list.find((g) => g.id === playId);
         if (found) {
-          this.selectedGame.set(found);
+          void this.selectGame(found);
         }
       }
-    } catch (err) {
+    } catch {
       // Fallback: try listContent('game')
       try {
         const fallback = await firstValueFrom(this.api.listContent('game'));
@@ -117,13 +117,26 @@ export class Gamehub implements OnInit {
     }
   }
 
-  selectGame(game: ContentRead): void {
+  async selectGame(game: ContentRead): Promise<void> {
     this.selectedGame.set(game);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { play: game.id },
       queryParamsHandling: 'merge',
     });
+
+    try {
+      const item = await firstValueFrom(this.api.playGame(game.id));
+      if (this.selectedGame()?.id === game.id) {
+        this.selectedGame.set({
+          ...game,
+          round_id: item.round_id,
+          data: item.data && Object.keys(item.data).length > 0 ? item.data : undefined,
+        });
+      }
+    } catch {
+      // If round endpoint fails, defaultGameData handles all games seamlessly
+    }
   }
 
   closeGame(): void {

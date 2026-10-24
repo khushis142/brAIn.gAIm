@@ -209,6 +209,14 @@ export class ApiService {
     return this.http.get<ContentRead>(this.url(`games/${encodeURIComponent(gameId)}`));
   }
 
+  playGame(gameId: string): Observable<GameItem> {
+    return this.http.post<GameItem>(
+      this.url(`games/${encodeURIComponent(gameId)}/play`),
+      null,
+      this.authOptions(),
+    );
+  }
+
   createContent(content: ContentCreate): Observable<ContentRead> {
     return this.http.post<ContentRead>(this.url('content'), content, this.authOptions());
   }

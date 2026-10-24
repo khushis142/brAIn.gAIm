@@ -176,6 +176,24 @@ describe('ApiService', () => {
     });
   });
 
+  it('requests to play a game round', () => {
+    authenticate();
+    api.playGame('game-1').subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/games/game-1/play`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    request.flush({
+      type: 'game',
+      id: 'game-1',
+      title: 'Quiz',
+      url: 'http://cdn/quiz.js',
+      round_id: 'r-1',
+      data: { context: 'Test' },
+      assets: [],
+    });
+  });
+
   it('requests the next authenticated feed item', () => {
     authenticate();
     api.nextItem().subscribe();

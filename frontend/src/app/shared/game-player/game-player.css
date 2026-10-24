@@ -14,13 +14,6 @@
   width: 100%;
 }
 
-.game-host :deep(iframe) {
-  border: 0;
-  display: block;
-  height: 100% !important;
-  width: 100% !important;
-}
-
 .player-header {
   align-items: center;
   background: linear-gradient(180deg, rgb(0 0 0 / 0.75) 0%, transparent 100%);

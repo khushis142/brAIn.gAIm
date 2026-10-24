@@ -27,49 +27,98 @@ export interface GamePlayable {
 }
 
 export function defaultGameData(title: string): GameCustomData {
+  const safeTitle = title.length > 30 ? title.slice(0, 30) : title;
   return {
-    context: `BrainGain: ${title}`,
-    difficulty: 'medium',
-    pauseTitle: `${title} Paused`,
-    pauseMessage: 'Take a break or continue when ready.',
+    context: `BrainGain: ${safeTitle}`,
+    difficulty: 'normal',
+    pauseTitle: `${safeTitle} Paused`,
+    pauseMessage: 'Take a quick break or continue when ready.',
     resumeLabel: 'Resume Play',
-    leaderboardTitle: `${title} Leaderboard`,
+    leaderboardTitle: `${safeTitle} Rankings`,
     leaderboardSubtitle: 'Top learners',
-    scoreLabel: 'Final Score',
+    scoreLabel: 'Points',
+    chains: [
+      {
+        title: 'Scientific Method',
+        steps: ['Observe', 'Hypothesize', 'Experiment', 'Analyze', 'Conclude'],
+        decoys: ['Guess', 'Ignore data'],
+      },
+      {
+        title: 'Water Cycle',
+        steps: ['Evaporation', 'Condensation', 'Precipitation', 'Collection'],
+        decoys: ['Combustion'],
+      },
+    ],
     questions: [
       {
         question: "What is the primary power source of Earth's climate system?",
-        options: ['The Moon', 'The Sun', 'Geothermal vents', 'Ocean currents'],
+        options: ['The Sun', 'The Moon', 'Geothermal vents', 'Ocean currents'],
+        answer: 0,
         left_option: 'The Sun',
         right_option: 'The Moon',
         correct: 'left',
-        answer: 1,
+        answer_correct: 'The Sun',
+        answer_incorrect: 'The Moon',
+        answer_incorrect2: 'Ocean currents',
       },
       {
         question: 'Which organ in the human body consumes the most energy?',
-        options: ['Heart', 'Liver', 'Brain', 'Kidneys'],
+        options: ['Brain', 'Heart', 'Liver', 'Kidneys'],
+        answer: 0,
         left_option: 'Brain',
         right_option: 'Heart',
         correct: 'left',
-        answer: 2,
+        answer_correct: 'Brain',
+        answer_incorrect: 'Heart',
+        answer_incorrect2: 'Liver',
       },
       {
         question: 'Which data structure operates on a Last-In-First-Out (LIFO) basis?',
-        options: ['Queue', 'Stack', 'Array', 'Linked List'],
+        options: ['Stack', 'Queue', 'Array', 'Linked List'],
+        answer: 0,
         left_option: 'Stack',
         right_option: 'Queue',
         correct: 'left',
-        answer: 1,
+        answer_correct: 'Stack',
+        answer_incorrect: 'Queue',
+        answer_incorrect2: 'Array',
       },
       {
         question: 'What is the speed of light in vacuum (approximate)?',
         options: ['300,000 km/s', '150,000 km/s', '3,000 km/s', '3,000,000 km/s'],
+        answer: 0,
         left_option: '300,000 km/s',
         right_option: '150,000 km/s',
         correct: 'left',
-        answer: 0,
+        answer_correct: '300,000 km/s',
+        answer_incorrect: '150,000 km/s',
+        answer_incorrect2: '3,000 km/s',
       },
     ],
+  };
+}
+
+export function resolveGameData(title: string, custom?: GameCustomData): GameCustomData {
+  const fallback = defaultGameData(title);
+  if (!custom || Object.keys(custom).length === 0) {
+    return fallback;
+  }
+  return {
+    ...fallback,
+    ...custom,
+    questions:
+      Array.isArray(custom['questions']) && custom['questions'].length > 0
+        ? custom['questions']
+        : fallback['questions'],
+    chains:
+      Array.isArray(custom['chains']) && custom['chains'].length > 0
+        ? custom['chains']
+        : fallback['chains'],
+    difficulty:
+      typeof custom['difficulty'] === 'string' &&
+      ['easy', 'normal', 'hard'].includes(custom['difficulty'])
+        ? custom['difficulty']
+        : 'normal',
   };
 }
 
@@ -111,8 +160,9 @@ export class GamePlayer {
 
   private cachedGameCode: { url: string; code: string } | null = null;
   private username: string | null = null;
-  private windowFocused = true;
   private submittedResult: GameResult | null = null;
+  private currentGameId: string | null = null;
+  private busy = false;
 
   constructor() {
     afterNextRender(() => {
@@ -121,26 +171,11 @@ export class GamePlayer {
     });
 
     const destroyRef = inject(DestroyRef);
-    const view = document.defaultView;
-
     const onVisibilityChange = () => this.syncLifecycle();
-    const onFocus = () => {
-      this.windowFocused = true;
-      this.syncLifecycle();
-    };
-    const onBlur = () => {
-      this.windowFocused = false;
-      this.syncLifecycle();
-    };
-
     document.addEventListener('visibilitychange', onVisibilityChange);
-    view?.addEventListener('focus', onFocus);
-    view?.addEventListener('blur', onBlur);
 
     destroyRef.onDestroy(() => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      view?.removeEventListener('focus', onFocus);
-      view?.removeEventListener('blur', onBlur);
       this.session()?.destroy();
     });
 
@@ -153,7 +188,8 @@ export class GamePlayer {
     // Effect to react when game() changes
     effect(() => {
       const g = this.game();
-      if (this.session()) {
+      const sess = this.session();
+      if (sess && g && g.id !== this.currentGameId) {
         void this.loadAndStart();
       }
     });
@@ -177,9 +213,13 @@ export class GamePlayer {
     const current = this.game();
     if (!current) {
       this.session()?.stop();
+      this.currentGameId = null;
       return;
     }
 
+    if (this.busy) return;
+    this.busy = true;
+    this.currentGameId = current.id;
     this.loading.set(true);
     this.loadError.set(null);
     this.gameResult.set(null);
@@ -209,7 +249,7 @@ export class GamePlayer {
       this.session()?.stop();
       this.session()?.start(this.cachedGameCode.code, {
         username: this.username ?? 'Player',
-        data: current.data ?? defaultGameData(current.title),
+        data: resolveGameData(current.title, current.data),
         width,
         height,
       });
@@ -219,6 +259,7 @@ export class GamePlayer {
       this.loadError.set(err instanceof Error ? err.message : String(err));
     } finally {
       this.loading.set(false);
+      this.busy = false;
     }
   }
 
@@ -250,7 +291,12 @@ export class GamePlayer {
 
     this.isSubmitting.set(true);
     try {
-      await firstValueFrom(this.api.submitScore(current.id, { score }));
+      await firstValueFrom(
+        this.api.submitScore(current.id, {
+          score: Math.max(0, score),
+          round_id: current.round_id,
+        }),
+      );
       this.scoreSubmitted.emit(score);
     } catch {
       // Score submission failure should not block the user
@@ -266,22 +312,21 @@ export class GamePlayer {
     }
   }
 
-  private syncLifecycle(): void {
+  syncLifecycle(): void {
     const session = this.session();
     if (!session) return;
 
-    const canPlay =
-      this.active() &&
-      this.windowFocused &&
-      document.visibilityState === 'visible';
-
-    const isPlaying = session.lifecycle() === 'playing';
-    const isPaused = session.lifecycle() === 'paused';
-
-    if (!canPlay && isPlaying) {
-      session.pause();
-    } else if (canPlay && isPaused) {
-      session.resume();
+    if (session.result() !== null) {
+      session.setLifecycle('completed');
+      return;
     }
+
+    if (document.visibilityState === 'hidden' || !this.active()) {
+      session.setLifecycle('paused');
+      return;
+    }
+
+    session.focus();
+    session.setLifecycle('playing');
   }
 }

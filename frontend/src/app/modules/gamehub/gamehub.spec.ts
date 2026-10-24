@@ -43,6 +43,16 @@ describe('Gamehub', () => {
             getMe: () => of({ username: 'tester' }),
             getLeaderboard: () => of([{ username: 'top1', score: 100 }]),
             submitScore: () => of(undefined),
+            playGame: (id: string) =>
+              of({
+                type: 'game' as const,
+                id,
+                title: 'Game',
+                url: 'http://cdn/game.js',
+                round_id: 'r1',
+                data: {},
+                assets: [],
+              }),
           },
         },
         { provide: GAME_RUNTIME_SOURCE, useValue: '' },
