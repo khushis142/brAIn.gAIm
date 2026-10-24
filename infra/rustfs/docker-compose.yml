@@ -1,0 +1,20 @@
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    container_name: rustfs
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_VOLUMES: "/data"
+    volumes:
+      - rustfs_data:/data
+
+volumes:
+  rustfs_data:
