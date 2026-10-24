@@ -32,6 +32,6 @@ npm test -- --watch=false  # Vitest unit test suite
 
 ## Deployment
 
-- `version.txt` tracks the semantic version (`0.2.7`). Pushing a change to `version.txt` on `main` triggers `.github/workflows/release-and-build.yaml` to publish `ghcr.io/brain-gaim/frontend:<version>`.
+- `version.txt` tracks the semantic version (`0.2.8`). Pushing a change to `version.txt` on `main` triggers `.github/workflows/release-and-build.yaml` to publish `ghcr.io/brain-gaim/frontend:<version>`.
 - `Dockerfile` builds the Angular app with Node 22 and serves it with `nginx:1.31-alpine` (`nginx.conf`), reverse-proxying `/api/` to `http://backend:8000` and `/cdn/` to `http://cdn:8080`.
 - `docker-compose.yaml` deploys the container on port `8080:80` attached to the `braingain` Docker network.
