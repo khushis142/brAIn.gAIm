@@ -4,6 +4,7 @@ import {
   GameResult,
   GameStartInput,
   GamePerformanceOptions,
+  GameAssetManifest,
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
@@ -22,6 +23,7 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
   readonly width?: number;
   readonly height?: number;
   readonly performance?: GamePerformanceOptions;
+  readonly assets?: GameAssetManifest;
 }
 
 /**
@@ -233,8 +235,10 @@ export class GameSession {
       "default-src 'none'",
       "script-src 'unsafe-inline'",
       "style-src 'unsafe-inline'",
-      'img-src data: blob:',
-      'media-src data: blob:',
+      `img-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `media-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `font-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `connect-src ${this.assetOrigins(options.assets).join(' ') || "'none'"}`,
     ].join('; ');
 
     // Stop generated code from closing the script tag or opening an HTML comment
@@ -251,6 +255,7 @@ export class GameSession {
         maxPixelRatio: options.performance?.maxPixelRatio ?? 2,
         reducedEffects: options.performance?.reducedEffects ?? false,
       },
+      assets: options.assets ?? {},
     })
       .replace(/</g, '\\u003c')
       .replace(/\u2028/g, '\\u2028')
@@ -270,5 +275,18 @@ export class GameSession {
 <script>${safeCode}</script>
 </body>
 </html>`;
+  }
+
+  private assetOrigins(assets: GameAssetManifest | undefined): string[] {
+    const origins = new Set<string>();
+    for (const asset of Object.values(assets ?? {})) {
+      try {
+        const url = new URL(asset.url);
+        if (url.protocol === 'https:') origins.add(url.origin);
+      } catch {
+        // Invalid entries are ignored here and rejected by the runtime.
+      }
+    }
+    return [...origins];
   }
 }

@@ -194,16 +194,67 @@ receives the WebGL rendering context. The runtime clears the color and depth
 buffers and updates the viewport before each frame. A game owns shaders,
 buffers, matrices, camera logic, and all other 3D rendering code.
 
+Games that do not need custom shaders can use the small approved built-in 3D
+helper instead:
+
+```js
+let scene;
+
+function init(api) {
+  scene = api.webgl.createBasicScene();
+  scene?.addBox({ z: 0, size: 1, color: [0.2, 0.7, 1, 1] });
+}
+
+function render() {
+  scene?.render();
+}
+
+function contextRestored(api) {
+  // WebGL resources are invalid after context loss; recreate the scene.
+  scene = api.webgl.createBasicScene();
+  scene?.addBox({ z: 0, size: 1, color: [0.2, 0.7, 1, 1] });
+}
+```
+
+`createBasicScene()` provides a camera and colored boxes for simple 3D games.
+It is intentionally small; use a separately approved prebundled 3D runtime
+when a game needs models, lighting, animation systems, or advanced materials.
+The helper returns `null` when the game is not using WebGL.
+
+The capability report is available at `api.webgl.capabilities`:
+
+```js
+{
+  available: true,
+  webgl2: true,
+  maxTextureSize: 4096,
+  maxViewportDimensions: [4096, 4096],
+  antialias: true,
+  highPerformance: true,
+  renderer: 'GPU name when the browser exposes it'
+}
+```
+
+Use `maxTextureSize` and `maxViewportDimensions` to choose compatible assets
+and render targets. `highPerformance` is only a hint: prefer simpler effects
+when it is `false`, and continue to handle missing capabilities gracefully.
+
+WebGL context loss is recoverable. When it happens, rendering pauses and the
+runtime calls optional `contextLost()`. After the browser restores the
+context, the runtime recreates the WebGL context, refreshes the capability
+report, calls `contextRestored(api)`, and resumes rendering. Recreate all
+buffers, shaders, textures, and scene objects in `contextRestored`; WebGL
+resources from before the loss cannot be reused.
+
 For the default `renderer: '2d'`, `render(ctx)` receives a
 `CanvasRenderingContext2D`; the runtime resets and restores its drawing state
 around each frame. Do not use 2D methods with a WebGL context or WebGL methods
 with a 2D context.
 
-WebGL context loss ends the session with an error. Games should release GPU
-resources in `destroy()` and be prepared for the session to be recreated. The
-iframe remains sandboxed and the Content Security Policy still prevents normal
-network access, so WebGL libraries and assets must be bundled or supplied by a
-future approved asset system. The existing 200 KB source limit still applies.
+Games should release GPU resources in `destroy()`. The iframe remains
+sandboxed and the Content Security Policy still prevents normal network
+access, so advanced WebGL libraries and assets must be bundled or supplied by
+the approved asset system. The existing 200 KB source limit still applies.
 
 ## Inputs
 
@@ -240,6 +291,75 @@ JSON-compatible values: objects, arrays, strings, numbers, booleans, and
 `null`. Do not rely on functions, class instances, DOM nodes, or circular
 references. The host can add fields to the startup object later without
 changing the game lifecycle.
+
+## Assets
+
+The host supplies an approved asset manifest when starting the game. Game code
+receives asset IDs, never arbitrary URLs:
+
+```js
+session.start(gameCode, {
+  username: 'alex',
+  data: { context: 'A short reaction game.' },
+  assets: {
+    player: {
+      kind: 'image',
+      url: 'https://cdn.example.com/games/player.png',
+      maxBytes: 500000,
+      preload: true,
+    },
+    success: {
+      kind: 'audio',
+      url: 'https://cdn.example.com/games/success.ogg',
+    },
+    titleFont: {
+      kind: 'font',
+      url: 'https://cdn.example.com/games/title.woff2',
+    },
+    scene: {
+      kind: 'model',
+      url: 'https://cdn.example.com/games/scene.glb',
+    },
+  },
+});
+```
+
+Only approved HTTPS backend/CDN entries are accepted. The runtime rejects
+unknown IDs, mismatched asset kinds, non-HTTPS URLs, and assets larger than
+the hard limits: 5 MB for images, 10 MB for audio, 2 MB for fonts, and 15 MB
+for models. `maxBytes` may impose a smaller per-asset limit, but cannot raise
+the runtime limit. The runtime also limits the CSP to the origins in the
+manifest.
+
+Load assets by ID. Loads are cached and concurrent requests for one ID share
+the same promise:
+
+```js
+async function init(api) {
+  const player = await api.assets.loadImage('player');
+  const success = await api.assets.loadAudio('success');
+  await api.assets.preload(['titleFont', 'scene']);
+
+  if (player) drawPlayer(player);
+  if (success) playSuccess(success);
+}
+```
+
+Entries marked `preload: true` begin loading before `init`. Calling
+`api.assets.preload()` with no arguments waits for all manifest-declared
+preloads; passing IDs preloads only those entries. Loading progress is live:
+
+```js
+const progress = api.assets.progress;
+// progress.loaded, progress.total, progress.bytesLoaded, progress.bytesTotal
+```
+
+`loadImage` returns an `HTMLImageElement`, `loadAudio` an `HTMLAudioElement`,
+`loadFont` a boolean, and `loadModel` an `ArrayBuffer`. Missing, blocked,
+oversized, or failed assets resolve to `null` (or `false` for fonts) and never
+throw. Always provide a gameplay-safe fallback when an optional asset is not
+available. Asset bytes are fetched with credentials omitted and the sandbox
+does not expose arbitrary network access to game code.
 
 Keyboard, touch, and gamepad input is available through `input.keys`. The
 runtime currently tracks `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and
