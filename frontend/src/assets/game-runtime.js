@@ -33,8 +33,16 @@
   const HEARTBEAT_MS = 500;          // how often we report "I'm alive"
   const STALL_MS = 2000;             // no frame for this long = loop is dead
   const REGISTER_TIMEOUT_MS = 3000;  // game must call registerGame() by then
+    const EXECUTION_TIME_MS = 5 * 60 * 1000;
   const MAX_ERROR_LENGTH = 500;
   const MAX_CANVAS_SIZE = 4096;
+    const MAX_CANVAS_PIXELS = 16 * 1024 * 1024;
+    const MAX_ASSETS = 32;
+    const MAX_TOTAL_ASSET_BYTES = 32 * 1024 * 1024;
+    const MAX_RESULT_BYTES = 32 * 1024;
+    const MAX_UI_TEXT_LENGTH = 200;
+    const MAX_UI_DESIGN_BYTES = 8 * 1024;
+    const MAX_RESULT_SUBMISSIONS = 3;
   const MIN_QUALITY_SCALE = 0.5;
   const SLOW_FRAME_LIMIT = 8;
   const REQUIRED_HOOKS = ['init', 'update', 'render'];
@@ -82,6 +90,8 @@
   let lastFrame = last;
   let registerTimer;
   let heartbeatTimer;
+    let executionTimer;
+    let resultSubmissions = 0;
   let performanceConfig = null;
   let qualityScale = 1;
   let frameTime = 0;
@@ -142,12 +152,21 @@
 
   const assetManifest = gameInput.assets && typeof gameInput.assets === 'object' &&
     !Array.isArray(gameInput.assets) ? gameInput.assets : {};
+  if (Object.keys(assetManifest).length > MAX_ASSETS) {
+    post({ type: 'error', message: 'Runtime: asset count exceeds the budget' });
+    return;
+  }
   const assetCache = new Map();
   const assetPending = new Map();
   const assetProgress = { loaded: 0, total: 0, bytesLoaded: 0, bytesTotal: 0 };
   const assetEntries = new Map();
 
   for (const [id, definition] of Object.entries(assetManifest)) {
+      const totalAssetBytes = [...assetEntries.values()].reduce((total, entry) => total + entry.maxBytes, 0);
+      if (totalAssetBytes > MAX_TOTAL_ASSET_BYTES) {
+        post({ type: 'error', message: 'Runtime: asset byte budget exceeded' });
+        return;
+      }
     if (!/^[a-zA-Z0-9._-]{1,64}$/.test(id) || definition === null ||
         typeof definition !== 'object' ||
         !['image', 'audio', 'font', 'model'].includes(definition.kind) ||
@@ -324,6 +343,9 @@
       Math.round(width * devicePixelRatio)));
     const pixelHeight = Math.max(1, Math.min(MAX_CANVAS_SIZE,
       Math.round(height * devicePixelRatio)));
+    if (pixelWidth * pixelHeight > MAX_CANVAS_PIXELS) {
+      throw new Error('Canvas backing store exceeds the memory budget');
+    }
     return Object.freeze({
       width,
       height,
@@ -381,6 +403,20 @@
           typeof result.score !== 'number' || !Number.isFinite(result.score)) {
         throw new Error('submitResult() expects an object with a finite score');
       }
+      if (++resultSubmissions > MAX_RESULT_SUBMISSIONS) {
+        fail(new Error('Result submission budget exceeded'));
+        return;
+      }
+      let resultBytes;
+      try {
+        resultBytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
+      } catch (_) {
+        throw new Error('submitResult() expects JSON-compatible data');
+      }
+      if (resultBytes > MAX_RESULT_BYTES) {
+        fail(new Error('Result exceeds the size budget'));
+        return;
+      }
       post({ type: 'result', result });
     },
     setUiDesign(design) {
@@ -403,7 +439,22 @@
           !validSection(design.pauseMenu) || !validSection(design.leaderboard)) {
         throw new Error('setUiDesign() expects a design object');
       }
+      const sections = [design.pauseMenu, design.leaderboard];
+      const text = sections.flatMap((section) => section ?
+        [section.title, section.message, section.resumeLabel, section.subtitle, section.scoreLabel] : []);
+      if (text.some((item) => item !== undefined && item.length > MAX_UI_TEXT_LENGTH) ||
+          new TextEncoder().encode(JSON.stringify(design)).byteLength > MAX_UI_DESIGN_BYTES) {
+        fail(new Error('UI text exceeds the size budget'));
+        return;
+      }
       post({ type: 'ui-design', design });
+        let next;
+        try {
+          next = createViewport(Math.floor(width), Math.floor(height));
+        } catch (err) {
+          fail(err);
+          return;
+        }
     },
   });
 
@@ -794,6 +845,7 @@
     syncLoop();
     clearInterval(heartbeatTimer);
     clearTimeout(registerTimer);
+      clearTimeout(executionTimer);
     try {
       if (game && typeof game.destroy === 'function') game.destroy();
     } catch (_) {
@@ -911,6 +963,7 @@
         REGISTER_TIMEOUT_MS / 1000 + 's'));
     }
   }, REGISTER_TIMEOUT_MS);
+  executionTimer = setTimeout(() => fail(new Error('Execution time budget exceeded')), EXECUTION_TIME_MS);
 
   // ---------------------------------------------------------------- heartbeat
   // Only sent while things are healthy. If the loop should be running but no

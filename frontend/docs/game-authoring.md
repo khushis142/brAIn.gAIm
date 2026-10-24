@@ -282,6 +282,50 @@ sandboxed and the Content Security Policy still prevents normal network
 access, so advanced WebGL libraries and assets must be bundled or supplied by
 the approved asset system. The existing 200 KB source limit still applies.
 
+## Security and resource budgets
+
+Games run in a sandboxed iframe, but game code is still untrusted. The runtime
+automatically stops a game when it exceeds any hard budget below. These limits
+are runtime enforcement, not a replacement for backend validation.
+
+| Resource | Hard limit |
+| --- | ---: |
+| Execution time | 5 minutes per run |
+| Approved asset entries | 32 |
+| Aggregate declared asset bytes | 32 MiB |
+| Image / audio / font / model | 5 / 10 / 2 / 15 MiB each |
+| Logical canvas width or height | 4096 px |
+| Canvas backing-store area | 16 megapixels |
+| One result payload | 32 KiB of UTF-8 JSON |
+| Result submissions | 3 per run |
+| One UI text value | 200 characters |
+| Complete UI design | 8 KiB of UTF-8 JSON |
+
+The execution timer starts when the sandbox is created and includes asset
+loading and game initialization. Pausing or hiding the game does not reset the
+timer. A failed budget reports an error and calls `destroy()` before the iframe
+is removed.
+
+Asset limits apply to the approved manifest and to bytes read from the network.
+Use `maxBytes` to choose a smaller per-asset limit; it cannot raise the hard
+per-kind limit. Keep the manifest to assets the game actually uses. Invalid,
+unknown, non-HTTPS, oversized, and over-budget entries are unavailable.
+
+Canvas dimensions are capped both when the host creates or resizes the iframe
+and when the runtime calculates the device-pixel backing store. Draw in logical
+coordinates and use `api.viewport.pixelWidth` and `api.viewport.pixelHeight`
+only when physical dimensions are genuinely required.
+
+Results must be JSON-compatible objects with a finite numeric `score`. Keep
+results compact and submit only when the game has a final result; repeated
+submissions are capped even when their content is valid. UI design labels are
+also bounded, so keep titles and controls short enough for a phone screen.
+
+The host validates all messages again before exposing them to the application.
+Do not treat result or UI validation as an authorization boundary: scores and
+display text still need normal backend validation before persistence or display
+to other users.
+
 ## Inputs
 
 The host starts a game with a game-code string and an input object:

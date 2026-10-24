@@ -181,6 +181,31 @@ describe('GameSession', () => {
     expect(container.querySelector('iframe')).toBeNull();
   });
 
+  it('rejects canvas dimensions outside the resource budget', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    expect(() => session.start(gameCode, { ...options, width: 4097 })).toThrow('Canvas dimensions');
+    expect(() => session.start(gameCode, { ...options, width: 4096, height: 4097 })).toThrow('Canvas dimensions');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('stops after too many result submissions', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const result = { type: 'result', result: { score: 1 } };
+
+    for (let submission = 0; submission < 4; submission += 1) {
+      window.dispatchEvent(new MessageEvent('message', { source: iframe.contentWindow, data: result }));
+    }
+
+    expect(session.status()).toBe('error');
+    expect(session.error()).toContain('result submission budget');
+    session.destroy();
+  });
+
   it('removes the iframe after stopping and lets the runtime shut down first', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
