@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     database_url: str
     jwt_secret: str = Field(min_length=32)
+    # Public base URL of the CDN service, e.g. https://cdn.example.com
+    cdn_base_url: str
 
     @field_validator("database_url")
     @classmethod

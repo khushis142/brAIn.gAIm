@@ -18,11 +18,14 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 
 ## Architecture rules
 
-- All content (study fields, videos, games) comes from the CMS via `app/cms.py`.
-  It is an in-process mock until the real CMS API exists; keep its function
-  signatures and change only the bodies. Never add S3 or file storage here.
-- The database stores only CMS ids (user field slug, impressions, scores), never
-  content metadata.
+- Files live on the CDN service (github.com/brAIn-gAIm/CDN); clients upload there
+  directly. The backend owns all metadata (`content` table, keyed by the CDN file id)
+  and never handles file bytes or S3.
+- Delivery URLs are always built by `app/cdn.py` from `CDN_BASE_URL`; never store or
+  return a client-supplied URL (games are JS that runs in the app).
+- Study fields are seeded by migrations; a new field is a new migration.
+- Only developers (`users.is_developer`, granted via SQL) may publish games; videos
+  are open to every logged-in user.
 - Feed decisions live in `app/feed.py`; routers stay thin.
 - Settings come from env via `app/config.py`; add a variable only when the value
   really differs between environments, and update `.env.example` and

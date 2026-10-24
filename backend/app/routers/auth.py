@@ -16,7 +16,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(body: UserCreate, session: SessionDep) -> User:
-    await require_known_field(body.field)
+    await require_known_field(session, body.field)
     user = User(
         username=body.username,
         password_hash=hash_password(body.password),

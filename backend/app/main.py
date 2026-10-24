@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import engine
-from app.routers import auth, feed, fields, games, users
+from app.routers import auth, content, feed, fields, games, users
 
 
 @asynccontextmanager
@@ -24,7 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router in (auth.router, users.router, fields.router, feed.router, games.router):
+for router in (
+    auth.router,
+    users.router,
+    fields.router,
+    content.router,
+    feed.router,
+    games.router,
+):
     app.include_router(router)
 
 

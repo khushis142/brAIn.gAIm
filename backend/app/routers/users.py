@@ -16,7 +16,7 @@ async def read_me(user: CurrentUser) -> User:
 
 @router.patch("/me", response_model=UserRead)
 async def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> User:
-    await require_known_field(body.field)
+    await require_known_field(session, body.field)
     user.field = body.field
     await session.commit()
     return user
