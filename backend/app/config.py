@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
     database_url: str
+    jwt_secret: str = Field(min_length=32)
 
     @field_validator("database_url")
     @classmethod
@@ -19,14 +20,6 @@ class Settings(BaseSettings):
         if url.get_backend_name() not in ("postgres", "postgresql"):
             raise ValueError("must be a PostgreSQL URL")
         return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
-
-    # Self-hosted S3-compatible store; must be reachable by browsers (presigned URLs).
-    s3_endpoint_url: str
-    s3_bucket: str
-    s3_access_key_id: str
-    s3_secret_access_key: str
-
-    jwt_secret: str = Field(min_length=32)
 
 
 @lru_cache

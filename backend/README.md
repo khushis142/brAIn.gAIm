@@ -24,11 +24,10 @@ Dependencies live in `pyproject.toml` (pinned in `uv.lock`). Add one with
 ### 2. Services and app
 
 ```sh
-cp .env.example .env # point at the Postgres/S3 provided by the team
-docker compose -f docker-compose.dev.yaml up -d # optional: local Postgres + S3 (RustFS) stand-ins, console on :9001
+cp .env.example .env # point at the Postgres provided by the team
+docker compose -f docker-compose.dev.yaml up -d # optional: local Postgres
                                                 # (direnv users: started automatically on cd)
 alembic upgrade head
-python -m app.seed seed/   # needs seed/manifest.json, see seed/manifest.example.json
 fastapi dev app/main.py    # http://localhost:8000/docs
 ```
 
@@ -36,16 +35,16 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 
 | Method | Path                         | Auth | Purpose                                    |
 | ------ | ---------------------------- | ---- | ------------------------------------------ |
-| GET    | `/fields`                    |      | Education fields to pick at signup         |
-| POST   | `/auth/register`             |      | `{username, password, field_id}`           |
+| GET    | `/fields`                    |      | Education fields (`slug`, `name`) to pick  |
+| POST   | `/auth/register`             |      | `{username, password, field}` (slug)       |
 | POST   | `/auth/token`                |      | OAuth2 password form → bearer JWT          |
 | GET    | `/users/me`                  | ✓    | Current user                               |
-| PATCH  | `/users/me`                  | ✓    | Change field `{field_id}`                  |
+| PATCH  | `/users/me`                  | ✓    | Change field `{field}`                     |
 | POST   | `/feed/next`                 | ✓    | Next item: `{type: "video" \| "game", id, title, url}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
 
-`url` is a presigned S3 GET URL (valid 1h); the client fetches content directly from S3.
+Content ids and `url`s come from the CMS; the client fetches content directly from `url`.
 
 ## Design
 
@@ -53,8 +52,11 @@ fastapi dev app/main.py    # http://localhost:8000/docs
   served, both scoped to the user's field. Unseen videos are preferred; once a field
   is exhausted videos repeat. If a field lacks one kind of content, the other is served.
   Every served item is stored as an `Impression`, which is the feed state.
-- **Content**: files live in S3, metadata in Postgres. Ingestion is the seed CLI only
-  (idempotent, keyed by S3 key) so there is no upload API to secure.
+- **Content**: a CMS owns study fields, videos and games; the database stores only
+  their ids (users' field, impressions, scores). The CMS API is not defined yet, so
+  `app/cms.py` is an in-process mock with sample content, shaped after the expected
+  endpoints (list by field, get one with its URL). Replace its function bodies with
+  HTTP calls once the real CMS exists.
 - **Migrations**: Alembic. After changing `app/models.py`:
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.
 
@@ -78,13 +80,9 @@ Portainer setup (once):
 1. *Stacks → Add stack → Repository*: this repo, compose path `docker-compose.yaml`.
 2. Enable *GitOps updates* (polling or webhook). Pushing a new image tag in
    `docker-compose.yaml` then redeploys the stack.
-3. Set the stack environment variables (all required): `DATABASE_URL`,
-   `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+3. Set the stack environment variables (both required): `DATABASE_URL`,
    `JWT_SECRET`. Easiest: import `.env.example` via *Load variables from .env file*
    and replace every value.
-
-Seed production content from a dev machine with `.env` pointing at the production
-database and bucket: `python -m app.seed seed/`.
 
 ## Tests
 

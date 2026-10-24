@@ -1,9 +1,12 @@
 """Decides what a user sees next and records it."""
 
-from sqlalchemy import func, select
+import random
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Game, Impression, User, Video
+from app import cms
+from app.models import Impression, User
 
 VIDEOS_PER_GAME = 3
 
@@ -12,7 +15,7 @@ def videos_since_last_game(recent: list[Impression]) -> int:
     """Count leading video impressions in a newest-first list."""
     count = 0
     for impression in recent:
-        if impression.game_id is not None:
+        if impression.kind == "game":
             break
         count += 1
     return count
@@ -22,27 +25,26 @@ def should_serve_game(videos_since_game: int) -> bool:
     return videos_since_game >= VIDEOS_PER_GAME
 
 
-async def _pick_video(session: AsyncSession, user: User) -> Video | None:
-    seen = select(Impression.video_id).where(
-        Impression.user_id == user.id, Impression.video_id.is_not(None)
+async def _pick(session: AsyncSession, user: User, kind: cms.Kind) -> cms.ContentSummary | None:
+    candidates = await cms.list_content(kind, user.field)
+    if not candidates:
+        return None
+    seen = set(
+        await session.scalars(
+            select(Impression.content_id).where(
+                Impression.user_id == user.id, Impression.kind == kind
+            )
+        )
     )
-    in_field = select(Video).where(Video.field_id == user.field_id).order_by(func.random()).limit(1)
-    # Prefer unseen videos; once the field is exhausted, start repeating.
-    return await session.scalar(in_field.where(Video.id.not_in(seen))) or await session.scalar(
-        in_field
-    )
+    # Prefer unseen items; once the field is exhausted, start repeating.
+    unseen = [c for c in candidates if c.id not in seen]
+    return random.choice(unseen or candidates)
 
 
-async def _pick_game(session: AsyncSession, user: User) -> Game | None:
-    return await session.scalar(
-        select(Game).where(Game.field_id == user.field_id).order_by(func.random()).limit(1)
-    )
-
-
-async def next_item(session: AsyncSession, user: User) -> Video | Game | None:
+async def next_item(session: AsyncSession, user: User) -> tuple[cms.Kind, cms.Content] | None:
     """Pick the next feed item for `user`, record the impression, and commit.
 
-    Falls back to the other item kind when the preferred one has no content,
+    Falls back to the other kind when the preferred one has no content,
     so a field with only videos (or only games) still yields a feed.
     """
     recent = (
@@ -53,20 +55,18 @@ async def next_item(session: AsyncSession, user: User) -> Video | Game | None:
             .limit(VIDEOS_PER_GAME)
         )
     ).all()
-    pickers = [_pick_video, _pick_game]
+    kinds: list[cms.Kind] = ["video", "game"]
     if should_serve_game(videos_since_last_game(list(recent))):
-        pickers.reverse()
+        kinds.reverse()
 
-    for pick in pickers:
-        item = await pick(session, user)
-        if item is not None:
-            break
-    else:
-        return None
-
-    if isinstance(item, Video):
-        session.add(Impression(user_id=user.id, video_id=item.id))
-    else:
-        session.add(Impression(user_id=user.id, game_id=item.id))
-    await session.commit()
-    return item
+    for kind in kinds:
+        summary = await _pick(session, user, kind)
+        if summary is None:
+            continue
+        content = await cms.get_content(kind, summary.id)
+        if content is None:  # removed from the CMS between list and get
+            continue
+        session.add(Impression(user_id=user.id, kind=kind, content_id=content.id))
+        await session.commit()
+        return kind, content
+    return None

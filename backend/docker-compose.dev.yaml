@@ -1,4 +1,4 @@
-# Local dev stand-ins for the externally provided Postgres and S3.
+# Local dev stand-in for the externally provided Postgres.
 # Deployment uses docker-compose.yaml.
 services:
   postgres:
@@ -14,29 +14,5 @@ services:
       interval: 2s
       retries: 15
 
-  # S3-compatible object store (MinIO images are no longer published).
-  s3:
-    image: rustfs/rustfs:latest
-    environment:
-      RUSTFS_ACCESS_KEY: braingain
-      RUSTFS_SECRET_KEY: braingain-secret
-      RUSTFS_CONSOLE_ENABLE: "true"
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [s3-data:/data]
-
-  s3-init:
-    image: amazon/aws-cli:latest
-    depends_on: [s3]
-    environment:
-      AWS_ACCESS_KEY_ID: braingain
-      AWS_SECRET_ACCESS_KEY: braingain-secret
-      AWS_DEFAULT_REGION: us-east-1
-    entrypoint: ["sh", "-c"]
-    command:
-      - >
-        until aws --endpoint-url http://s3:9000 s3api head-bucket --bucket braingain 2>/dev/null
-        || aws --endpoint-url http://s3:9000 s3 mb s3://braingain; do sleep 1; done
-
 volumes:
   postgres-data:
-  s3-data:

@@ -3,11 +3,11 @@ from app.models import Impression
 
 
 def _video() -> Impression:
-    return Impression(video_id=1)
+    return Impression(kind="video", content_id="v")
 
 
 def _game() -> Impression:
-    return Impression(game_id=1)
+    return Impression(kind="game", content_id="g")
 
 
 def test_counts_videos_until_most_recent_game() -> None:

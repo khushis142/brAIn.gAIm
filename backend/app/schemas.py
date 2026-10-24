@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 class StudyFieldRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
     slug: str
     name: str
 
@@ -15,11 +14,11 @@ class StudyFieldRead(BaseModel):
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
     password: str = Field(min_length=8, max_length=128)
-    field_id: int
+    field: str
 
 
 class UserUpdate(BaseModel):
-    field_id: int
+    field: str
 
 
 class UserRead(BaseModel):
@@ -27,7 +26,7 @@ class UserRead(BaseModel):
 
     id: uuid.UUID
     username: str
-    field: StudyFieldRead
+    field: str
 
 
 class Token(BaseModel):
@@ -37,14 +36,14 @@ class Token(BaseModel):
 
 class VideoItem(BaseModel):
     type: Literal["video"] = "video"
-    id: int
+    id: str
     title: str
     url: str
 
 
 class GameItem(BaseModel):
     type: Literal["game"] = "game"
-    id: int
+    id: str
     title: str
     url: str
 

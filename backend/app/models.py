@@ -2,7 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, MetaData, String, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# Content (fields, videos, games) lives in the CMS; these columns hold its ids.
+CMS_ID = String(64)
 
 
 class Base(DeclarativeBase):
@@ -18,46 +21,15 @@ class Base(DeclarativeBase):
     )
 
 
-class StudyField(Base):
-    """An education field (e.g. computer science) that scopes a user's feed."""
-
-    __tablename__ = "study_fields"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    slug: Mapped[str] = mapped_column(String(64), unique=True)
-    name: Mapped[str] = mapped_column(String(128))
-
-
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(32), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    field_id: Mapped[int] = mapped_column(ForeignKey("study_fields.id"))
+    # CMS study field slug; scopes the user's feed.
+    field: Mapped[str] = mapped_column(CMS_ID)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    field: Mapped[StudyField] = relationship(lazy="joined")
-
-
-class Video(Base):
-    __tablename__ = "videos"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(200))
-    s3_key: Mapped[str] = mapped_column(String(512), unique=True)
-    field_id: Mapped[int] = mapped_column(ForeignKey("study_fields.id"), index=True)
-
-
-class Game(Base):
-    """A self-contained JS game/quiz served to the frontend from S3."""
-
-    __tablename__ = "games"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(200))
-    s3_key: Mapped[str] = mapped_column(String(512), unique=True)
-    field_id: Mapped[int] = mapped_column(ForeignKey("study_fields.id"), index=True)
 
 
 class Impression(Base):
@@ -65,14 +37,14 @@ class Impression(Base):
 
     __tablename__ = "impressions"
     __table_args__ = (
-        CheckConstraint("(video_id IS NULL) <> (game_id IS NULL)", name="exactly_one_item"),
+        CheckConstraint("kind IN ('video', 'game')", name="kind"),
         Index("ix_impressions_user_served_at", "user_id", "served_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    video_id: Mapped[int | None] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"))
-    game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(8))
+    content_id: Mapped[str] = mapped_column(CMS_ID)
     served_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -85,6 +57,6 @@ class Score(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    game_id: Mapped[str] = mapped_column(CMS_ID)
     score: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -7,6 +7,3 @@ __pycache__/
 result
 .pytest_cache/
 .ruff_cache/
-# Local seed content (only the example manifest is tracked)
-seed/*
-!seed/manifest.example.json
