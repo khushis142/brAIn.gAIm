@@ -1,7 +1,10 @@
-// dodge/game.js: dodge the falling blocks. Arrow keys to move.
-let W, H, gameApi, username, difficulty, context;
+// dodge/game.js: dodge the falling blocks. Arrow keys to move; on touch screens, hold the
+// left or right half. The runtime only forwards keys, so the game listens for pointer events
+// on its own canvas.
+let W, H, gameApi, username, difficulty, context, canvas;
 let player, blocks, spawnTimer, score, gameOver, previousKeys;
 let best = 0;
+const touches = new Map(); // pointerId -> 'left' | 'right'
 
 function init(api) {
   gameApi = api;
@@ -27,7 +30,32 @@ function init(api) {
       scoreLabel: api.data.scoreLabel,
     },
   });
+  canvas = document.getElementById('c');
+  if (canvas) {
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', onPointer);
+    canvas.addEventListener('pointermove', onPointer);
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+      canvas.addEventListener(type, onPointerEnd);
+    }
+  }
   reset();
+}
+
+function onPointer(event) {
+  if (event.type === 'pointermove' && !touches.has(event.pointerId)) return;
+  const rect = canvas.getBoundingClientRect();
+  touches.set(event.pointerId, event.clientX - rect.left < rect.width / 2 ? 'left' : 'right');
+  event.preventDefault();
+}
+
+function onPointerEnd(event) {
+  touches.delete(event.pointerId);
+}
+
+function touching(side) {
+  for (const value of touches.values()) if (value === side) return true;
+  return false;
 }
 
 function reset() {
@@ -43,8 +71,8 @@ function update(dt, input) {
   previousKeys = { ...input.keys };
   if (gameOver) return;
 
-  const left = input.keys.ArrowLeft;
-  const right = input.keys.ArrowRight;
+  const left = input.keys.ArrowLeft || touching('left');
+  const right = input.keys.ArrowRight || touching('right');
   if (left) player.x -= player.speed * dt;
   if (right) player.x += player.speed * dt;
   player.x = Math.max(0, Math.min(W - player.w, player.x));
@@ -119,4 +147,13 @@ function render(ctx) {
   }
 }
 
-registerGame({ init, update, render });
+function destroy() {
+  if (!canvas) return;
+  canvas.removeEventListener('pointerdown', onPointer);
+  canvas.removeEventListener('pointermove', onPointer);
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+    canvas.removeEventListener(type, onPointerEnd);
+  }
+}
+
+registerGame({ init, update, render, destroy });
