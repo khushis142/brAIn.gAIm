@@ -474,10 +474,15 @@ async def test_active_project_feeds_the_games(
     assert materials[-1] == ["# B\n\nbb"]
     assert await ready_rounds() == 1
 
+    # Editing the active project replaces the prepared round with one about the new text.
+    await client.patch(f"/projects/{second['id']}", json={"body": "bb edited"}, headers=owner)
+    assert materials[-1] == ["# B\n\nbb edited"]
+    assert await ready_rounds() == 1
+
     # Setting the same project again or other fields keeps the prepared round.
     await client.patch("/users/me", json={"active_project_id": second["id"]}, headers=owner)
     await client.patch("/users/me", json={"interests": "x"}, headers=owner)
-    assert len(materials) == 2
+    assert len(materials) == 3
 
     # Others' projects can't be activated, and look the same as missing ones.
     for project_id in [foreign["id"], str(uuid.uuid4())]:

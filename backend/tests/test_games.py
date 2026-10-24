@@ -11,7 +11,7 @@ from app.generator.games import (
     generate_game,
     reference_game,
 )
-from app.generator.inputs import MAX_ATTEMPTS
+from app.generator.inputs import MAX_ATTEMPTS, GameConfig
 from app.generator.llm import LLM, FakeLLM, Message
 
 GAMES = Path(__file__).parents[1] / "games"
@@ -38,6 +38,7 @@ class ScriptedLLM(LLM):
 @pytest.mark.parametrize("game", sorted(GAMES.glob("*/game.js")), ids=lambda p: p.parent.name)
 def test_reviewed_games_pass_the_checks(game: Path) -> None:
     assert check_game_code(game.read_text()) == []
+    GameConfig.model_validate_json((game.parent / "config.json").read_text())
 
 
 def test_reference_is_the_example_quiz() -> None:

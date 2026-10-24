@@ -51,7 +51,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
 | GET    | `/projects/{id}/flashcards`  | ✓    | The project's flashcards; empty until generated |
 | POST   | `/projects/{id}/flashcards`  | ✓    | (Re)generate them from the current text (one LLM call, waits for it; 502 keeps the old ones) |
-| POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, webp, gif, txt, md, csv) |
+| POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, jpeg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
 | POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
@@ -101,7 +101,7 @@ other requests. Uploads set `fileId`/`filename`, project creation sets `projectI
   lives in the `content` table, keyed by the CDN file id.
 - **Projects**: a user's private knowledge (Markdown body plus CDN attachments). The
   one set as `active_project_id` on the user is the material for the mini games;
-  switching it (or deleting it) discards the prepared round so the next game is about it.
+  switching, editing or deleting it (or regenerating its flashcards) discards the prepared round so the next game is about the current material.
   On the user's request (`POST /projects/{id}/flashcards`), the LLM splits it into
   flashcards (short, self-contained snippets), replacing the old ones; unchanged text
   skips the call. Nothing regenerates them automatically, to keep LLM calls down. They replace the planned decks and

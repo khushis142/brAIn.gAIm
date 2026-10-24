@@ -30,3 +30,6 @@ class LLM(ABC):
 
         Raises `LLMError` when the provider cannot answer.
         """
+
+    async def aclose(self) -> None:  # noqa: B027
+        """Close underlying network resources, if any."""

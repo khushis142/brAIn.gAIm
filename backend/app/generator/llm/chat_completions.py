@@ -67,6 +67,9 @@ class ChatCompletionsLLM(LLM):
             raise LLMError("LLM provider returned no text")
         return content
 
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
 
 def _error(res: httpx.Response) -> LLMError:
     try:

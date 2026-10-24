@@ -22,7 +22,6 @@ let squishAnim = 0; // jump stretch effect
 let facing = 1; // 1 = right, -1 = left
 
 const touches = new Map(); // pointerId -> 'left' | 'right'
-let prevKeys = {};
 
 const GRAVITY = 900;
 const BOUNCE_VELOCITY = -550;
@@ -251,7 +250,6 @@ function update(dt, input) {
 
   // Once game ends, no updates or restart
   if (gameState === 'GAME_OVER' || gameState === 'VICTORY') {
-    prevKeys = { ...input.keys };
     return;
   }
 
@@ -389,8 +387,6 @@ function update(dt, input) {
   const activeLevelY = levels[Math.min(currentQuestionIndex, levels.length - 1)].middle.y;
   targetCameraY = activeLevelY - H * 0.65;
   cameraY += (targetCameraY - cameraY) * Math.min(1, dt * 6);
-
-  prevKeys = { ...input.keys };
 }
 
 function drawPlayer(ctx, x, y, w, h, facingDir, squish) {
@@ -438,6 +434,22 @@ function drawPlayer(ctx, x, y, w, h, facingDir, squish) {
   ctx.restore();
 }
 
+function wrapPlatformWords(ctx, words, maxW) {
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(test).width <= maxW) {
+      cur = test;
+    } else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 // Draws text wrapped cleanly inside platform bounds so long answers never truncate
 function drawWrappedPlatformText(ctx, text, cx, cy, maxW) {
   text = String(text || '').trim();
@@ -451,36 +463,13 @@ function drawWrappedPlatformText(ctx, text, cx, cy, maxW) {
 
   // Try 2 lines at 11px
   ctx.font = 'bold 11px sans-serif';
-  let words = text.split(/\s+/);
-  let lines = [];
-  let cur = '';
-
-  for (const w of words) {
-    const test = cur ? cur + ' ' + w : w;
-    if (ctx.measureText(test).width <= maxW) {
-      cur = test;
-    } else {
-      if (cur) lines.push(cur);
-      cur = w;
-    }
-  }
-  if (cur) lines.push(cur);
+  const words = text.split(/\s+/);
+  let lines = wrapPlatformWords(ctx, words, maxW);
 
   // If still overflowing width, shrink to 10px
   if (lines.length > 2 || lines.some((l) => ctx.measureText(l).width > maxW)) {
     ctx.font = 'bold 10px sans-serif';
-    lines = [];
-    cur = '';
-    for (const w of words) {
-      const test = cur ? cur + ' ' + w : w;
-      if (ctx.measureText(test).width <= maxW) {
-        cur = test;
-      } else {
-        if (cur) lines.push(cur);
-        cur = w;
-      }
-    }
-    if (cur) lines.push(cur);
+    lines = wrapPlatformWords(ctx, words, maxW);
   }
 
   const lineH = 13;
@@ -665,31 +654,18 @@ function render(ctx) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    if (gameState === 'VICTORY') {
-      ctx.fillStyle = '#22c55e';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.fillText('Summit Reached!', W / 2, H / 2 - 50);
+    const victory = gameState === 'VICTORY';
+    ctx.fillStyle = victory ? '#22c55e' : '#ef4444';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(victory ? 'Summit Reached!' : 'Run Complete', W / 2, H / 2 - 50);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(`Score: ${score}`, W / 2, H / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(`Score: ${score}`, W / 2, H / 2);
 
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText(`Best: ${bestScore}`, W / 2, H / 2 + 35);
-    } else {
-      ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.fillText('Run Complete', W / 2, H / 2 - 50);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(`Score: ${score}`, W / 2, H / 2);
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText(`Best: ${bestScore}`, W / 2, H / 2 + 35);
-    }
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(`Best: ${bestScore}`, W / 2, H / 2 + 35);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '14px sans-serif';

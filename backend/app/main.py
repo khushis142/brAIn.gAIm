@@ -5,12 +5,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import engine
+from app.generator.llm import get_llm
 from app.routers import auth, content, feed, games, projects, users
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
+    if get_llm.cache_info().currsize:
+        await get_llm().aclose()
     await engine.dispose()
 
 

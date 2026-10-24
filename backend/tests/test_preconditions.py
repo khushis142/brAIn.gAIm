@@ -35,6 +35,8 @@ def test_tts_step_must_fit_the_schema() -> None:
         ({"path": "/questions/*/prompt", "into": "a"}, "unknown property 'prompt'"),
         ({"path": "/questions/*/answer", "into": "a"}, "must point to a string"),
         ({"path": "/questions/*/question", "into": "answer"}, "clashes"),
+        ({"path": "/intro/*/question", "into": "a"}, "uses '\\*' on a non-array"),
+        ({"path": "/questions/*", "into": "a"}, "String should match pattern"),
         ({"path": "questions", "into": "a"}, "String should match pattern"),
         ({"path": "/intro", "into": "bad-name"}, "String should match pattern"),
     ]:

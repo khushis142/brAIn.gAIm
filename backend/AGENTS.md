@@ -30,11 +30,16 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 - The user's active project (`users.active_project_id`) is the only material game
   rounds are generated from: a few random flashcards of it (`feed._project_materials`),
   which `app/generator/flashcards.py` regenerates only when the user asks (never
-  automatically, to keep LLM calls down).
+  automatically, to keep LLM calls down). Switching, editing, or deleting the active
+  project (or regenerating its flashcards) discards any prepared game round so the next
+  round reflects the updated material.
 - Users can register only videos via the API. Games (JS that runs in the app) enter only
-  through `app/seed_game.py`; never add an API path that accepts game code or files.
-- Games are fixed templates; the LLM only produces their `input` (data, validated against
-  the game's `config.input_schema` in `app/generator/inputs.py`), never code.
+  through `app/seed_game.py` (or the offline generator `app/generator/games.py`); never
+  add an API path that accepts client-supplied game code or files.
+- Seeded games are fixed templates; per round, the LLM only produces their `input` (data,
+  validated against the game's `config.input_schema` in `app/generator/inputs.py`), never
+  per-round code. (`app/generator/games.py` can also generate whole new game templates,
+  checked by `check_game_code`.)
 - Game rounds are prepared in the background (`feed.top_up`) and served from the ready
   pool; never put LLM, TTS or other slow calls on the `/feed/next` request path.
 - Feed decisions live in `app/feed.py`; routers stay thin.

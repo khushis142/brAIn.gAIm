@@ -2,9 +2,8 @@
 // screens, hold the left or right half. The runtime only forwards keys, so the game listens
 // for pointer events on its own canvas.
 let gl, api, program, positionBuffer, colorBuffer, canvas;
-let playerX, obstacles, spawnTimer, score, gameOver, previousKeys;
+let playerX, obstacles, spawnTimer, score, gameOver;
 let username, difficulty, context;
-let best = 0;
 const touches = new Map(); // pointerId -> 'left' | 'right'
 
 const vertexSource = `
@@ -85,11 +84,9 @@ function reset() {
   spawnTimer = 0;
   score = 0;
   gameOver = false;
-  previousKeys = {};
 }
 
 function update(dt, input) {
-  previousKeys = { ...input.keys };
   if (gameOver) return;
 
   if (input.keys.ArrowLeft || touching('left')) playerX -= 2.8 * dt;
@@ -108,7 +105,6 @@ function update(dt, input) {
     obstacle.z += obstacle.speed * dt;
     if (Math.abs(obstacle.x - playerX) < obstacle.size + 0.45 && obstacle.z > -1 && obstacle.z < 1) {
       gameOver = true;
-      best = Math.max(best, score);
       api.submitResult({
         score: Math.floor(score * 10),
         game: 'dodge3d',
@@ -180,8 +176,11 @@ function drawCube(center, size, color) {
 }
 
 function drawGround() {
-  drawGeometry([-4, -0.5, -14, 4, -0.5, -14, 4, -0.5, 4, -4, -0.5, 4],
-    Array(12).fill([0.12, 0.18, 0.3]).flat(), modelMatrix());
+  const vertices = [
+    -4, -0.5, -14,  4, -0.5, -14,  4, -0.5, 4,
+    -4, -0.5, -14,  4, -0.5,  4, -4, -0.5, 4,
+  ];
+  drawGeometry(vertices, Array(6).fill([0.12, 0.18, 0.3]).flat(), modelMatrix());
 }
 
 function cubeVertices(x, y, z, w, h, d) {
@@ -228,4 +227,8 @@ function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function normalize(v) { const l = Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; }
 
-registerGame({ renderer: 'webgl', init, update, render, destroy });
+function resize(width, height) {
+  if (gl) gl.viewport(0, 0, width, height);
+}
+
+registerGame({ renderer: 'webgl', init, update, render, resize, destroy });

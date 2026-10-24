@@ -61,9 +61,10 @@ async def generate_flashcards(llm: LLM, material: str) -> list[dict[str, str]]:
     return data["cards"]
 
 
-async def refresh_flashcards(session: AsyncSession, project: Project) -> None:
+async def refresh_flashcards(session: AsyncSession, project: Project) -> bool:
     """Regenerate the project's cards unless they match its text, and commit.
 
+    Returns True when cards were updated, False when text was unchanged.
     Raises InputGenerationError or LLMError and keeps the old cards when generation fails.
     """
     # One refresh per project at a time; one queued behind a refresh of the same text
@@ -74,7 +75,7 @@ async def refresh_flashcards(session: AsyncSession, project: Project) -> None:
     material = _material(project)
     digest = hashlib.sha256(material.encode()).hexdigest()
     if project.flashcards_hash == digest:
-        return
+        return False
     cards = await generate_flashcards(get_llm(), material) if project.body.strip() else []
     await session.execute(delete(Flashcard).where(Flashcard.project_id == project.id))
     session.add_all(Flashcard(project_id=project.id, **card) for card in cards)
@@ -85,3 +86,4 @@ async def refresh_flashcards(session: AsyncSession, project: Project) -> None:
         .values(flashcards_hash=digest, updated_at=Project.updated_at)
     )
     await session.commit()
+    return True

@@ -23,7 +23,10 @@ class TtsStep(BaseModel):
     """Speak each matched text; write the audio file's URL into `into`."""
 
     type: Literal["tts"]
-    path: str = Field(pattern=r"^(/([A-Za-z0-9_-]+|\*))+$", examples=["/questions/*/question"])
+    path: str = Field(
+        pattern=r"^(/([A-Za-z0-9_-]+|\*))*/[A-Za-z0-9_-]+$",
+        examples=["/questions/*/question"],
+    )
     into: str = Field(pattern=_IDENTIFIER, examples=["questionAudio"])
 
     def check_against(self, schema: dict[str, Any]) -> None:
@@ -31,7 +34,12 @@ class TtsStep(BaseModel):
         *parents, key = self.path.strip("/").split("/")
         node = schema
         for segment in parents:
-            node = node.get("items", {}) if segment == "*" else _property(node, segment)
+            if segment == "*":
+                if node.get("type") != "array":
+                    raise ValueError(f"precondition path {self.path} uses '*' on a non-array")
+                node = node.get("items", {})
+            else:
+                node = _property(node, segment)
         if _property(node, key).get("type") != "string":
             raise ValueError(f"precondition path {self.path} must point to a string")
         if self.into in node.get("properties", {}):

@@ -2,7 +2,7 @@
 // left or right half. The runtime only forwards keys, so the game listens for pointer events
 // on its own canvas.
 let W, H, gameApi, username, difficulty, context, canvas;
-let player, blocks, spawnTimer, score, gameOver, previousKeys;
+let player, blocks, spawnTimer, score, gameOver;
 let best = 0;
 const touches = new Map(); // pointerId -> 'left' | 'right'
 
@@ -64,11 +64,9 @@ function reset() {
   spawnTimer = 0;
   score = 0;
   gameOver = false;
-  previousKeys = {};
 }
 
 function update(dt, input) {
-  previousKeys = { ...input.keys };
   if (gameOver) return;
 
   const left = input.keys.ArrowLeft || touching('left');
@@ -147,6 +145,15 @@ function render(ctx) {
   }
 }
 
+function resize(width, height) {
+  W = width;
+  H = height;
+  if (player) {
+    player.y = H - 50;
+    player.x = Math.max(0, Math.min(W - player.w, player.x));
+  }
+}
+
 function destroy() {
   if (!canvas) return;
   canvas.removeEventListener('pointerdown', onPointer);
@@ -156,4 +163,4 @@ function destroy() {
   }
 }
 
-registerGame({ init, update, render, destroy });
+registerGame({ init, update, render, resize, destroy });

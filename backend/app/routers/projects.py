@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -81,11 +81,18 @@ async def get_project(project_id: uuid.UUID, user: CurrentUser, session: Session
 
 @router.patch("/{project_id}", response_model=ProjectRead)
 async def update_project(
-    project_id: uuid.UUID, body: ProjectUpdate, user: CurrentUser, session: SessionDep
+    project_id: uuid.UUID,
+    body: ProjectUpdate,
+    user: CurrentUser,
+    session: SessionDep,
+    background: BackgroundTasks,
 ) -> ProjectRead:
     project = await _get_own(session, project_id, user)
     for name, value in body.model_dump(exclude_none=True).items():
         setattr(project, name, value)
+    if user.active_project_id == project_id:
+        await feed.discard_ready_rounds(session, user.id)
+        background.add_task(feed.top_up, user.id)
     await session.commit()
     await session.refresh(project)  # updated_at is set by the database
     return _read(project)
@@ -116,15 +123,22 @@ async def list_flashcards(
     responses={status.HTTP_502_BAD_GATEWAY: {"description": "The LLM failed; old cards kept"}},
 )
 async def generate_flashcards(
-    project_id: uuid.UUID, user: CurrentUser, session: SessionDep
+    project_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    background: BackgroundTasks,
 ) -> Sequence[Flashcard]:
     """(Re)generate the cards from the project's current text; one LLM call, so it takes a
     while. Unchanged text returns the existing cards without one."""
     project = await _get_own(session, project_id, user)
     try:
-        await refresh_flashcards(session, project)
+        refreshed = await refresh_flashcards(session, project)
     except (InputGenerationError, LLMError):
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Generating flashcards failed") from None
+    if refreshed and user.active_project_id == project_id:
+        await feed.discard_ready_rounds(session, user.id)
+        await session.commit()
+        background.add_task(feed.top_up, user.id)
     return await _flashcards(session, project_id)
 
 
