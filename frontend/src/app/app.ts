@@ -1,9 +1,9 @@
 import { Component, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import {LucideHouse, LucideSettings, LucideUpload} from '@lucide/angular';
+import {LucideDynamicIcon, LucideHouse, LucideMoon, LucideSettings, LucideSun, LucideUpload} from '@lucide/angular';
 
 @Component({
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, LucideHouse, LucideUpload, LucideSettings],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, LucideHouse, LucideUpload, LucideSettings, LucideDynamicIcon],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
@@ -29,5 +29,9 @@ export class App {
 
   private applyTheme(): void {
     document.documentElement.classList.toggle('dark', this.isDarkMode());
+  }
+
+  protected icon() {
+    return this.isDarkMode() ? LucideSun : LucideMoon;
   }
 }

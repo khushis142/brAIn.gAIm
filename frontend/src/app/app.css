@@ -51,7 +51,6 @@
   color: var(--text);
   cursor: pointer;
   font-size: 0.72rem;
-  min-width: 58px;
   padding: 7px 10px;
   text-transform: capitalize;
 }
