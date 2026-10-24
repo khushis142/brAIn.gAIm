@@ -46,6 +46,12 @@
     [14, 'ArrowLeft'], [15, 'ArrowRight'],
   ]);
   const GAMEPAD_AXIS_DEADZONE = 0.5;
+  const ASSET_LIMITS = Object.freeze({
+    image: 5 * 1024 * 1024,
+    audio: 10 * 1024 * 1024,
+    font: 2 * 1024 * 1024,
+    model: 15 * 1024 * 1024,
+  });
 
   // ---------------------------------------------------------------- helpers
   // '*' is required: a sandboxed iframe without allow-same-origin has an
@@ -70,6 +76,7 @@
   let failed = false;
   let stopped = false;
   let hostPaused = false;
+  let contextLost = false;
   let rafId = 0;
   let last = performance.now();
   let lastFrame = last;
@@ -80,6 +87,15 @@
   let frameTime = 0;
   let averageFrameTime = 0;
   let slowFrameCount = 0;
+  let webglCapabilities = Object.freeze({
+    available: false,
+    webgl2: false,
+    maxTextureSize: 0,
+    maxViewportDimensions: [0, 0],
+    antialias: false,
+    highPerformance: false,
+    renderer: '',
+  });
 
   const pointer = {
     x: 0,
@@ -123,6 +139,164 @@
     maxPixelRatio: Math.min(Math.max(Number(requestedPerformance.maxPixelRatio) || 2, 1), 4),
     reducedEffects: requestedPerformance.reducedEffects === true,
   });
+
+  const assetManifest = gameInput.assets && typeof gameInput.assets === 'object' &&
+    !Array.isArray(gameInput.assets) ? gameInput.assets : {};
+  const assetCache = new Map();
+  const assetPending = new Map();
+  const assetProgress = { loaded: 0, total: 0, bytesLoaded: 0, bytesTotal: 0 };
+  const assetEntries = new Map();
+
+  for (const [id, definition] of Object.entries(assetManifest)) {
+    if (!/^[a-zA-Z0-9._-]{1,64}$/.test(id) || definition === null ||
+        typeof definition !== 'object' ||
+        !['image', 'audio', 'font', 'model'].includes(definition.kind) ||
+        typeof definition.url !== 'string') continue;
+    try {
+      const url = new URL(definition.url);
+      if (url.protocol !== 'https:') continue;
+      const hardLimit = ASSET_LIMITS[definition.kind];
+      const maxBytes = Math.min(
+        hardLimit,
+        Number.isFinite(definition.maxBytes) && definition.maxBytes > 0
+          ? definition.maxBytes : hardLimit,
+      );
+      assetEntries.set(id, Object.freeze({
+        kind: definition.kind,
+        url: url.href,
+        maxBytes,
+        preload: definition.preload === true,
+      }));
+    } catch (_) {
+      // Invalid manifest entries are unavailable and never fetched.
+    }
+  }
+
+  const addAssetProgress = (id) => {
+    if (assetProgress.total === 0 || !assetPending.has(id)) {
+      assetProgress.total += 1;
+      const definition = assetEntries.get(id);
+      assetProgress.bytesTotal += definition?.maxBytes || 0;
+    }
+  };
+
+  const materializeAsset = async (definition, bytes) => {
+    const blob = new Blob([bytes]);
+    if (definition.kind === 'model') return bytes;
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      if (definition.kind === 'image') {
+        const image = new Image();
+        image.src = objectUrl;
+        await image.decode();
+        return image;
+      }
+      if (definition.kind === 'audio') {
+        const audio = new Audio(objectUrl);
+        audio.preload = 'auto';
+        await new Promise((resolve, reject) => {
+          audio.addEventListener('canplaythrough', resolve, { once: true });
+          audio.addEventListener('error', reject, { once: true });
+          audio.load();
+        });
+        return audio;
+      }
+      const font = new FontFace(`game-asset-${definition.url}`, bytes);
+      await font.load();
+      document.fonts.add(font);
+      return true;
+    } finally {
+      if (definition.kind !== 'audio') URL.revokeObjectURL(objectUrl);
+    }
+  };
+
+  const readLimitedBody = async (response, maxBytes) => {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength > maxBytes) throw new Error('asset is too large');
+      return bytes;
+    }
+    const chunks = [];
+    let total = 0;
+    try {
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        total += part.value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          throw new Error('asset is too large');
+        }
+        chunks.push(part.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes.buffer;
+  };
+
+  const loadAsset = (id, expectedKind) => {
+    if (typeof id !== 'string' || !assetEntries.has(id) || assetEntries.get(id).kind !== expectedKind) {
+      return Promise.resolve(expectedKind === 'font' ? false : null);
+    }
+    if (assetCache.has(id)) return Promise.resolve(assetCache.get(id));
+    if (assetPending.has(id)) return assetPending.get(id);
+    const definition = assetEntries.get(id);
+    addAssetProgress(id);
+    const promise = fetch(definition.url, { credentials: 'omit' })
+      .then((response) => {
+        if (!response.ok) throw new Error('asset request failed');
+        const declaredLength = Number(response.headers.get('content-length'));
+        if (declaredLength > definition.maxBytes) throw new Error('asset is too large');
+        return readLimitedBody(response, definition.maxBytes);
+      })
+      .then((bytes) => {
+        if (bytes.byteLength > definition.maxBytes) throw new Error('asset is too large');
+        assetProgress.bytesLoaded += bytes.byteLength;
+        return materializeAsset(definition, bytes);
+      })
+      .catch(() => expectedKind === 'font' ? false : null)
+      .then((asset) => {
+        assetCache.set(id, asset);
+        assetProgress.loaded += 1;
+        assetPending.delete(id);
+        return asset;
+      });
+    assetPending.set(id, promise);
+    return promise;
+  };
+
+  const assets = Object.freeze({
+    progress: Object.freeze({
+      get loaded() { return assetProgress.loaded; },
+      get total() { return assetProgress.total; },
+      get bytesLoaded() { return assetProgress.bytesLoaded; },
+      get bytesTotal() { return assetProgress.bytesTotal; },
+    }),
+    loadImage: (id) => loadAsset(id, 'image'),
+    loadAudio: (id) => loadAsset(id, 'audio'),
+    loadFont: (id) => loadAsset(id, 'font'),
+    loadModel: (id) => loadAsset(id, 'model'),
+    preload: async (ids) => {
+      const requested = ids === undefined
+        ? [...assetEntries].filter(([, definition]) => definition.preload).map(([id]) => id)
+        : [...ids];
+      await Promise.all(requested.map((id) => {
+        const definition = assetEntries.get(id);
+        return definition ? loadAsset(id, definition.kind) : Promise.resolve(null);
+      }));
+    },
+  });
+
+  // Begin manifest-declared preloads immediately; games can await api.assets.preload().
+  assets.preload();
 
   function readSafeArea() {
     const probe = document.createElement('div');
@@ -197,6 +371,11 @@
       get averageFrameTime() { return averageFrameTime; },
       get qualityScale() { return qualityScale; },
     }),
+    assets,
+    webgl: Object.freeze({
+      get capabilities() { return webglCapabilities; },
+      createBasicScene,
+    }),
     submitResult(result) {
       if (result === null || typeof result !== 'object' ||
           typeof result.score !== 'number' || !Number.isFinite(result.score)) {
@@ -230,9 +409,109 @@
 
   function createContext(selectedRenderer) {
     if (selectedRenderer === 'webgl') {
-      return canvas.getContext('webgl2') || canvas.getContext('webgl');
+      return canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' }) ||
+        canvas.getContext('webgl', { antialias: true, powerPreference: 'high-performance' });
     }
     return canvas.getContext('2d');
+  }
+
+  function readWebGlCapabilities(gl) {
+    if (!gl) return webglCapabilities;
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const rendererName = debugInfo
+      ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || ''
+      : gl.getParameter(gl.RENDERER) || '';
+    const maxViewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [0, 0];
+    return Object.freeze({
+      available: true,
+      webgl2: typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext,
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) || 0,
+      maxViewportDimensions: [maxViewport[0] || 0, maxViewport[1] || 0],
+      antialias: Boolean(gl.getContextAttributes?.().antialias),
+      highPerformance: /angle|swiftshader|llvmpipe|software/i.test(rendererName) === false,
+      renderer: String(rendererName),
+    });
+  }
+
+  function createBasicScene() {
+    if (renderer !== 'webgl' || !ctx) return null;
+    const gl = ctx;
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    if (!vertexShader || !fragmentShader) return null;
+    gl.shaderSource(vertexShader, 'attribute vec3 p; uniform mat4 m; void main(){gl_Position=m*vec4(p,1.0);}');
+    gl.shaderSource(fragmentShader, 'precision mediump float; uniform vec4 u; void main(){gl_FragColor=u;}');
+    gl.compileShader(vertexShader);
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS) || !gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) return null;
+    const program = gl.createProgram();
+    if (!program) return null;
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+    const vertices = new Float32Array([
+      -1,-1,-1, 1,0,0,1, 1,-1,-1, 0,1,0,1, 1,1,-1, 0,0,1,1, -1,1,-1, 1,1,0,1,
+      -1,-1,1, 1,0,1,1, 1,-1,1, 0,1,1,1, 1,1,1, 1,1,1,1, -1,1,1, 0,0,0,1,
+    ]);
+    const indices = new Uint16Array([
+      0,1,2, 0,2,3, 4,6,5, 4,7,6, 0,4,5, 0,5,1,
+      3,2,6, 3,6,7, 1,5,6, 1,6,2, 0,3,7, 0,7,4,
+    ]);
+    const vertexBuffer = gl.createBuffer();
+    const indexBuffer = gl.createBuffer();
+    if (!vertexBuffer || !indexBuffer) return null;
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, 'p');
+    const boxColor = gl.getUniformLocation(program, 'u');
+    const matrix = gl.getUniformLocation(program, 'm');
+    const boxes = [];
+    const camera = { x: 0, y: 0, z: 5, fov: 60 };
+    const multiply = (a, b) => {
+      const out = new Float32Array(16);
+      for (let row = 0; row < 4; row += 1) for (let column = 0; column < 4; column += 1) {
+        out[column * 4 + row] = a[row] * b[column * 4] + a[4 + row] * b[column * 4 + 1] +
+          a[8 + row] * b[column * 4 + 2] + a[12 + row] * b[column * 4 + 3];
+      }
+      return out;
+    };
+    const perspective = (aspect) => {
+      const f = 1 / Math.tan(camera.fov * Math.PI / 360);
+      const out = new Float32Array(16);
+      out[0] = f / aspect; out[5] = f; out[10] = -1; out[11] = -1; out[14] = -0.2;
+      return out;
+    };
+    const render = (timeSeconds = 0) => {
+      gl.useProgram(program);
+      gl.enable(gl.DEPTH_TEST);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 3, gl.FLOAT, false, 28, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      const projection = perspective(canvas.width / Math.max(1, canvas.height));
+      for (const box of boxes) {
+        const c = Math.cos((box.rotation || 0) + timeSeconds * 0.2);
+        const s = Math.sin((box.rotation || 0) + timeSeconds * 0.2);
+        const model = new Float32Array([c*box.size,0,-s*box.size,0, 0,box.size,0,0, s*box.size,0,c*box.size,0, box.x,box.y,box.z,1]);
+        const view = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, -camera.x,-camera.y,-camera.z,1]);
+        gl.uniformMatrix4fv(matrix, false, multiply(projection, multiply(view, model)));
+        gl.uniform4fv(boxColor, box.color);
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+      }
+    };
+    return {
+      camera,
+      addBox(box = {}) {
+        const item = { x: box.x || 0, y: box.y || 0, z: box.z || 0, size: box.size || 1, color: [...(box.color || [1, 1, 1, 1])], rotation: 0 };
+        boxes.push(item);
+        return item;
+      },
+      render,
+      clear() { boxes.length = 0; },
+    };
   }
 
   // ---------------------------------------------------------------- input
@@ -422,7 +701,7 @@
 
   // ---------------------------------------------------------------- loop
   const shouldRun = () =>
-    game !== null && !failed && !stopped && !hostPaused && !document.hidden;
+    game !== null && !failed && !stopped && !hostPaused && !contextLost && !document.hidden;
 
   function frame(now) {
     rafId = 0;
@@ -551,7 +830,7 @@
       fail(new Error('Game is missing required function(s): ' + missing.join(', ')));
       return;
     }
-    for (const name of ['destroy', 'resize']) {
+    for (const name of ['destroy', 'resize', 'contextLost', 'contextRestored']) {
       if (candidate[name] !== undefined && typeof candidate[name] !== 'function') {
         fail(new Error('Game hook "' + name + '" must be a function'));
         return;
@@ -564,6 +843,11 @@
     if (!ctx) {
       fail(new Error('Runtime: ' + renderer + ' context not available'));
       return;
+    }
+    if (renderer === 'webgl') {
+      webglCapabilities = readWebGlCapabilities(ctx);
+      canvas.addEventListener('webglcontextlost', onWebGlContextLost);
+      canvas.addEventListener('webglcontextrestored', onWebGlContextRestored);
     }
     if (renderer === 'webgl') {
       canvas.addEventListener('webglcontextlost', (event) => {
@@ -581,6 +865,37 @@
     }
 
     post({ type: 'started' });
+    syncLoop();
+  }
+
+  function onWebGlContextLost(event) {
+    event.preventDefault();
+    contextLost = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    try {
+      game?.contextLost?.();
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  function onWebGlContextRestored() {
+    if (failed || stopped || renderer !== 'webgl') return;
+    ctx = createContext(renderer);
+    if (!ctx) {
+      fail(new Error('WebGL context could not be restored'));
+      return;
+    }
+    webglCapabilities = readWebGlCapabilities(ctx);
+    contextLost = false;
+    applyViewport(viewport.width, viewport.height, true);
+    try {
+      game?.contextRestored?.(api);
+    } catch (err) {
+      fail(err);
+      return;
+    }
     syncLoop();
   }
 

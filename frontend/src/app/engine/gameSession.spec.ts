@@ -71,6 +71,30 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('embeds the approved asset manifest', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    session.start(gameCode, {
+      ...options,
+      assets: {
+        player: {
+          kind: 'image',
+          url: 'https://cdn.example.test/games/player.png',
+          maxBytes: 1024 * 1024,
+          preload: true,
+        },
+      },
+    });
+
+    const iframe = container.querySelector('iframe');
+    expect(iframe?.srcdoc).toContain('"player"');
+    expect(iframe?.srcdoc).toContain('https://cdn.example.test/games/player.png');
+    expect(iframe?.srcdoc).toContain('connect-src https://cdn.example.test');
+
+    session.destroy();
+  });
+
   it('updates status, UI design, and result only from the active iframe', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');

@@ -9,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideChevronDown } from '@lucide/angular';
+import { LucideBrain, LucideChevronDown } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, FeedItem } from '../../core/api.service';
 import { GameEngineService } from '../../engine/gameEngineService';
@@ -21,11 +21,20 @@ type PlaybackBubble = 'play' | 'pause';
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
+const DOUBLE_TAP_MS = 300;
+const TAP_SLOP_PX = 10; // more movement than this is a swipe, not a tap
+const BURST_MS = 800; // keep in sync with the burst animation in home.css
+
+interface Burst {
+  id: number;
+  x: number;
+  y: number;
+}
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 @Component({
-  imports: [LucideChevronDown],
+  imports: [LucideBrain, LucideChevronDown],
   selector: 'app-home',
   styleUrl: './home.css',
   templateUrl: './home.html',
@@ -60,12 +69,24 @@ export class Home {
       this.loadError() ?? (this.item()?.type === 'game' ? this.session()?.error() : null) ?? null,
   );
 
+  // Likes are cosmetic for now: kept in memory until the backend has an endpoint
+  private readonly likedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly liked = computed(() => {
+    const current = this.item();
+    return current !== null && this.likedIds().has(current.id);
+  });
+  protected readonly bursts = signal<Burst[]>([]);
+
   private busy = false;
   private username: string | null = null;
   private touchStartY: number | null = null;
   private seekTimestampTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private playerControlsTimer: ReturnType<typeof setTimeout> | null = null;
+  private tapStart: { x: number; y: number } | null = null;
+  private lastTapAt = 0;
+  private nextBurstId = 0;
+  private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -78,6 +99,7 @@ export class Home {
       if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
       if (this.playbackBubbleTimer !== null) clearTimeout(this.playbackBubbleTimer);
       if (this.playerControlsTimer !== null) clearTimeout(this.playerControlsTimer);
+      if (this.singleTapTimer !== null) clearTimeout(this.singleTapTimer);
     });
   }
 
@@ -122,6 +144,50 @@ export class Home {
     const swipedUp = this.touchStartY - event.changedTouches[0].clientY;
     this.touchStartY = null;
     if (swipedUp > SWIPE_MIN_PX) this.next();
+  }
+
+  protected toggleLike(): void {
+    const current = this.item();
+    if (current === null) return;
+    this.setLiked(current.id, !this.liked());
+  }
+
+  protected onTapStart(event: PointerEvent): void {
+    this.tapStart = { x: event.clientX, y: event.clientY };
+  }
+
+  protected onTapEnd(event: PointerEvent): void {
+    const start = this.tapStart;
+    this.tapStart = null;
+    const current = this.item();
+    if (start === null || current === null) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return;
+
+    if (event.timeStamp - this.lastTapAt > DOUBLE_TAP_MS) {
+      this.lastTapAt = event.timeStamp;
+      this.singleTapTimer = setTimeout(() => {
+        this.singleTapTimer = null;
+        this.togglePlayback();
+      }, DOUBLE_TAP_MS);
+      return;
+    }
+    if (this.singleTapTimer !== null) clearTimeout(this.singleTapTimer);
+    this.singleTapTimer = null;
+    // Double tap only likes, never unlikes; the button does that.
+    this.lastTapAt = 0;
+    this.setLiked(current.id, true);
+    const burst = { id: this.nextBurstId++, x: event.offsetX, y: event.offsetY };
+    this.bursts.update((all) => [...all, burst]);
+    setTimeout(() => this.bursts.update((all) => all.filter((b) => b !== burst)), BURST_MS);
+  }
+
+  private setLiked(id: string, liked: boolean): void {
+    this.likedIds.update((ids) => {
+      const next = new Set(ids);
+      if (liked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   protected onResize(): void {

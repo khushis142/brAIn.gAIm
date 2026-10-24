@@ -3,6 +3,43 @@ export const GAME_PROTOCOL_VERSION = 2;
 
 export type GameRenderer = '2d' | 'webgl';
 
+export type GameInputKind = 'touch' | 'keyboard' | 'gamepad';
+
+export interface GamePackageMetadata {
+  readonly renderer: GameRenderer;
+  readonly orientation: GameOrientation;
+  readonly minDurationSeconds: number;
+  readonly maxDurationSeconds: number;
+  readonly input: readonly GameInputKind[];
+  /** Asset IDs used by the package; URLs remain in the approved asset manifest. */
+  readonly assets: readonly string[];
+}
+
+export interface WebGlCapabilities {
+  readonly available: boolean;
+  readonly webgl2: boolean;
+  readonly maxTextureSize: number;
+  readonly maxViewportDimensions: readonly [number, number];
+  readonly antialias: boolean;
+  readonly highPerformance: boolean;
+  readonly renderer: string;
+}
+
+export interface BasicSceneBox {
+  readonly x?: number;
+  readonly y?: number;
+  readonly z?: number;
+  readonly size?: number;
+  readonly color?: readonly [number, number, number, number];
+}
+
+export interface BasicScene {
+  readonly camera: { x: number; y: number; z: number; fov: number };
+  addBox(box?: BasicSceneBox): { x: number; y: number; z: number; size: number; color: number[] };
+  render(timeSeconds?: number): void;
+  clear(): void;
+}
+
 export type GameOrientation = 'portrait' | 'landscape';
 
 export interface GameSafeAreaInsets {
@@ -30,6 +67,19 @@ export interface GamePerformanceOptions {
   readonly maxPixelRatio?: number;
   readonly reducedEffects?: boolean;
 }
+
+export type GameAssetKind = 'image' | 'audio' | 'font' | 'model';
+
+export interface GameAssetDefinition {
+  readonly kind: GameAssetKind;
+  /** Approved backend/CDN URL. Games only use the manifest id. */
+  readonly url: string;
+  /** Optional lower limit for this asset; the runtime always applies hard caps. */
+  readonly maxBytes?: number;
+  readonly preload?: boolean;
+}
+
+export type GameAssetManifest = Readonly<Record<string, GameAssetDefinition>>;
 
 /** Contract shared between the host app and the sandboxed runtime. */
 
@@ -92,8 +142,29 @@ export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
     readonly averageFrameTime: number;
     readonly qualityScale: number;
   };
+  readonly assets: GameAssetsApi;
+  readonly webgl: {
+    readonly capabilities: WebGlCapabilities;
+    createBasicScene(): BasicScene | null;
+  };
   submitResult(result: GameResult): void;
   setUiDesign(design: GameUiDesign): void;
+}
+
+export interface GameAssetsProgress {
+  readonly loaded: number;
+  readonly total: number;
+  readonly bytesLoaded: number;
+  readonly bytesTotal: number;
+}
+
+export interface GameAssetsApi {
+  readonly progress: GameAssetsProgress;
+  loadImage(id: string): Promise<HTMLImageElement | null>;
+  loadAudio(id: string): Promise<HTMLAudioElement | null>;
+  loadFont(id: string): Promise<boolean>;
+  loadModel(id: string): Promise<ArrayBuffer | null>;
+  preload(ids?: readonly string[]): Promise<void>;
 }
 
 export function isGameUiDesign(value: unknown): value is GameUiDesign {
@@ -170,6 +241,8 @@ export interface GameModule<CustomData extends GameCustomData = GameCustomData> 
   update(dt: number, input: InputState): void;
   render(ctx: CanvasRenderingContext2D | WebGLRenderingContext): void;
   resize?(width: number, height: number, viewport: GameViewport): void;
+  contextLost?(): void;
+  contextRestored?(api: GameApi<CustomData>): void;
   destroy?(): void;
 }
 

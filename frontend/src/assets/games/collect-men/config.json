@@ -1,0 +1,32 @@
+{
+  "context": "Create short, encouraging configuration text for a simple 3D reaction game that teaches focus and sustained attention. Set difficulty to easy, normal, or hard. Keep text short for a phone-sized scoreboard and pause menu. Provide a List of Questions with each question having three answers. Two incorrect ones and one correct answer. Keep the questions and answers short enough to fit on a phone screen.",
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "difficulty", "pauseTitle", "pauseMessage", "resumeLabel", "leaderboardTitle", "leaderboardSubtitle", "scoreLabel"],
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "difficulty": { "type": "string", "enum": ["easy", "normal", "hard"] },
+      "pauseTitle": { "type": "string", "minLength": 1, "maxLength": 48 },
+      "pauseMessage": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "resumeLabel": { "type": "string", "minLength": 1, "maxLength": 32 },
+      "leaderboardTitle": { "type": "string", "minLength": 1, "maxLength": 48 },
+      "leaderboardSubtitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "scoreLabel": { "type": "string", "minLength": 1, "maxLength": 32 },
+      "questions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["question", "answer_correct", "answer_incorrect", "answer_incorrect2"],
+          "properties": {
+            "question": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "answer_correct": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "answer_incorrect": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "answer_incorrect2": { "type": "string", "minLength": 1, "maxLength": 120 }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

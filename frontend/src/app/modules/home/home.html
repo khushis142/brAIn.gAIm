@@ -21,7 +21,6 @@
             (timeupdate)="onVideoTimeUpdate($event)"
             (play)="onVideoPlay()"
             (pause)="onVideoPause()"
-            (click)="togglePlayback()"
           ></video>
 
           @if (isSeeking()) {
@@ -64,6 +63,12 @@
               </span>
             </div>
           </div>
+
+          <div class="tap-layer" (pointerdown)="onTapStart($event)" (pointerup)="onTapEnd($event)">
+            @for (burst of bursts(); track burst.id) {
+              <svg lucideBrain class="burst" [style.left.px]="burst.x" [style.top.px]="burst.y"></svg>
+            }
+          </div>
         }
       } @else if (!error()) {
         <p class="placeholder">Loading your feed…</p>
@@ -90,6 +95,18 @@
       @if (item(); as current) {
         <span class="badge">{{ current.type }}</span>
         <h2 class="title">{{ current.title }}</h2>
+        @if (current.type === 'video') {
+          <button
+            class="like"
+            type="button"
+            [class.liked]="liked()"
+            [attr.aria-pressed]="liked()"
+            aria-label="Like"
+            (click)="toggleLike()"
+          >
+            <svg lucideBrain></svg>
+          </button>
+        }
       }
       <button class="next" type="button" (click)="next()" aria-label="Next item">
         <svg lucideChevronDown></svg>
