@@ -13,7 +13,7 @@ go test -race -v ./...                            # run unit tests
 
 ## Architecture & Rules
 
-- **Stateless binary delivery**: The CDN stores and streams files (`video/mp4`, `audio/*`, `application/javascript`, `application/pdf`, `text/*`, `image/*`) in S3 under `<uuid>/<filename>`. All domain metadata (owners, tags, projects, content records) lives in the Backend Postgres database.
+- **Stateless binary delivery**: The CDN stores and streams files (`video/mp4`, `audio/*`, `model/*`, `application/javascript`, `application/pdf`, `text/*`, `image/*`) in S3 under `<uuid>/<filename>`. All domain metadata (owners, tags, projects, content records) lives in the Backend Postgres database.
 - **No arbitrary file execution or HTML**: `validateAssetType` in `internal/handler/handler.go` strictly whitelists permitted extensions and MIME categories.
 - **Upload limits & cleanup**: Request bodies are bounded by `MAX_UPLOAD_SIZE_MB` via `http.MaxBytesReader`. Multipart form overflow files and temporary upload buffers are always cleaned up on request completion.
 - **Immutable caching & byte-range support**: `GET /files/{id}` and `GET /files/{id}/{filename}` support `Range` requests (`206 Partial Content`), `ETag` (`If-None-Match` -> `304 Not Modified`), and set `Cache-Control: public, max-age=31536000, immutable`.

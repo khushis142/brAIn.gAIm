@@ -129,6 +129,12 @@ func TestValidateAssetType(t *testing.T) {
 		{"pic.png", "", "image/png", false},
 		{"avatar.jpg", "", "image/jpeg", false},
 		{"logo.svg", "", "image/svg+xml", false},
+		{"model.glb", "", "model/gltf-binary", false},
+		{"scene.gltf", "", "model/gltf+json", false},
+		{"mesh.obj", "", "model/obj", false},
+		{"part.stl", "", "model/stl", false},
+		{"asset.usdz", "", "model/vnd.usdz+zip", false},
+		{"unknown.3d", "model/gltf-binary", "model/gltf-binary", false},
 		{"test.xyz", "application/pdf", "application/pdf", false},
 		{"malicious.exe", "application/x-msdownload", "", true},
 		{"binary.bin", "application/octet-stream", "", true},
@@ -237,5 +243,27 @@ func TestSwaggerEndpoints(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK for /swagger/openapi.yaml, got %d", rec.Code)
+	}
+}
+
+func TestUpload3DFile(t *testing.T) {
+	handler, _ := setupTestServer()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "scene.glb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = part.Write([]byte("glTF binary mock data"))
+	_ = writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/v1/files", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created for .glb, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

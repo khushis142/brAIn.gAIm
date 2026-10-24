@@ -347,6 +347,19 @@ func (h *Handler) ServeSwaggerUI(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(swaggerHTML))
 }
 
+func init() {
+	_ = mime.AddExtensionType(".glb", "model/gltf-binary")
+	_ = mime.AddExtensionType(".gltf", "model/gltf+json")
+	_ = mime.AddExtensionType(".obj", "model/obj")
+	_ = mime.AddExtensionType(".mtl", "model/mtl")
+	_ = mime.AddExtensionType(".stl", "model/stl")
+	_ = mime.AddExtensionType(".fbx", "model/fbx")
+	_ = mime.AddExtensionType(".dae", "model/vnd.collada+xml")
+	_ = mime.AddExtensionType(".usdz", "model/vnd.usdz+zip")
+	_ = mime.AddExtensionType(".3mf", "model/3mf")
+	_ = mime.AddExtensionType(".ply", "model/ply")
+}
+
 func validateAssetType(filename, headerContentType string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
@@ -370,6 +383,27 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 		return "audio/webm", nil
 	case ".opus":
 		return "audio/opus", nil
+	// 3D Models
+	case ".glb":
+		return "model/gltf-binary", nil
+	case ".gltf":
+		return "model/gltf+json", nil
+	case ".obj":
+		return "model/obj", nil
+	case ".mtl":
+		return "model/mtl", nil
+	case ".stl":
+		return "model/stl", nil
+	case ".fbx":
+		return "model/fbx", nil
+	case ".dae":
+		return "model/vnd.collada+xml", nil
+	case ".usdz":
+		return "model/vnd.usdz+zip", nil
+	case ".3mf":
+		return "model/3mf", nil
+	case ".ply":
+		return "model/ply", nil
 	// Script
 	case ".js", ".mjs", ".cjs":
 		return "application/javascript", nil
@@ -410,6 +444,7 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 		}
 		if hType == "video/mp4" ||
 			strings.HasPrefix(hType, "audio/") ||
+			strings.HasPrefix(hType, "model/") ||
 			hType == "application/javascript" || hType == "text/javascript" ||
 			hType == "application/pdf" ||
 			strings.HasPrefix(hType, "text/") ||
@@ -420,13 +455,13 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 
 	if ext != "" {
 		if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-			if strings.HasPrefix(mimeType, "audio/") || strings.HasPrefix(mimeType, "text/") || strings.HasPrefix(mimeType, "image/") {
+			if strings.HasPrefix(mimeType, "audio/") || strings.HasPrefix(mimeType, "text/") || strings.HasPrefix(mimeType, "image/") || strings.HasPrefix(mimeType, "model/") {
 				return mimeType, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("unsupported file type: only video (mp4), audio, code (js), or docs (pdf, text, images) are permitted (got filename: %s, mime: %s)", filename, headerContentType)
+	return "", fmt.Errorf("unsupported file type: only video (mp4), audio, 3D models (glb, gltf, obj, etc), code (js), or docs (pdf, text, images) are permitted (got filename: %s, mime: %s)", filename, headerContentType)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

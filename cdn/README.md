@@ -4,7 +4,7 @@
 [![Storage](https://img.shields.io/badge/storage-RustFS%20%2F%20S3-DEA584?style=flat&logo=rust)](https://github.com/rustfs)
 [![API Spec](https://img.shields.io/badge/OpenAPI-3.0.3-85EA2D?style=flat&logo=openapiinitiative)](/swagger/)
 
-Lightweight, high-performance static asset CDN written in Go. Delivers video (`.mp4`), audio (`.mp3`, `.wav`, `.ogg`, etc.), code/scripts (`.js`), and documents (`.pdf`, text, images) directly from S3-compatible storage ([RustFS](https://github.com/rustfs) / MinIO).
+Lightweight, high-performance static asset CDN written in Go. Delivers video (`.mp4`), audio (`.mp3`, `.wav`, `.ogg`, etc.), 3D models (`.glb`, `.gltf`, etc.), code/scripts (`.js`), and documents (`.pdf`, text, images) directly from S3-compatible storage ([RustFS](https://github.com/rustfs) / MinIO).
 
 > [!NOTE]
 > Asset metadata (ownership, tags, topics, user relations) is managed externally in the **Backend**. The CDN acts purely as a content delivery engine: receiving binary streams, assigning UUIDs, storing to S3, and streaming with byte-range support and immutable caching.
@@ -40,6 +40,7 @@ flowchart TD
 |---|---|---|
 | **Video** | `.mp4` | `video/mp4` |
 | **Audio** | `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.flac`, `.weba`, `.opus` | `audio/mpeg`, `audio/wav`, `audio/ogg`, `audio/mp4`, `audio/aac`, `audio/flac`, `audio/webm`, `audio/opus` |
+| **3D Models** | `.glb`, `.gltf`, `.obj`, `.mtl`, `.stl`, `.fbx`, `.dae`, `.usdz`, `.3mf`, `.ply` | `model/gltf-binary`, `model/gltf+json`, `model/obj`, `model/mtl`, `model/stl`, `model/fbx`, `model/vnd.collada+xml`, `model/vnd.usdz+zip`, `model/3mf`, `model/ply` |
 | **Code / Scripts** | `.js`, `.mjs`, `.cjs` | `application/javascript`, `text/javascript` |
 | **PDF** | `.pdf` | `application/pdf` |
 | **Text** | `.txt`, `.md`, `.csv`, `.json`, `.xml` | `text/plain`, `text/markdown`, `text/csv`, `application/json`, `application/xml` |
@@ -198,7 +199,7 @@ go test -v ./...
 ## CI / CD
 
 Configured identical to `../Frontend`:
-- `version.txt`: Semantic version tracking (`0.0.5`)
+- `version.txt`: Semantic version tracking (`0.0.7`)
 - `renovate.json`: Automated dependency upgrades with automerge for patch/minor updates
 - `.github/workflows/pr-bump-version.yaml`: Automatic version bumps for Renovate PRs
 - `.github/workflows/release-and-build.yaml`: Container image build and GitHub release pipeline
