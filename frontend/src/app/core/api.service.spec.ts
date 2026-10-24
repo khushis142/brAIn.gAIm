@@ -110,6 +110,30 @@ describe('ApiService', () => {
     request.flush({ status: 'ok' });
   });
 
+  it('registers a video from an already-uploaded CDN file', () => {
+    authenticate();
+    api.createContent({ id: 'cdn-1', filename: 'clip.mp4', title: 'My clip', tags: ['bio'] }).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/content`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    expect(request.request.body).toEqual({
+      id: 'cdn-1',
+      filename: 'clip.mp4',
+      title: 'My clip',
+      tags: ['bio'],
+    });
+    request.flush({
+      id: 'content-1',
+      kind: 'video',
+      title: 'My clip',
+      tags: ['bio'],
+      owner: 'alex',
+      url: 'http://cdn/clip.mp4',
+      created_at: '2026-01-01T00:00:00Z',
+    });
+  });
+
   function authenticate(): void {
     api.login('alex', 'password123').subscribe();
     httpTesting.expectOne(`${environment.apiBaseUrl}/auth/token`).flush({

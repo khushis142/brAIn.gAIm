@@ -58,6 +58,13 @@ export interface ContentRead {
   created_at: string;
 }
 
+export interface ContentCreate {
+  id: string;
+  filename: string;
+  title: string;
+  tags?: string[];
+}
+
 export interface ScoreCreate {
   score: number;
 }
@@ -149,6 +156,10 @@ export class ApiService {
     let params = new HttpParams().set('limit', limit);
     if (kind) params = params.set('kind', kind);
     return this.http.get<ContentRead[]>(this.url('content'), { params });
+  }
+
+  createContent(content: ContentCreate): Observable<ContentRead> {
+    return this.http.post<ContentRead>(this.url('content'), content, this.authOptions());
   }
 
   nextItem(): Observable<FeedItem> {
