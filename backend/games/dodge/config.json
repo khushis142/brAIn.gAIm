@@ -1,5 +1,11 @@
 {
   "context": "Create short, encouraging configuration text for a reaction game that teaches focus and sustained attention. Use the player's study context to make the wording relevant. Set difficulty to easy, normal, or hard. Keep every text field short enough for a phone-sized scoreboard and pause menu.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": [

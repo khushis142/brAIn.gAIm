@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 from jsonschema import validate
@@ -17,8 +18,9 @@ from app.generator.games import generate_game, publish_generated_game
 from app.generator.inputs import GameConfig, InputGenerationError
 from app.generator.llm import FakeLLM, LLMError
 from app.main import app
-from app.models import Base, Content, GameRound, Impression, Score, User
+from app.models import Base, Content, GameRound, Impression, Score, User, UserAccessory
 from app.seed_game import seed_game, update_game
+from tests.test_attachments import text_pdf
 
 EXAMPLE_DIR = Path(__file__).parents[1] / "games/example-quiz"
 EXAMPLE_GAME = GameConfig.model_validate_json((EXAMPLE_DIR / "config.json").read_text())
@@ -352,7 +354,7 @@ async def test_leaderboard_keeps_best_score_per_user(client: AsyncClient) -> Non
     video = (await _register(client, erin))["id"]
     for headers, score in [(erin, 10), (erin, 30), (frank, 20)]:
         res = await client.post(f"/games/{game}/scores", json={"score": score}, headers=headers)
-        assert res.status_code == 204
+        assert res.status_code == 200
 
     board = (await client.get(f"/games/{game}/leaderboard")).json()
     assert board == [{"username": "erin", "score": 30}, {"username": "frank", "score": 20}]
@@ -372,14 +374,22 @@ async def test_projects_are_private_crud(client: AsyncClient) -> None:
     )
     assert res.status_code == 201
     project = res.json()
+    assert project["color"] == "#ffc800"
     assert project["body"] == "# Notes\n\n*FSRS* basics"
     assert project["attachments"] == []
     path = f"/projects/{project['id']}"
 
-    patched = (await client.patch(path, json={"name": "Thesis v2"}, headers=owner)).json()
+    patched_response = await client.patch(
+        path, json={"name": "Thesis v2", "color": "#42a5f5"}, headers=owner
+    )
+    assert patched_response.status_code == 200
+    patched = patched_response.json()
     assert patched["name"] == "Thesis v2"
+    assert patched["color"] == "#42a5f5"
     assert patched["body"] == project["body"]
     assert patched["updated_at"] >= project["updated_at"]
+    assert (await client.get(path, headers=owner)).json()["color"] == "#42a5f5"
+    assert (await client.patch(path, json={"color": "blue"}, headers=owner)).status_code == 422
 
     assert [p["id"] for p in (await client.get("/projects", headers=owner)).json()] == [
         project["id"]
@@ -482,7 +492,9 @@ async def test_active_project_feeds_the_games(
     # Setting the same project again or other fields keeps the prepared round.
     await client.patch("/users/me", json={"active_project_id": second["id"]}, headers=owner)
     await client.patch("/users/me", json={"interests": "x"}, headers=owner)
+    await client.patch(f"/projects/{second['id']}", json={"color": "#42a5f5"}, headers=owner)
     assert len(materials) == 3
+    assert await ready_rounds() == 1
 
     # Others' projects can't be activated, and look the same as missing ones.
     for project_id in [foreign["id"], str(uuid.uuid4())]:
@@ -553,8 +565,10 @@ async def test_flashcards_are_generated_on_request(
 
     second = await generate()
     assert len(second) == 10 and not set(second) & set(first)
+    # Nothing to make cards from: an error, and the old cards stay.
     await client.patch(path, json={"body": ""}, headers=owner)
-    assert await generate() == []
+    assert (await client.post(cards_path, headers=owner)).status_code == 422
+    assert await card_ids() == second
 
     # Rounds use a few random cards of the active project.
     await client.patch(path, json={"body": "v3"}, headers=owner)
@@ -566,3 +580,272 @@ async def test_flashcards_are_generated_on_request(
         materials = await feed._project_materials(session, user_id)
     assert len(materials) == feed.CARDS_PER_ROUND
     assert all(m.startswith("# P: ") for m in materials)
+
+
+async def _score(
+    client: AsyncClient, headers: dict[str, str], game: str, score: int, **extra: object
+) -> dict:
+    res = await client.post(
+        f"/games/{game}/scores", json={"score": score, **extra}, headers=headers
+    )
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+async def _user_id(username: str) -> uuid.UUID:
+    async with SessionLocal() as session:
+        user_id = await session.scalar(select(User.id).where(User.username == username))
+        assert user_id is not None
+        return user_id
+
+
+async def _unlock_rows(username: str) -> list[str]:
+    user_id = await _user_id(username)
+    async with SessionLocal() as session:
+        return sorted(
+            await session.scalars(
+                select(UserAccessory.accessory_id).where(UserAccessory.user_id == user_id)
+            )
+        )
+
+
+async def test_zombie_endpoints_require_auth(client: AsyncClient) -> None:
+    await _auth(client, "owner")
+    game = await _create_game("owner")
+    bogus = {"Authorization": "Bearer garbage"}
+    for headers in [{}, bogus]:
+        assert (await client.get("/zombie/accessories", headers=headers)).status_code == 401
+        assert (await client.get("/users/me/zombie", headers=headers)).status_code == 401
+        res = await client.put("/users/me/zombie/equipped", json={}, headers=headers)
+        assert res.status_code == 401
+        res = await client.post(f"/games/{game}/scores", json={"score": 1}, headers=headers)
+        assert res.status_code == 401
+
+
+async def test_accessory_catalog(client: AsyncClient) -> None:
+    headers = await _auth(client, "shopper")
+    catalog = (await client.get("/zombie/accessories", headers=headers)).json()
+    assert [(a["id"], a["slot"]) for a in catalog] == [
+        ("hat", "head"),
+        ("sunglasses", "eyes"),
+        ("red-sneakers", "feet"),
+        ("gold-chain", "neck"),
+    ]
+    assert all(set(a) == {"id", "name", "slot", "unlock_description"} for a in catalog)
+
+
+async def test_score_is_persisted_and_unlocks_the_hat(client: AsyncClient) -> None:
+    headers = await _auth(client, "newbie")
+    game = await _create_game("newbie")
+    assert await _score(client, headers, game, 3) == {
+        "newly_unlocked": ["hat"],
+        "games_completed": 1,
+    }
+    async with SessionLocal() as session:
+        score = await session.scalar(select(Score))
+    assert score is not None
+    assert (score.user_id, str(score.game_id), score.score, score.round_id) == (
+        await _user_id("newbie"),
+        game,
+        3,
+        None,
+    )
+    assert score.created_at is not None
+    # Unlocks are reported once.
+    assert await _score(client, headers, game, 0) == {"newly_unlocked": [], "games_completed": 2}
+
+
+async def test_round_scores_are_idempotent(client: AsyncClient) -> None:
+    headers = await _auth(client, "replayer")
+    other = await _auth(client, "copycat")
+    game = await _create_game("replayer")
+    other_game = await _create_game("replayer")
+    async with SessionLocal() as session:
+        game_round = GameRound(
+            user_id=await _user_id("replayer"), game_id=uuid.UUID(game), input={}
+        )
+        session.add(game_round)
+        await session.commit()
+    round_id = str(game_round.id)
+
+    first = await _score(client, headers, game, 5, round_id=round_id)
+    assert first == {"newly_unlocked": ["hat"], "games_completed": 1}
+    # A resubmission (even with a better score) is ignored and runs no unlocks.
+    again = await _score(client, headers, game, 50, round_id=round_id)
+    assert again == {"newly_unlocked": [], "games_completed": 1}
+    async with SessionLocal() as session:
+        assert list(await session.scalars(select(Score.score))) == [5]
+    assert await _unlock_rows("replayer") == ["hat"]
+
+    # Only the user's own rounds of that game can be scored.
+    body = {"score": 1, "round_id": round_id}
+    for path, headers_ in [(game, other), (other_game, headers)]:
+        res = await client.post(f"/games/{path}/scores", json=body, headers=headers_)
+        assert res.status_code == 404
+    unknown = {"score": 1, "round_id": str(uuid.uuid4())}
+    res = await client.post(f"/games/{game}/scores", json=unknown, headers=headers)
+    assert res.status_code == 404
+
+
+async def test_games_completed_unlocks(client: AsyncClient) -> None:
+    headers = await _auth(client, "grinder")
+    game = await _create_game("grinder")
+    unlocked_after: dict[str, int] = {}
+    for n in range(1, 26):
+        # Equal scores never beat the personal best.
+        result = await _score(client, headers, game, 7)
+        assert result["games_completed"] == n
+        for accessory in result["newly_unlocked"]:
+            assert accessory not in unlocked_after
+            unlocked_after[accessory] = n
+    assert unlocked_after == {"hat": 1, "sunglasses": 5, "gold-chain": 25}
+    assert await _unlock_rows("grinder") == ["gold-chain", "hat", "sunglasses"]
+
+
+async def test_personal_best_unlock_needs_an_earlier_score_of_that_game(
+    client: AsyncClient,
+) -> None:
+    headers = await _auth(client, "climber")
+    first_game = await _create_game("climber")
+    second_game = await _create_game("climber")
+    assert (await _score(client, headers, first_game, 10))["newly_unlocked"] == ["hat"]
+    # A first score in another game is no personal best, however high (scales differ).
+    assert (await _score(client, headers, second_game, 500))["newly_unlocked"] == []
+    assert (await _score(client, headers, first_game, 10))["newly_unlocked"] == []  # a tie
+    assert (await _score(client, headers, first_game, 11))["newly_unlocked"] == ["red-sneakers"]
+    assert await _unlock_rows("climber") == ["hat", "red-sneakers"]
+
+
+async def test_zombie_backfills_existing_score_history(client: AsyncClient) -> None:
+    headers = await _auth(client, "veteran")
+    game = await _create_game("veteran")
+    user_id = await _user_id("veteran")
+    async with SessionLocal() as session:
+        session.add_all(
+            Score(user_id=user_id, game_id=uuid.UUID(game), score=score) for score in [1, 4, 2]
+        )
+        await session.commit()
+
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert zombie == {
+        "unlocked": ["hat", "red-sneakers"],
+        "equipped": {"head": None, "eyes": None, "neck": None, "feet": None},
+        "games_completed": 3,
+        "progress": [
+            {"id": "sunglasses", "current": 3, "target": 5},
+            {"id": "gold-chain", "current": 3, "target": 25},
+        ],
+    }
+    assert (await client.get("/users/me/zombie", headers=headers)).json() == zombie
+    assert await _unlock_rows("veteran") == ["hat", "red-sneakers"]
+    # Backfilled accessories are not reported again by the next score.
+    assert await _score(client, headers, game, 0) == {"newly_unlocked": [], "games_completed": 4}
+
+
+async def test_equip_accessories(client: AsyncClient) -> None:
+    headers = await _auth(client, "dresser")
+    game = await _create_game("dresser")
+    path = "/users/me/zombie/equipped"
+    fresh = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert (fresh["unlocked"], fresh["games_completed"]) == ([], 0)
+    assert [p["id"] for p in fresh["progress"]] == ["hat", "sunglasses", "gold-chain"]
+
+    await _score(client, headers, game, 1)
+    await _score(client, headers, game, 2)  # hat and red sneakers
+    res = await client.put(path, json={"head": "hat", "feet": "red-sneakers"}, headers=headers)
+    assert res.status_code == 200
+    expected = {"head": "hat", "eyes": None, "neck": None, "feet": "red-sneakers"}
+    assert res.json()["equipped"] == expected
+    assert res.json() == (await client.get("/users/me/zombie", headers=headers)).json()
+
+    # Omitted slots stay, null unequips.
+    res = await client.put(path, json={"feet": None}, headers=headers)
+    expected = {"head": "hat", "eyes": None, "neck": None, "feet": None}
+    assert res.json()["equipped"] == expected
+    assert (await client.put(path, json={}, headers=headers)).json() == res.json()
+
+    for body in [
+        {"eyes": "hat"},  # wrong slot
+        {"head": "crown"},  # unknown accessory
+        {"tail": "hat"},  # unknown slot
+    ]:
+        assert (await client.put(path, json=body, headers=headers)).status_code == 422, body
+    locked = await client.put(path, json={"eyes": "sunglasses"}, headers=headers)
+    assert locked.status_code == 403
+    # Failed updates change nothing.
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert zombie["equipped"] == expected
+
+
+async def test_flashcards_read_text_and_pdf_attachments(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.generator import flashcards
+
+    owner = await _auth(client, "reader")
+    project = (await client.post("/projects", json={"name": "Bio"}, headers=owner)).json()
+    path = f"/projects/{project['id']}"
+    files = {
+        "notes.txt": b"Mitochondria make ATP.",
+        "paper.pdf": text_pdf("Ribosomes build proteins"),
+        "diagram.png": b"\x89PNG never read",
+        "gone.md": None,  # missing on the CDN
+    }
+    downloads: list[str] = []
+    materials: list[str] = []
+
+    async def fake_download(file_id: uuid.UUID, filename: str, max_bytes: int) -> bytes:
+        downloads.append(filename)
+        if files[filename] is None:
+            request = httpx.Request("GET", cdn.file_url(file_id, filename))
+            raise httpx.HTTPStatusError("404", request=request, response=httpx.Response(404))
+        return files[filename]
+
+    real_generate = flashcards.generate_flashcards
+
+    async def recording_generate(llm, material):  # type: ignore[no-untyped-def]
+        materials.append(material)
+        return await real_generate(llm, material)
+
+    monkeypatch.setattr(cdn, "download", fake_download)
+    monkeypatch.setattr(flashcards, "generate_flashcards", recording_generate)
+
+    async def attach(filename: str) -> None:
+        body = {"id": str(uuid.uuid4()), "filename": filename}
+        assert (
+            await client.post(f"{path}/attachments", json=body, headers=owner)
+        ).status_code == 201
+
+    # An image alone is no material, and isn't even downloaded.
+    await attach("diagram.png")
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 422
+    assert downloads == []
+
+    for filename in ["notes.txt", "paper.pdf", "gone.md"]:
+        await attach(filename)
+    res = await client.post(f"{path}/flashcards", headers=owner)
+    assert res.status_code == 200 and len(res.json()) == 10
+    assert sorted(downloads) == ["gone.md", "notes.txt", "paper.pdf"]
+    assert materials == [
+        "# Bio\n\n## notes.txt\n\nMitochondria make ATP."
+        "\n\n## paper.pdf\n\nRibosomes build proteins"
+    ]
+
+    # Unchanged project: no downloads, no LLM call. A new attachment counts as a change.
+    downloads.clear()
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 200
+    assert downloads == [] and len(materials) == 1
+    files["more.txt"] = b"Cells divide."
+    await attach("more.txt")
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 200
+    assert len(materials) == 2 and "Cells divide." in materials[1]
+
+    # An unreachable CDN fails the request instead of making cards from part of the project.
+    files["late.txt"] = b"x"
+    await attach("late.txt")
+
+    async def unreachable(*args: object) -> bytes:
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(cdn, "download", unreachable)
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 502

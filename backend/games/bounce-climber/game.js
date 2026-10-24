@@ -34,8 +34,8 @@ const PLATFORM_Y_OFFSET = 125; // Up from middle platform
 
 function init(gameApi) {
   api = gameApi;
-  W = api.width || 360;
-  H = api.height || 640;
+  W = api.viewport.width || 360;
+  H = api.viewport.height || 640;
 
   // Defensive data extraction
   const rawQuestions = Array.isArray(api.data?.questions) ? api.data.questions : [];
@@ -254,6 +254,10 @@ function update(dt, input) {
   }
 
   elapsedTime += dt;
+  if (elapsedTime >= 60) {
+    finishGame(score, false);
+    return;
+  }
 
   // Steering controls
   let moveDir = 0;
@@ -261,10 +265,8 @@ function update(dt, input) {
     typeof input.keys?.ArrowLeft === 'object' ? input.keys.ArrowLeft.held : input.keys?.ArrowLeft;
   const rightHeld =
     typeof input.keys?.ArrowRight === 'object' ? input.keys.ArrowRight.held : input.keys?.ArrowRight;
-  const aHeld = typeof input.keys?.KeyA === 'object' ? input.keys.KeyA.held : input.keys?.KeyA;
-  const dHeld = typeof input.keys?.KeyD === 'object' ? input.keys.KeyD.held : input.keys?.KeyD;
-  if (leftHeld || aHeld || isTouching('left')) moveDir -= 1;
-  if (rightHeld || dHeld || isTouching('right')) moveDir += 1;
+  if (leftHeld || isTouching('left')) moveDir -= 1;
+  if (rightHeld || isTouching('right')) moveDir += 1;
 
   if (moveDir !== 0) {
     facing = moveDir;
@@ -679,7 +681,7 @@ function render(ctx) {
   }
 }
 
-function resize(width, height) {
+function resize(width, height, viewport) {
   W = width;
   H = height;
 }

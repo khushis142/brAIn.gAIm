@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from typing import Any, Self
 
 from jsonschema import Draft202012Validator, SchemaError
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.generator.llm import LLM, Message
 from app.generator.preconditions import TtsStep
@@ -25,10 +25,51 @@ _MAX_REPORTED_ERRORS = 10
 class GameConfig(BaseModel):
     """Stored on every game as `Content.config`."""
 
+    model_config = ConfigDict(extra="forbid")
+
     input_schema: dict[str, Any]
     context: str
+    renderer: str = "2d"
+    orientation: str = "portrait"
+    minDurationSeconds: int = Field(default=20, gt=0)
+    maxDurationSeconds: int = Field(default=60, gt=0)
+    input: list[str] = Field(default_factory=lambda: ["touch", "keyboard"])
+    assets: list[str] = Field(default_factory=list)
     # Run on the generated input before a round is ready; see app/generator/preconditions.py.
-    preconditions: list[TtsStep] = []
+    preconditions: list[TtsStep] = Field(default_factory=list)
+
+    @field_validator("renderer")
+    @classmethod
+    def _valid_renderer(cls, renderer: str) -> str:
+        if renderer not in {"2d", "webgl"}:
+            raise ValueError("renderer must be '2d' or 'webgl'")
+        return renderer
+
+    @field_validator("orientation")
+    @classmethod
+    def _valid_orientation(cls, orientation: str) -> str:
+        if orientation not in {"portrait", "landscape"}:
+            raise ValueError("orientation must be 'portrait' or 'landscape'")
+        return orientation
+
+    @field_validator("input")
+    @classmethod
+    def _valid_input(cls, input_sources: list[str]) -> list[str]:
+        allowed_sources = {"touch", "keyboard", "gamepad"}
+        if not input_sources or any(source not in allowed_sources for source in input_sources):
+            raise ValueError("input must contain only touch, keyboard, and gamepad")
+        if len(input_sources) != len(set(input_sources)):
+            raise ValueError("input entries must be unique")
+        return input_sources
+
+    @field_validator("assets")
+    @classmethod
+    def _valid_assets(cls, assets: list[str]) -> list[str]:
+        if len(assets) > 32 or len(assets) != len(set(assets)):
+            raise ValueError("assets must contain at most 32 unique IDs")
+        if any(not asset or len(asset) > 128 for asset in assets):
+            raise ValueError("asset IDs must be non-empty and at most 128 characters")
+        return assets
 
     @field_validator("input_schema")
     @classmethod
@@ -52,6 +93,8 @@ class GameConfig(BaseModel):
 
     @model_validator(mode="after")
     def _preconditions_fit_schema(self) -> Self:
+        if self.minDurationSeconds > self.maxDurationSeconds:
+            raise ValueError("minDurationSeconds must not exceed maxDurationSeconds")
         for step in self.preconditions:
             step.check_against(self.input_schema)
         return self

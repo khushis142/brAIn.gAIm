@@ -3,7 +3,7 @@
 services:
   backend:
     # Deployed version, updated by hand after CI has published it (see README).
-    image: ghcr.io/brain-gaim/backend:0.0.19
+    image: ghcr.io/brain-gaim/backend:0.0.23
     container_name: backend
     restart: unless-stopped
     ports: ["3000:8000"]

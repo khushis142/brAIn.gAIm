@@ -14,12 +14,17 @@ class Score(Base):
     __table_args__ = (
         CheckConstraint("score >= 0", name="score_non_negative"),
         Index("ix_scores_game_score", "game_id", "score"),
+        Index("ix_scores_user_game", "user_id", "game_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     game_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("content.id", ondelete="CASCADE"))
     score: Mapped[int]
+    # The feed round this score is for; each round is scored once, resubmissions are ignored.
+    round_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("game_rounds.id", ondelete="SET NULL"), unique=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

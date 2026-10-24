@@ -1,5 +1,11 @@
 {
   "context": "Create short, encouraging configuration text for a simple 3D reaction game that teaches focus and sustained attention. Set difficulty to easy, normal, or hard. Keep text short for a phone-sized scoreboard and pause menu.",
+  "renderer": "webgl",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "difficulty", "pauseTitle", "pauseMessage", "resumeLabel", "leaderboardTitle", "leaderboardSubtitle", "scoreLabel"],

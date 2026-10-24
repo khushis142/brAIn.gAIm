@@ -50,12 +50,15 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | PATCH  | `/projects/{id}`             | ✓    | `{name?, body?}`                           |
 | DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
 | GET    | `/projects/{id}/flashcards`  | ✓    | The project's flashcards; empty until generated |
-| POST   | `/projects/{id}/flashcards`  | ✓    | (Re)generate them from the current text (one LLM call, waits for it; 502 keeps the old ones) |
+| POST   | `/projects/{id}/flashcards`  | ✓    | (Re)generate them from the body and txt/md/csv/PDF attachments (one LLM call, waits for it; 422 without any text, 502 keeps the old ones) |
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, jpeg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
 | POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
-| POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
+| POST   | `/games/{id}/scores`         | ✓    | Submit `{score, round_id?}` → `{newly_unlocked, games_completed}`; a round is scored once |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
+| GET    | `/zombie/accessories`        | ✓    | Accessory catalog `[{id, name, slot, unlock_description}]` |
+| GET    | `/users/me/zombie`           | ✓    | `{unlocked, equipped, games_completed, progress}` |
+| PUT    | `/users/me/zombie/equipped`  | ✓    | `{head?, eyes?, neck?, feet?}`, `null` unequips; 403 if not unlocked |
 
 **Uploading:** the client uploads the file to the [CDN](https://github.com/brAIn-gAIm/CDN)
 (`POST /api/v1/files`), then registers the returned `id` and `filename` with
@@ -102,10 +105,16 @@ other requests. Uploads set `fileId`/`filename`, project creation sets `projectI
 - **Projects**: a user's private knowledge (Markdown body plus CDN attachments). The
   one set as `active_project_id` on the user is the material for the mini games;
   switching, editing or deleting it (or regenerating its flashcards) discards the prepared round so the next game is about the current material.
-  On the user's request (`POST /projects/{id}/flashcards`), the LLM splits it into
-  flashcards (short, self-contained snippets), replacing the old ones; unchanged text
-  skips the call. Nothing regenerates them automatically, to keep LLM calls down. They replace the planned decks and
+  On the user's request (`POST /projects/{id}/flashcards`), the LLM splits its body and
+  attachments (text files as they are, PDFs text-extracted, images skipped; at most 50k
+  characters) into flashcards (short, self-contained snippets), replacing the old ones;
+  an unchanged project skips the call. Nothing regenerates them automatically, to keep LLM calls down. They replace the planned decks and
   documents (#20). Other users get 404, not 403, so projects don't reveal they exist.
+- **Zombie wardrobe** (`app/zombie.py`): the mascot's accessories are a static catalog in
+  code, each with an unlock rule over the user's score history (games finished, beating
+  an earlier score in the same game; never raw scores, as their scales differ per game).
+  Rules run after every score and on `GET /users/me/zombie`, so existing players and new
+  accessories are backfilled. Unlocks are permanent; one accessory per slot can be worn.
 - **Migrations**: Alembic. After changing a model in `app/models/` (one module per domain;
   re-export new models in `app/models/__init__.py` so autogenerate sees them):
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.

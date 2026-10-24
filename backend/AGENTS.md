@@ -21,7 +21,8 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 
 - Files live on the CDN service (github.com/brAIn-gAIm/CDN); clients upload there
   directly. The backend owns all metadata (`content` table, keyed by the CDN file id)
-  and never handles file bytes or S3.
+  and never proxies uploads or touches S3; it only downloads text/PDF attachments to
+  read them for flashcards (`app/generator/attachments.py`).
 - Delivery URLs are always built by `app/cdn.py` from `CDN_BASE_URL`; never store or
   return a client-supplied URL (games are JS that runs in the app).
 - Users' free-text `interests` are the input for feed personalization (not built yet).

@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Sequence
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -8,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app import feed
 from app.cdn import file_url
 from app.db import SessionDep
-from app.generator.flashcards import refresh_flashcards
+from app.generator.flashcards import NoMaterialError, refresh_flashcards
 from app.generator.inputs import InputGenerationError
 from app.generator.llm import LLMError
 from app.models import Flashcard, Project, ProjectAttachment, User
@@ -38,6 +39,7 @@ def _read(project: Project) -> ProjectRead:
     return ProjectRead(
         id=project.id,
         name=project.name,
+        color=project.color,
         body=project.body,
         attachments=[_attachment(a) for a in project.attachments],
         created_at=project.created_at,
@@ -88,11 +90,16 @@ async def update_project(
     background: BackgroundTasks,
 ) -> ProjectRead:
     project = await _get_own(session, project_id, user)
-    for name, value in body.model_dump(exclude_none=True).items():
-        setattr(project, name, value)
-    if user.active_project_id == project_id:
+    updates = body.model_dump(exclude_none=True)
+    changed_material = any(
+        name in {"name", "body"} and getattr(project, name) != value
+        for name, value in updates.items()
+    )
+    if changed_material and user.active_project_id == project_id:
         await feed.discard_ready_rounds(session, user.id)
         background.add_task(feed.top_up, user.id)
+    for name, value in updates.items():
+        setattr(project, name, value)
     await session.commit()
     await session.refresh(project)  # updated_at is set by the database
     return _read(project)
@@ -120,7 +127,10 @@ async def list_flashcards(
 @router.post(
     "/{project_id}/flashcards",
     response_model=list[FlashcardRead],
-    responses={status.HTTP_502_BAD_GATEWAY: {"description": "The LLM failed; old cards kept"}},
+    responses={
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "No text in body or attachments"},
+        status.HTTP_502_BAD_GATEWAY: {"description": "The LLM or CDN failed; old cards kept"},
+    },
 )
 async def generate_flashcards(
     project_id: uuid.UUID,
@@ -128,12 +138,17 @@ async def generate_flashcards(
     session: SessionDep,
     background: BackgroundTasks,
 ) -> Sequence[Flashcard]:
-    """(Re)generate the cards from the project's current text; one LLM call, so it takes a
-    while. Unchanged text returns the existing cards without one."""
+    """(Re)generate the cards from the project's body and text/PDF attachments; one LLM
+    call, so it takes a while. An unchanged project returns the existing cards without one."""
     project = await _get_own(session, project_id, user)
     try:
         refreshed = await refresh_flashcards(session, project)
-    except (InputGenerationError, LLMError):
+    except NoMaterialError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "The project has no text to make flashcards from",
+        ) from None
+    except (InputGenerationError, LLMError, httpx.HTTPError):
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Generating flashcards failed") from None
     if refreshed and user.active_project_id == project_id:
         await feed.discard_ready_rounds(session, user.id)

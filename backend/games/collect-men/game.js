@@ -1,7 +1,12 @@
 // collect-men/game.js: answer questions by choosing one of three lanes.
 let THREE, GLTFLoader, cloneModel, renderer, scene, camera, playerModel, playerModels, playerMixers, playerAnimation, sideDecorations, treeMixers, treeAnimation, laneModels, groundStripes, clock, api;
+let gl, program, positionBuffer, colorBuffer, canvas, W, H;
 let playerLane, previousKeys, worldZ, wallTimer, walls, score, gameOver;
 let username, context, difficulty;
+let elapsedTime;
+let questionBank, questions, questionIndex, activeQuestion, feedback, feedbackTimer, ui, styleEl;
+const WORLD_SPEED = 4;
+
 const negx_url = 'http://192.168.188.67:8081/files/abd1ef2f-630b-4ee4-9d72-237bca6397cd/negx.jpg';
 const negy_url = 'http://192.168.188.67:8081/files/324c958f-1d39-464a-9587-b11152362be4/negy.jpg';
 const negz_url = 'http://192.168.188.67:8081/files/19d01af5-9e6e-4c4b-a772-8983c42fc498/negz.jpg';
@@ -10,11 +15,16 @@ const posy_url = 'http://192.168.188.67:8081/files/26fafcc4-eab7-4bb7-bd26-1d767
 const posz_url = 'http://192.168.188.67:8081/files/a8b053d4-8b46-470e-8ec4-d46c6620300c/posz.jpg';
 const SKYBOX_URLS = [posx_url, negx_url, posy_url, negy_url, posz_url, negz_url];
 
-let questionBank, questions, questionIndex, activeQuestion, feedback, feedbackTimer, ui;
-const WORLD_SPEED = 4;
+function isPressed(keyState) {
+    if (!keyState) return false;
+    if (typeof keyState === 'object') return Boolean(keyState.justPressed);
+    return Boolean(keyState);
+}
 
 function init(gameApi) {
   api = gameApi;
+  W = api.viewport.width;
+  H = api.viewport.height;
   username = api.username;
   context = api.data.context;
   difficulty = api.data.difficulty;
@@ -50,6 +60,7 @@ function reset() {
   score = 3;
   playerModels = [];
   playerMixers = [];
+  elapsedTime = 0;
   gameOver = false;
   questionIndex = 0;
   feedback = '';
@@ -61,12 +72,25 @@ function reset() {
 
 function update(dt, input) {
   if (gameOver) return;
-  const leftPressed = input.keys.ArrowLeft && !previousKeys.ArrowLeft;
-  const rightPressed = input.keys.ArrowRight && !previousKeys.ArrowRight;
-  if (leftPressed) playerLane = Math.max(-1, playerLane - 1);
-  if (rightPressed) playerLane = Math.min(1, playerLane + 1);
-  previousKeys = { ...input.keys };
-  worldZ += WORLD_SPEED * dt;
+    elapsedTime += dt;
+    if (elapsedTime >= 60) {
+        finishGame();
+        return;
+    }
+    const leftPressed = isPressed(input.keys?.ArrowLeft);
+    const rightPressed = isPressed(input.keys?.ArrowRight);
+    if (leftPressed) {
+        playerLane = Math.max(-1, playerLane - 1);
+        updateUi();
+    }
+    if (rightPressed) {
+        playerLane = Math.min(1, playerLane + 1);
+        updateUi();
+    }
+    const targetX = laneX(playerLane);
+    playerX += (targetX - playerX) * Math.min(1, dt * 12);
+
+    worldZ += WORLD_SPEED * dt;
 
   if (feedbackTimer > 0) {
     feedbackTimer -= dt;
@@ -543,6 +567,20 @@ async function bootstrapThree() {
   });
 }
 
+function resize(width, height, viewport) {
+  W = width;
+  H = height;
+}
+
+function contextLost() {
+  gl = null;
+  program = null;
+  positionBuffer = null;
+  colorBuffer = null;
+}
+
+function contextRestored(restoredApi) {
+  api = restoredApi;
 function updateGame(dt, input) {
   update(dt, input);
 }
@@ -563,6 +601,17 @@ function destroy() {
   laneModels = [];
   groundStripes = [];
 }
+
+registerGame({
+  renderer: 'webgl',
+  init,
+  update,
+  render,
+  resize,
+  contextLost,
+  contextRestored,
+  destroy,
+});
 
 bootstrapThree().catch((error) => {
   throw new Error(`Three.js could not load: ${error.message}`);

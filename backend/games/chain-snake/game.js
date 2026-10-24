@@ -537,8 +537,8 @@ function onPointerDown(event) {
 
 function init(gameApi) {
   api = gameApi;
-  W = api.width;
-  H = api.height;
+  W = api.viewport.width;
+  H = api.viewport.height;
   layout();
   chains = loadChains(api.data);
   const context = clean(api.data.context, 120) || 'Chain Snake';
@@ -596,7 +596,7 @@ function update(dt, input) {
   prevKeys = { ...input.keys };
 }
 
-function resize(width, height) {
+function resize(width, height, viewport) {
   W = width;
   H = height;
   const oldCols = cols;

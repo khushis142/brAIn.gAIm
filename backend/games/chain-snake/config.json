@@ -1,5 +1,11 @@
 {
   "context": "Chain Snake: the player steers a snake and has to eat the steps of a sequence in the correct order while decoys sit on the board. Create 1 to 3 chains from the study material. A chain is something where order genuinely matters: the steps of a process, algorithm or protocol, a lifecycle, a chronological series of events, or a ranking (e.g. smallest to largest). `title` names the chain in a few words, e.g. 'TCP handshake'. `steps` lists 3 to 6 items in the correct order, first to last; each is a short label of 1 to 4 words (at most 24 characters), all steps of a chain are distinct, and each is understandable on its own. `decoys` are 0 to 3 plausible items that do NOT belong in the chain, such as common confusions or items from a related process; never repeat a step of the same chain as a decoy. `context` is one short sentence naming the topic; it is shown to the player. Prefer chains from different parts of the material, and only use facts that are in it.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "chains"],
