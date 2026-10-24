@@ -1,0 +1,211 @@
+<div class="gamehub-container">
+  @if (selectedGame(); as activeGame) {
+    <!-- Active Game Screen -->
+    <div class="active-game-view">
+      <div class="active-game-toolbar">
+        <button type="button" class="back-button" (click)="closeGame()" aria-label="Back to Game Hub">
+          <svg lucideArrowLeft></svg>
+          <span>Game Hub</span>
+        </button>
+        <div class="active-game-info">
+          <h2>{{ activeGame.title }}</h2>
+          <span class="owner-pill"><svg lucideUser></svg> {{ activeGame.owner }}</span>
+        </div>
+      </div>
+
+      <div class="player-stage">
+        <app-game-player
+          [game]="activeGame"
+          [active]="true"
+          [showControls]="true"
+          (close)="closeGame()"
+        />
+      </div>
+    </div>
+  } @else {
+    <!-- Game Hub Catalog View -->
+    <header class="hub-header">
+      <div class="hub-title-row">
+        <div class="title-with-icon">
+          <span class="hub-icon-bubble">
+            <svg lucideGamepad2></svg>
+          </span>
+          <div>
+            <h1>Game Hub</h1>
+            <p class="subtitle">Choose a game to play and level up your knowledge</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search and Tag filters -->
+      <div class="search-filter-section">
+        <div class="search-box">
+          <svg lucideSearch class="search-icon"></svg>
+          <input
+            type="search"
+            placeholder="Search games by title or tag..."
+            [value]="searchQuery()"
+            (input)="onSearch($event)"
+            aria-label="Search games"
+          />
+        </div>
+
+        @if (availableTags().length > 0) {
+          <div class="tags-row" role="tablist" aria-label="Game categories">
+            <button
+              type="button"
+              class="tag-pill"
+              [class.active]="selectedTag() === null"
+              (click)="selectedTag.set(null)"
+            >
+              All
+            </button>
+            @for (tag of availableTags(); track tag) {
+              <button
+                type="button"
+                class="tag-pill"
+                [class.active]="selectedTag() === tag"
+                (click)="toggleTag(tag)"
+              >
+                #{{ tag }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </header>
+
+    <!-- Games Content -->
+    @if (loading()) {
+      <div class="games-grid skeleton-grid" aria-busy="true">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+          <div class="game-card skeleton-card">
+            <div class="skeleton-banner"></div>
+            <div class="skeleton-body">
+              <div class="skeleton-line short"></div>
+              <div class="skeleton-line long"></div>
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (error(); as err) {
+      <div class="state-card error-card" role="alert">
+        <p>{{ err }}</p>
+        <button type="button" class="btn primary" (click)="loadGames()">
+          <svg lucideRotateCcw></svg> Retry
+        </button>
+      </div>
+    } @else if (filteredGames().length === 0) {
+      <div class="state-card empty-card">
+        <span class="empty-icon"><svg lucideGamepad2></svg></span>
+        <h3>No games found</h3>
+        <p>
+          @if (searchQuery() || selectedTag()) {
+            No games match your current filter. Try clearing your search.
+          } @else {
+            No games are registered yet. Check back soon!
+          }
+        </p>
+        @if (searchQuery() || selectedTag()) {
+          <button
+            type="button"
+            class="btn outline"
+            (click)="searchQuery.set(''); selectedTag.set(null)"
+          >
+            Clear Filters
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="games-grid">
+        @for (game of filteredGames(); track game.id) {
+          <article class="game-card" (click)="selectGame(game)">
+            <div class="game-card-banner" [style.background]="getGameColor(game.title)">
+              <span class="banner-icon"><svg lucideGamepad2></svg></span>
+              <button
+                type="button"
+                class="leaderboard-chip"
+                (click)="openLeaderboard(game, $event)"
+                title="View high scores"
+                aria-label="View Leaderboard"
+              >
+                <svg lucideTrophy></svg>
+                <span>Scores</span>
+              </button>
+            </div>
+
+            <div class="game-card-body">
+              <div class="game-card-header">
+                <h3 class="game-card-title">{{ game.title }}</h3>
+                <span class="creator">by {{ game.owner }}</span>
+              </div>
+
+              @if (game.tags && game.tags.length > 0) {
+                <div class="card-tags">
+                  @for (tag of game.tags; track tag) {
+                    <span class="card-tag">#{{ tag }}</span>
+                  }
+                </div>
+              }
+
+              <div class="game-card-footer">
+                <button
+                  type="button"
+                  class="play-btn"
+                  (click)="selectGame(game); $event.stopPropagation()"
+                >
+                  <svg lucidePlay></svg>
+                  <span>Play</span>
+                </button>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+
+  <!-- Leaderboard Modal from Card Click -->
+  @if (activeLeaderboardGame(); as lbGame) {
+    <div class="leaderboard-modal-backdrop" (click)="closeLeaderboard()">
+      <div class="leaderboard-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="trophy-badge"><svg lucideTrophy></svg></span>
+            <div>
+              <h3>{{ lbGame.title }}</h3>
+              <p class="modal-sub">Leaderboard</p>
+            </div>
+          </div>
+          <button type="button" class="close-btn" (click)="closeLeaderboard()" aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        <div class="modal-body">
+          @if (loadingLeaderboard()) {
+            <p class="modal-loading">Loading top scores...</p>
+          } @else if (!activeLeaderboard() || activeLeaderboard()!.length === 0) {
+            <p class="modal-empty">No scores recorded yet. Be the first to play!</p>
+          } @else {
+            <ol class="leaderboard-list">
+              @for (entry of activeLeaderboard()!; track entry.username + entry.score; let idx = $index) {
+                <li class="leaderboard-item" [class.gold]="idx === 0" [class.silver]="idx === 1" [class.bronze]="idx === 2">
+                  <span class="rank-badge">{{ idx + 1 }}</span>
+                  <span class="player-name">{{ entry.username }}</span>
+                  <span class="score-badge">{{ entry.score }} pts</span>
+                </li>
+              }
+            </ol>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn primary" (click)="selectGame(lbGame); closeLeaderboard()">
+            <svg lucidePlay></svg> Play Game
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

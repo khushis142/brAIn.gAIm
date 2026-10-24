@@ -200,6 +200,15 @@ export class ApiService {
     return this.http.get<ContentRead[]>(this.url('content'), { params });
   }
 
+  listGames(limit = 100): Observable<ContentRead[]> {
+    const params = new HttpParams().set('limit', limit);
+    return this.http.get<ContentRead[]>(this.url('games'), { params });
+  }
+
+  getGame(gameId: string): Observable<ContentRead> {
+    return this.http.get<ContentRead>(this.url(`games/${encodeURIComponent(gameId)}`));
+  }
+
   createContent(content: ContentCreate): Observable<ContentRead> {
     return this.http.post<ContentRead>(this.url('content'), content, this.authOptions());
   }

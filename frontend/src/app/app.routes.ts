@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { Router, Routes } from '@angular/router';
+import { Gamehub } from './modules/gamehub/gamehub';
 import { Home } from './modules/home/home';
 import { Settings } from './modules/settings/settings';
 import { Upload } from './modules/upload/upload';
@@ -16,6 +17,8 @@ const requireAuth = () => {
 
 export const routes: Routes = [
   { path: '', component: Home, canActivate: [requireAuth] },
+  { path: 'gamehub', component: Gamehub, canActivate: [requireAuth] },
+  { path: 'games', redirectTo: 'gamehub', pathMatch: 'full' },
   { path: 'knowledge', component: Upload, canActivate: [requireAuth] },
   { path: 'upload', redirectTo: 'knowledge', pathMatch: 'full' },
   { path: 'settings', component: Settings, canActivate: [requireAuth] },

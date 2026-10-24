@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   LucideBrain,
+  LucideGamepad2,
   LucideHouse,
   LucideSettings,
   LucideSkull,
@@ -16,6 +17,7 @@ import { Header } from './shared/header/header';
     RouterLinkActive,
     RouterOutlet,
     LucideHouse,
+    LucideGamepad2,
     LucideBrain,
     LucideVideo,
     LucideSkull,

@@ -58,7 +58,8 @@
 }
 
 @media (max-width: 600px) {
-  .page-content:has(app-home) {
+  .page-content:has(app-home),
+  .page-content:has(app-gamehub .active-game-view) {
     padding: 0;
   }
 }

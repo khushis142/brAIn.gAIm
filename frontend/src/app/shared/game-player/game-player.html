@@ -1,0 +1,124 @@
+<div class="game-player-container">
+  <!-- The game sandbox canvas host -->
+  <div #gameHost class="game-host"></div>
+
+  <!-- Optional Top floating control bar -->
+  @if (showControls() && game()) {
+    <header class="player-header">
+      <div class="game-meta">
+        <span class="game-badge">Game</span>
+        <h3 class="game-title">{{ game()?.title }}</h3>
+      </div>
+
+      <div class="player-actions">
+        <button
+          type="button"
+          class="icon-button"
+          (click)="toggleLeaderboard()"
+          [class.active]="showLeaderboard()"
+          title="Leaderboard"
+          aria-label="View Leaderboard"
+        >
+          <svg lucideTrophy></svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-button"
+          (click)="restart()"
+          title="Restart game"
+          aria-label="Restart game"
+        >
+          <svg lucideRotateCcw></svg>
+        </button>
+
+        <button
+          type="button"
+          class="icon-button exit-button"
+          (click)="close.emit()"
+          title="Close game"
+          aria-label="Close game"
+        >
+          <svg lucideX></svg>
+        </button>
+      </div>
+    </header>
+  }
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="overlay-panel loading-overlay">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Loading game...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error(); as err) {
+    <div class="overlay-panel error-overlay" role="alert">
+      <p class="error-msg">{{ err }}</p>
+      <div class="button-group">
+        <button type="button" class="btn primary" (click)="restart()">Retry</button>
+        <button type="button" class="btn secondary" (click)="close.emit()">Exit</button>
+      </div>
+    </div>
+  }
+
+  <!-- Game Finished / Result Overlay -->
+  @if (gameResult(); as res) {
+    <div class="overlay-panel result-overlay">
+      <div class="result-card">
+        <span class="trophy-icon"><svg lucideTrophy></svg></span>
+        <h2>{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Round Finished' }}</h2>
+        <p class="score-display">{{ res.score }}</p>
+
+        @if (isSubmitting()) {
+          <p class="submitting-text">Saving score to leaderboard...</p>
+        }
+
+        <div class="result-actions">
+          <button type="button" class="btn primary" (click)="restart()">Play Again</button>
+          <button type="button" class="btn secondary" (click)="toggleLeaderboard()">
+            {{ showLeaderboard() ? 'Hide Rankings' : 'View Rankings' }}
+          </button>
+          <button type="button" class="btn outline" (click)="close.emit()">Exit</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Leaderboard Modal / Drawer Overlay -->
+  @if (showLeaderboard()) {
+    <div class="overlay-panel leaderboard-overlay">
+      <div class="leaderboard-card">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title-group">
+            <svg lucideTrophy></svg>
+            <h3>{{ game()?.title }} Leaderboard</h3>
+          </div>
+          <button type="button" class="icon-button" (click)="showLeaderboard.set(false)" aria-label="Close leaderboard">
+            <svg lucideX></svg>
+          </button>
+        </div>
+
+        <div class="leaderboard-body">
+          @if (leaderboard() === null) {
+            <p class="loading-text">Loading scores...</p>
+          } @else if (leaderboard()!.length === 0) {
+            <p class="empty-text">No scores recorded yet. Be the first!</p>
+          } @else {
+            <ol class="score-list">
+              @for (entry of leaderboard()!; track entry.username + entry.score; let idx = $index) {
+                <li class="score-row" [class.podium]="idx < 3">
+                  <span class="rank">{{ idx + 1 }}</span>
+                  <span class="user">{{ entry.username }}</span>
+                  <span class="score">{{ entry.score }}</span>
+                </li>
+              }
+            </ol>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

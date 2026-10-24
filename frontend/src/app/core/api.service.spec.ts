@@ -142,6 +142,40 @@ describe('ApiService', () => {
     request.flush([{ slug: 'biology', name: 'Biology' }]);
   });
 
+  it('lists games', () => {
+    api.listGames(50).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/games?limit=50`);
+    expect(request.request.method).toBe('GET');
+    request.flush([
+      {
+        id: 'game-1',
+        kind: 'game',
+        title: 'Quiz',
+        tags: ['bio'],
+        owner: 'alex',
+        url: 'http://cdn/quiz.js',
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ]);
+  });
+
+  it('gets a single game', () => {
+    api.getGame('game-1').subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/games/game-1`);
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      id: 'game-1',
+      kind: 'game',
+      title: 'Quiz',
+      tags: ['bio'],
+      owner: 'alex',
+      url: 'http://cdn/quiz.js',
+      created_at: '2026-01-01T00:00:00Z',
+    });
+  });
+
   it('requests the next authenticated feed item', () => {
     authenticate();
     api.nextItem().subscribe();
