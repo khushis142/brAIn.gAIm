@@ -1,0 +1,9 @@
+<svg [attr.viewBox]="viewBox">
+  @for (layer of layers(); track layer.anchor) {
+    <g [attr.class]="'part ' + layer.anchor">
+      @for (href of layer.hrefs; track href) {
+        <use [attr.href]="href" />
+      }
+    </g>
+  }
+</svg>

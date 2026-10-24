@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <g id="hat">
+    <path d="M 70 32 Q 100 26, 130 32 Q 134 38, 130 42 Q 100 46, 70 42 Q 66 38, 70 32 Z" fill="#a82525" stroke="#2b2433" stroke-width="3" stroke-linejoin="round" />
+    <path d="M 78 32 C 78 12, 122 12, 122 32 Z" fill="#e23b3b" stroke="#2b2433" stroke-width="3" stroke-linejoin="round" />
+    <path d="M 78 32 C 78 12, 122 12, 122 32 Z" fill="none" stroke="#2b2433" stroke-width="3" />
+  </g>
+</svg>

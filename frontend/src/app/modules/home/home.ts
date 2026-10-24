@@ -4,16 +4,21 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LucideBrain, LucideChevronDown } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, FeedItem } from '../../core/api.service';
+import { ApiService, FeedItem, GameItem } from '../../core/api.service';
+import { ZombieService } from '../../core/zombie.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
+import { Zombie } from '../../shared/zombie/zombie';
 
 type Phase = 'idle' | 'leaving' | 'entering';
 type PlaybackBubble = 'play' | 'pause';
@@ -34,7 +39,7 @@ interface Burst {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 @Component({
-  imports: [LucideBrain, LucideChevronDown],
+  imports: [LucideBrain, LucideChevronDown, RouterLink, Zombie],
   selector: 'app-home',
   styleUrl: './home.css',
   templateUrl: './home.html',
@@ -46,6 +51,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
+  protected readonly zombie = inject(ZombieService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
@@ -77,6 +83,8 @@ export class Home {
     return current !== null && this.likedIds().has(current.id);
   });
   protected readonly bursts = signal<Burst[]>([]);
+  /** Accessories unlocked by the game on screen */
+  protected readonly unlockedNames = signal<string[]>([]);
 
   private busy = false;
   private username: string | null = null;
@@ -98,6 +106,13 @@ export class Home {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
       this.observeCardLifecycle();
       this.next();
+      // The mascot is decoration; without it the result screen still works
+      this.zombie.load().catch(() => {});
+    });
+    effect(() => {
+      const result = this.session()?.result();
+      const current = untracked(this.item);
+      if (result && current?.type === 'game') untracked(() => this.submitScore(current, result.score));
     });
     const destroyRef = inject(DestroyRef);
     const view = document.defaultView;
@@ -250,6 +265,23 @@ export class Home {
     setTimeout(() => this.bursts.update((all) => all.filter((b) => b !== burst)), BURST_MS);
   }
 
+  private async submitScore(game: GameItem, score: number): Promise<void> {
+    try {
+      // The backend rejects negative scores, but the finished game should still count
+      const { newly_unlocked } = await firstValueFrom(
+        this.api.submitScore(game.id, { score: Math.max(0, score), round_id: game.round_id }),
+      );
+      if (newly_unlocked.length === 0) return;
+      await this.zombie.load();
+      if (this.item() === game) {
+        this.unlockedNames.set(newly_unlocked.map((id) => this.zombie.accessoryName(id)));
+      }
+    } catch (err) {
+      // A lost score must not interrupt the feed
+      console.warn('Could not save game score', err);
+    }
+  }
+
   private setLiked(id: string, liked: boolean): void {
     this.likedIds.update((ids) => {
       const next = new Set(ids);
@@ -340,6 +372,7 @@ export class Home {
     this.arePlayerControlsVisible.set(false);
     this.playbackBubble.set(null);
     this.bursts.set([]);
+    this.unlockedNames.set([]);
     this.item.set(item);
 
     if (gameCode !== null && item.type === 'game') {

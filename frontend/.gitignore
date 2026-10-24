@@ -44,3 +44,7 @@ __screenshots__/
 Thumbs.db
 .github/mcp.json
 .playwright-mcp/
+
+# Windows download metadata (WSL)
+*:Zone.Identifier
+*Zone.Identifier
