@@ -22,14 +22,13 @@ describe('ApiService', () => {
   });
 
   it('registers users with the JSON API', () => {
-    api.register({ username: 'alex', password: 'password123', field: 'biology' }).subscribe();
+    api.register({ username: 'alex', password: 'password123' }).subscribe();
 
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/auth/register`);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
       username: 'alex',
       password: 'password123',
-      field: 'biology',
     });
     request.flush({ id: 'user-id', username: 'alex', field: 'biology' });
   });

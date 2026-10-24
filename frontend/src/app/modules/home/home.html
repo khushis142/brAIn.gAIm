@@ -1,3 +1,38 @@
-<section>
-  <h2>Home</h2>
+<section class="feed" (touchstart)="onTouchStart($event)" (touchend)="onTouchEnd($event)">
+  <article
+    class="card"
+    [class.leaving]="phase() === 'leaving'"
+    [class.entering]="phase() === 'entering'"
+  >
+    <div class="stage">
+      <div #gameHost class="game-host"></div>
+
+      @if (item(); as current) {
+        @if (current.type === 'video') {
+          <video class="video" [src]="current.url" autoplay muted loop playsinline controls></video>
+        }
+      } @else if (!error()) {
+        <p class="placeholder">Loading your feed…</p>
+      }
+
+      @if (error(); as message) {
+        <div class="error" role="alert">
+          <p>{{ message }}</p>
+          <button type="button" (click)="next()">Try again</button>
+        </div>
+      }
+    </div>
+
+    <footer class="info">
+      @if (item(); as current) {
+        <span class="badge">{{ current.type }}</span>
+        <h2 class="title">{{ current.title }}</h2>
+      }
+      <button class="next" type="button" (click)="next()" aria-label="Next item">
+        <svg lucideChevronDown></svg>
+      </button>
+    </footer>
+  </article>
+
+  <div class="warp" [class.active]="phase() === 'leaving'" aria-hidden="true"></div>
 </section>
