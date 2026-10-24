@@ -11,6 +11,9 @@ generator can write games itself (`app/generator/games.py`); they follow the sam
 pass the same checks. `example-quiz/` is a complete,
 working reference; copy it to start. `chain-snake/` is a larger one: an action game on
 ordered sequences with a bitmap font, effects, touch controls and per-item results.
+`glass-bridge/` is a touch-first quiz with a perspective bridge and a jumping robot, drawn
+with the 2D canvas. Three.js cannot be loaded from a CDN in the sandbox; a bundled copy
+would have to fit the 200 KB game limit. Native WebGL is available for custom 3D rendering.
 
 ## What you deliver
 
