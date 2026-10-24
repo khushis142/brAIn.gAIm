@@ -1,0 +1,12 @@
+services:
+  piper:
+    build: .
+    image: braingain/piper:1.8.0
+    container_name: piper
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+
+networks:
+  default:
+    name: braingain

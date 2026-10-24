@@ -48,3 +48,20 @@ Start service:
 ```bash
 docker compose -f glances/docker-compose.yml up -d
 ```
+
+### 4. Piper TTS (`piper/`)
+- **Image**: `braingain/piper:1.8.0` (built locally from `piper/Dockerfile`, `piper-tts[http]==1.8.0`)
+- **Port**:
+  - `5000`: HTTP API
+- **Voice**: `en_US-lessac-medium` (baked into the image; change via the `VOICE` build arg)
+- **Internal URL**: `http://piper:5000`
+
+Synthesize speech (returns WAV):
+```bash
+curl -X POST -H 'Content-Type: application/json' -d '{"text": "Hello"}' -o out.wav http://localhost:5000/synthesize
+```
+
+Start service:
+```bash
+docker compose -f piper/docker-compose.yml up -d --build
+```
