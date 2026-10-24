@@ -596,7 +596,7 @@ function update(dt, input) {
   prevKeys = { ...input.keys };
 }
 
-function resize(width, height) {
+function resize(width, height, viewport) {
   W = width;
   H = height;
   const oldCols = cols;

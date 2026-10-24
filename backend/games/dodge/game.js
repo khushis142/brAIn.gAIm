@@ -80,6 +80,18 @@ function update(dt, input) {
   player.x = Math.max(0, Math.min(W - player.w, player.x));
 
   score += dt;
+  if (score >= 60) {
+    gameOver = true;
+    gameApi.submitResult({
+      score: Math.floor(score * 10),
+      game: 'dodge',
+      username,
+      context,
+      difficulty,
+      survivedSeconds: Number(score.toFixed(2)),
+    });
+    return;
+  }
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
     const size = 20 + Math.random() * 40;
@@ -149,7 +161,7 @@ function render(ctx) {
   }
 }
 
-function resize(width, height) {
+function resize(width, height, viewport) {
   W = width;
   H = height;
   if (player) {

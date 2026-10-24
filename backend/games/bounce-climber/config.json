@@ -1,5 +1,11 @@
 {
   "context": "A vertical platform climbing quiz with 3 to 5 questions. The player continuously bounces on a safe middle platform, with two option platforms above: one up-left and one up-right. Exactly one option is correct and safe to bounce on; the other breaks immediately, causing the player to fall and lose. `context` is a short phrase naming the topic. `question` is a concise question (max 80 chars). `left_option` and `right_option` are short answers (1 to 4 words, under 30 chars). `correct` must be 'left' or 'right'. Keep questions focused on the study material.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "questions"],

@@ -27,6 +27,12 @@ my-game/
 ```json
 {
   "context": "Instructions for the LLM: what the game is and what good data looks like.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "..."],

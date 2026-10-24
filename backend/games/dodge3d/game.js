@@ -97,6 +97,18 @@ function update(dt, input) {
   if (rightHeld || touching('right')) playerX += 2.8 * dt;
   playerX = Math.max(-3, Math.min(3, playerX));
   score += dt;
+  if (score >= 60) {
+    gameOver = true;
+    api.submitResult({
+      score: Math.floor(score * 10),
+      game: 'dodge3d',
+      username,
+      context,
+      difficulty,
+      survivedSeconds: Number(score.toFixed(2)),
+    });
+    return;
+  }
   spawnTimer -= dt;
 
   if (spawnTimer <= 0) {
@@ -231,8 +243,26 @@ function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function normalize(v) { const l = Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; }
 
-function resize(width, height) {
-  if (gl) gl.viewport(0, 0, width, height);
+function resize(width, height, viewport) {}
+
+function contextLost() {
+  gl = null;
+  program = null;
+  positionBuffer = null;
+  colorBuffer = null;
 }
 
-registerGame({ renderer: 'webgl', init, update, render, resize, destroy });
+function contextRestored(restoredApi) {
+  api = restoredApi;
+}
+
+registerGame({
+  renderer: 'webgl',
+  init,
+  update,
+  render,
+  resize,
+  contextLost,
+  contextRestored,
+  destroy,
+});

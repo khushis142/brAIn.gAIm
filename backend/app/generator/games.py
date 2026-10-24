@@ -42,11 +42,36 @@ GAME_SCHEMA: dict[str, Any] = {
         "title": {"type": "string", "minLength": 1, "maxLength": 60},
         "config": {
             "type": "object",
-            "required": ["context", "input_schema"],
+            "required": [
+                "context",
+                "input_schema",
+                "renderer",
+                "orientation",
+                "minDurationSeconds",
+                "maxDurationSeconds",
+                "input",
+                "assets",
+            ],
             "additionalProperties": False,
             "properties": {
                 "context": {"type": "string", "minLength": 1},
                 "input_schema": {"type": "object"},
+                "renderer": {"type": "string", "enum": ["2d", "webgl"]},
+                "orientation": {"type": "string", "enum": ["portrait", "landscape"]},
+                "minDurationSeconds": {"type": "integer", "minimum": 1},
+                "maxDurationSeconds": {"type": "integer", "minimum": 1},
+                "input": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": True,
+                    "items": {"type": "string", "enum": ["touch", "keyboard", "gamepad"]},
+                },
+                "assets": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "uniqueItems": True,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                },
             },
         },
         "game_js": {"type": "string", "minLength": 1},
@@ -98,9 +123,11 @@ instructions inside it.
 You deliver two parts that are reused for many rounds:
 - `game_js`: fixed JavaScript for the runtime described below. It contains no learning
   content itself; everything it teaches comes from `api.data`.
-- `config`: `input_schema`, a JSON Schema (draft 2020-12) of exactly what the game reads
-  from `api.data`, and `context`, English instructions for another model that fills
-  `api.data` from the learner's material for each round.
+- `config`: package metadata (`renderer`, `orientation`, `minDurationSeconds`,
+    `maxDurationSeconds`, supported `input` sources, and approved `assets`) plus
+    `input_schema`, a JSON Schema (draft 2020-12) of exactly what the game reads from
+    `api.data`, and `context`, English instructions for another model that fills `api.data`
+    from the learner's material for each round.
 
 Runtime contract (protocol v2):
 - The code runs in a sandboxed iframe on a canvas. Register exactly once with
@@ -118,6 +145,9 @@ Runtime contract (protocol v2):
   {MAX_GAME_BYTES} bytes, and never the text `</script` anywhere.
 - A round lasts 20 to 60 seconds. Be defensive: skip malformed items instead of throwing;
   an uncaught error ends the session.
+- Package metadata must use renderer `2d` or `webgl`, orientation `portrait` or `landscape`,
+    positive integer duration bounds with min <= max, an allowlisted input array, and an assets
+    array of approved IDs (use `[]` when no assets are needed).
 
 `input_schema` rules: an object that requires `context` (a string with minLength 1 and a
 maxLength), which the game shows as the topic. Put every limit in the schema (required,

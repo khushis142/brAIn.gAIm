@@ -4,6 +4,7 @@ let gl, api, program, positionBuffer, colorBuffer, canvas;
 let playerLane, playerX, worldZ, wallTimer, walls, score, gameOver;
 let username, context, difficulty;
 let questionBank, questions, questionIndex, activeQuestion, feedback, feedbackTimer, ui, styleEl;
+let elapsedTime;
 const WORLD_SPEED = 4;
 
 const vertexSource = `
@@ -83,6 +84,7 @@ function reset() {
   wallTimer = 0;
   walls = [];
   score = 3;
+  elapsedTime = 0;
   gameOver = false;
   questionIndex = 0;
   feedback = '';
@@ -98,6 +100,11 @@ function reset() {
 
 function update(dt, input) {
   if (gameOver) return;
+  elapsedTime += dt;
+  if (elapsedTime >= 60) {
+    finishGame();
+    return;
+  }
   const leftPressed = isPressed(input.keys?.ArrowLeft);
   const rightPressed = isPressed(input.keys?.ArrowRight);
   if (leftPressed) {
@@ -465,8 +472,17 @@ function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function normalize(v) { const l = Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; }
 
-function resize(width, height) {
-  if (gl) gl.viewport(0, 0, width, height);
+function resize(width, height, viewport) {}
+
+function contextLost() {
+  gl = null;
+  program = null;
+  positionBuffer = null;
+  colorBuffer = null;
+}
+
+function contextRestored(restoredApi) {
+  api = restoredApi;
 }
 
 function destroy() {
@@ -475,4 +491,13 @@ function destroy() {
   if (styleEl) styleEl.remove();
 }
 
-registerGame({ renderer: 'webgl', init, update, render, resize, destroy });
+registerGame({
+  renderer: 'webgl',
+  init,
+  update,
+  render,
+  resize,
+  contextLost,
+  contextRestored,
+  destroy,
+});

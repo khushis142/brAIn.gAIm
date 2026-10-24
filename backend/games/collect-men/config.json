@@ -1,5 +1,11 @@
 {
   "context": "Create short, encouraging configuration text for a 3D lane-running quiz game that tests recall of the study material. Set difficulty to easy, normal, or hard. Keep text short for a phone-sized scoreboard and pause menu. Provide a list of questions with each question having three answers: two incorrect ones and one correct answer. Keep the questions and answers short enough to fit on a phone screen.",
+  "renderer": "webgl",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": [

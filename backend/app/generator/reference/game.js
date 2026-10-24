@@ -155,7 +155,7 @@ function render(ctx) {
   ctx.fillText('Tap an option, or Up/Down and Space', pad, H - pad - 14);
 }
 
-function resize(width, height) {
+function resize(width, height, viewport) {
   W = width;
   H = height;
 }
