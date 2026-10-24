@@ -24,6 +24,13 @@ export interface GameViewport {
   readonly safeArea: GameSafeAreaInsets;
 }
 
+export interface GamePerformanceOptions {
+  readonly targetFps?: 30 | 60;
+  readonly adaptiveQuality?: boolean;
+  readonly maxPixelRatio?: number;
+  readonly reducedEffects?: boolean;
+}
+
 /** Contract shared between the host app and the sandboxed runtime. */
 
 export interface GameCustomData {
@@ -77,6 +84,14 @@ export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
   readonly data: CustomData;
   readonly renderer: GameRenderer;
   readonly viewport: GameViewport;
+  readonly performance: {
+    readonly targetFps: 30 | 60;
+    readonly adaptiveQuality: boolean;
+    readonly reducedEffects: boolean;
+    readonly frameTime: number;
+    readonly averageFrameTime: number;
+    readonly qualityScale: number;
+  };
   submitResult(result: GameResult): void;
   setUiDesign(design: GameUiDesign): void;
 }

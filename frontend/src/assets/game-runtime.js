@@ -9,6 +9,7 @@
  *   update(dt, input)    required   dt in seconds, input = { keys, pointer }
  *                         touch gestures also press virtual keys
  *   renderer             optional   '2d' (default) or 'webgl'
+ *   api.performance      live frame metrics and adaptive quality state
  *   render(ctx)          required   CanvasRenderingContext2D or WebGLRenderingContext
  *   resize(w, h, viewport) optional called after the host resized the canvas
  *   destroy()            optional   called once when the game is stopped
@@ -34,6 +35,8 @@
   const REGISTER_TIMEOUT_MS = 3000;  // game must call registerGame() by then
   const MAX_ERROR_LENGTH = 500;
   const MAX_CANVAS_SIZE = 4096;
+  const MIN_QUALITY_SCALE = 0.5;
+  const SLOW_FRAME_LIMIT = 8;
   const REQUIRED_HOOKS = ['init', 'update', 'render'];
   const GAME_KEYS = new Set([
     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
@@ -67,6 +70,11 @@
   let lastFrame = last;
   let registerTimer;
   let heartbeatTimer;
+  let performanceConfig = null;
+  let qualityScale = 1;
+  let frameTime = 0;
+  let averageFrameTime = 0;
+  let slowFrameCount = 0;
 
   const pointer = {
     x: 0,
@@ -93,6 +101,15 @@
     return;
   }
 
+  const requestedPerformance = gameInput.performance && typeof gameInput.performance === 'object'
+    ? gameInput.performance : {};
+  performanceConfig = Object.freeze({
+    targetFps: requestedPerformance.targetFps === 30 ? 30 : 60,
+    adaptiveQuality: requestedPerformance.adaptiveQuality !== false,
+    maxPixelRatio: Math.min(Math.max(Number(requestedPerformance.maxPixelRatio) || 2, 1), 4),
+    reducedEffects: requestedPerformance.reducedEffects === true,
+  });
+
   function readSafeArea() {
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
@@ -111,7 +128,10 @@
   }
 
   function createViewport(width, height) {
-    const devicePixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 4);
+    const devicePixelRatio = Math.min(
+      Math.max(window.devicePixelRatio || 1, 1),
+      performanceConfig.maxPixelRatio,
+    ) * qualityScale;
     const pixelWidth = Math.max(1, Math.min(MAX_CANVAS_SIZE,
       Math.round(width * devicePixelRatio)));
     const pixelHeight = Math.max(1, Math.min(MAX_CANVAS_SIZE,
@@ -155,6 +175,14 @@
     username: typeof gameInput.username === 'string' ? gameInput.username : '',
     data: gameInput.data,
     get renderer() { return renderer; },
+    performance: Object.freeze({
+      get targetFps() { return performanceConfig.targetFps; },
+      get adaptiveQuality() { return performanceConfig.adaptiveQuality; },
+      get reducedEffects() { return performanceConfig.reducedEffects || qualityScale < 1; },
+      get frameTime() { return frameTime; },
+      get averageFrameTime() { return averageFrameTime; },
+      get qualityScale() { return qualityScale; },
+    }),
     submitResult(result) {
       if (result === null || typeof result !== 'object' ||
           typeof result.score !== 'number' || !Number.isFinite(result.score)) {
@@ -343,9 +371,13 @@
     if (!shouldRun()) return;
     rafId = requestAnimationFrame(frame);
 
+    const targetFrameTime = 1000 / performanceConfig.targetFps;
+    if (now - last < targetFrameTime - 1) return;
+
     const dt = Math.min(Math.max((now - last) / 1000, 0), MAX_DT);
     last = now;
     lastFrame = performance.now();
+    const startedAt = performance.now();
 
     try {
       game.update(dt, input);
@@ -368,6 +400,19 @@
         ctx.viewport(0, 0, canvas.width, canvas.height);
         ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT);
         game.render(ctx);
+      }
+      frameTime = performance.now() - startedAt;
+      averageFrameTime = averageFrameTime === 0
+        ? frameTime
+        : averageFrameTime * 0.9 + frameTime * 0.1;
+      if (performanceConfig.adaptiveQuality) {
+        if (frameTime > targetFrameTime * 1.25) slowFrameCount += 1;
+        else slowFrameCount = Math.max(0, slowFrameCount - 1);
+        if (slowFrameCount >= SLOW_FRAME_LIMIT && qualityScale > MIN_QUALITY_SCALE) {
+          qualityScale = Math.max(MIN_QUALITY_SCALE, qualityScale * 0.85);
+          slowFrameCount = 0;
+          applyViewport(viewport.width, viewport.height, true);
+        }
       }
     } catch (err) {
       fail(err);

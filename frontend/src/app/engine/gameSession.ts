@@ -3,6 +3,7 @@ import {
   GameCustomData,
   GameResult,
   GameStartInput,
+  GamePerformanceOptions,
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
@@ -20,6 +21,7 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
   extends GameStartInput<CustomData> {
   readonly width?: number;
   readonly height?: number;
+  readonly performance?: GamePerformanceOptions;
 }
 
 /**
@@ -243,6 +245,12 @@ export class GameSession {
       protocolVersion: 2,
       username: options.username,
       data: options.data,
+      performance: {
+        targetFps: options.performance?.targetFps ?? 60,
+        adaptiveQuality: options.performance?.adaptiveQuality ?? true,
+        maxPixelRatio: options.performance?.maxPixelRatio ?? 2,
+        reducedEffects: options.performance?.reducedEffects ?? false,
+      },
     })
       .replace(/</g, '\\u003c')
       .replace(/\u2028/g, '\\u2028')

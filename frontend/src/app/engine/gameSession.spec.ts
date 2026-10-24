@@ -35,6 +35,29 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('embeds the configured mobile performance profile', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    session.start(gameCode, {
+      ...options,
+      performance: {
+        targetFps: 30,
+        adaptiveQuality: false,
+        maxPixelRatio: 1,
+        reducedEffects: true,
+      },
+    });
+
+    const srcdoc = container.querySelector('iframe')?.srcdoc;
+    expect(srcdoc).toContain('"targetFps":30');
+    expect(srcdoc).toContain('"adaptiveQuality":false');
+    expect(srcdoc).toContain('"maxPixelRatio":1');
+    expect(srcdoc).toContain('"reducedEffects":true');
+
+    session.destroy();
+  });
+
   it('updates status, UI design, and result only from the active iframe', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');

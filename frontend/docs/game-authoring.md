@@ -129,6 +129,51 @@ edges, and use `orientation` to select a layout. The runtime measures the
 safe-area environment provided by the device and automatically tracks browser
 resize, orientation, and visual-viewport changes.
 
+## Mobile performance
+
+The host can provide a performance profile when starting a game:
+
+```js
+session.start(gameCode, {
+  username: 'alex',
+  data: { context: 'A short reaction game.' },
+  performance: {
+    targetFps: 30,          // 30 or 60; default: 60
+    adaptiveQuality: true,  // default: true
+    maxPixelRatio: 1.5,     // clamped by the runtime to 1..4; default: 2
+    reducedEffects: false,  // default: false
+  },
+});
+```
+
+Games can inspect the live state through `api.performance`:
+
+```js
+{
+  targetFps: 60,
+  adaptiveQuality: true,
+  reducedEffects: false,
+  frameTime: 4.2,
+  averageFrameTime: 5.1,
+  qualityScale: 1
+}
+```
+
+`frameTime` and `averageFrameTime` are milliseconds. `qualityScale` starts at
+`1` and can decrease to `0.5` when adaptive quality detects repeated slow
+frames. The runtime lowers the canvas backing-store resolution, while keeping
+the logical `width`, `height`, and input coordinates unchanged. This prevents
+a small phone from rendering an unnecessarily large high-DPI canvas. The
+runtime never increases quality automatically during a run.
+
+Use `reducedEffects` to skip optional visual work such as particles, shadows,
+post-processing, and animation flourishes. It becomes `true` when the host
+requests reduced effects or adaptive quality has reduced `qualityScale`.
+Keep gameplay, input handling, and readable text working in either mode. Draw
+in logical coordinates and use `api.viewport.pixelWidth` and
+`api.viewport.pixelHeight` only when a renderer specifically needs physical
+backing-store dimensions.
+
 ## Rendering modes and 3D support
 
 Games use the 2D renderer by default. A game that needs GPU rendering can opt
