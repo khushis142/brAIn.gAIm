@@ -30,6 +30,12 @@ Each game must include a `config.json` like this:
 ```json
 {
   "context": "Create short biology quiz data about the player's study notes.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "questions"],
@@ -64,6 +70,26 @@ Each game must include a `config.json` like this:
   }
 }
 ```
+
+The package metadata describes the mobile requirements used by the feed when
+selecting and presenting a game:
+
+- `renderer` is `2d` or `webgl` and must match the game registration.
+- `orientation` is the preferred `portrait` or `landscape` layout. Games must
+  still respond to `api.viewport.orientation` changes when the device rotates.
+- `minDurationSeconds` and `maxDurationSeconds` are positive integer bounds;
+  `minDurationSeconds` must not exceed `maxDurationSeconds`. The game should
+  submit its result within this window and avoid requiring a longer session.
+- `input` lists every supported input source: `touch`, `keyboard`, and/or
+  `gamepad`. Include only inputs the game genuinely supports, and always list
+  `touch` for a phone-first game.
+- `assets` is the list of approved asset IDs used by the package. It is not a
+  list of URLs; URLs, types, and byte limits belong to the host-provided asset
+  manifest described below. Every listed ID must exist in that manifest.
+
+The backend should validate these fields before publishing a package. Keep
+the metadata strict and use an allowlist for `renderer`, `orientation`, and
+`input`; reject unknown fields when validating package configuration.
 
 `input_schema` is JSON Schema Draft 2020-12. It describes exactly what the
 game reads from `api.data`. The backend validates every LLM response against
@@ -104,7 +130,75 @@ The required hooks are:
   seconds and is clamped by the runtime.
 - `render(ctx)`: draws one frame using the selected rendering context.
 
-Optional hooks are `resize(width, height)` and `destroy()`.
+Optional hooks are `resize(width, height, viewport)` and `destroy()`.
+
+The runtime keeps `width` and `height` in logical CSS pixels. The canvas backing
+store is scaled for the device-pixel ratio, so games should draw using the
+logical dimensions and must not use `canvas.width` or `canvas.height` directly.
+The current viewport is also available as `api.viewport`:
+
+```js
+{
+  width: 800,
+  height: 600,
+  pixelWidth: 1600,
+  pixelHeight: 1200,
+  devicePixelRatio: 2,
+  orientation: 'landscape',
+  safeArea: { top: 0, right: 0, bottom: 24, left: 0 }
+}
+```
+
+`resize` is called when the logical dimensions, device-pixel ratio, orientation,
+or safe-area insets change. Use `safeArea` when placing controls near screen
+edges, and use `orientation` to select a layout. The runtime measures the
+safe-area environment provided by the device and automatically tracks browser
+resize, orientation, and visual-viewport changes.
+
+## Mobile performance
+
+The host can provide a performance profile when starting a game:
+
+```js
+session.start(gameCode, {
+  username: 'alex',
+  data: { context: 'A short reaction game.' },
+  performance: {
+    targetFps: 30,          // 30 or 60; default: 60
+    adaptiveQuality: true,  // default: true
+    maxPixelRatio: 1.5,     // clamped by the runtime to 1..4; default: 2
+    reducedEffects: false,  // default: false
+  },
+});
+```
+
+Games can inspect the live state through `api.performance`:
+
+```js
+{
+  targetFps: 60,
+  adaptiveQuality: true,
+  reducedEffects: false,
+  frameTime: 4.2,
+  averageFrameTime: 5.1,
+  qualityScale: 1
+}
+```
+
+`frameTime` and `averageFrameTime` are milliseconds. `qualityScale` starts at
+`1` and can decrease to `0.5` when adaptive quality detects repeated slow
+frames. The runtime lowers the canvas backing-store resolution, while keeping
+the logical `width`, `height`, and input coordinates unchanged. This prevents
+a small phone from rendering an unnecessarily large high-DPI canvas. The
+runtime never increases quality automatically during a run.
+
+Use `reducedEffects` to skip optional visual work such as particles, shadows,
+post-processing, and animation flourishes. It becomes `true` when the host
+requests reduced effects or adaptive quality has reduced `qualityScale`.
+Keep gameplay, input handling, and readable text working in either mode. Draw
+in logical coordinates and use `api.viewport.pixelWidth` and
+`api.viewport.pixelHeight` only when a renderer specifically needs physical
+backing-store dimensions.
 
 ## Rendering modes and 3D support
 
@@ -126,16 +220,67 @@ receives the WebGL rendering context. The runtime clears the color and depth
 buffers and updates the viewport before each frame. A game owns shaders,
 buffers, matrices, camera logic, and all other 3D rendering code.
 
+Games that do not need custom shaders can use the small approved built-in 3D
+helper instead:
+
+```js
+let scene;
+
+function init(api) {
+  scene = api.webgl.createBasicScene();
+  scene?.addBox({ z: 0, size: 1, color: [0.2, 0.7, 1, 1] });
+}
+
+function render() {
+  scene?.render();
+}
+
+function contextRestored(api) {
+  // WebGL resources are invalid after context loss; recreate the scene.
+  scene = api.webgl.createBasicScene();
+  scene?.addBox({ z: 0, size: 1, color: [0.2, 0.7, 1, 1] });
+}
+```
+
+`createBasicScene()` provides a camera and colored boxes for simple 3D games.
+It is intentionally small; use a separately approved prebundled 3D runtime
+when a game needs models, lighting, animation systems, or advanced materials.
+The helper returns `null` when the game is not using WebGL.
+
+The capability report is available at `api.webgl.capabilities`:
+
+```js
+{
+  available: true,
+  webgl2: true,
+  maxTextureSize: 4096,
+  maxViewportDimensions: [4096, 4096],
+  antialias: true,
+  highPerformance: true,
+  renderer: 'GPU name when the browser exposes it'
+}
+```
+
+Use `maxTextureSize` and `maxViewportDimensions` to choose compatible assets
+and render targets. `highPerformance` is only a hint: prefer simpler effects
+when it is `false`, and continue to handle missing capabilities gracefully.
+
+WebGL context loss is recoverable. When it happens, rendering pauses and the
+runtime calls optional `contextLost()`. After the browser restores the
+context, the runtime recreates the WebGL context, refreshes the capability
+report, calls `contextRestored(api)`, and resumes rendering. Recreate all
+buffers, shaders, textures, and scene objects in `contextRestored`; WebGL
+resources from before the loss cannot be reused.
+
 For the default `renderer: '2d'`, `render(ctx)` receives a
 `CanvasRenderingContext2D`; the runtime resets and restores its drawing state
 around each frame. Do not use 2D methods with a WebGL context or WebGL methods
 with a 2D context.
 
-WebGL context loss ends the session with an error. Games should release GPU
-resources in `destroy()` and be prepared for the session to be recreated. The
-iframe remains sandboxed and the Content Security Policy still prevents normal
-network access, so WebGL libraries and assets must be bundled or supplied by a
-future approved asset system. The existing 200 KB source limit still applies.
+Games should release GPU resources in `destroy()`. The iframe remains
+sandboxed and the Content Security Policy still prevents normal network
+access, so advanced WebGL libraries and assets must be bundled or supplied by
+the approved asset system. The existing 200 KB source limit still applies.
 
 ## Inputs
 
@@ -173,8 +318,103 @@ JSON-compatible values: objects, arrays, strings, numbers, booleans, and
 references. The host can add fields to the startup object later without
 changing the game lifecycle.
 
-Keyboard input is available through `input.keys`. The runtime currently tracks
-`ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.
+## Assets
+
+The host supplies an approved asset manifest when starting the game. Game code
+receives asset IDs, never arbitrary URLs:
+
+```js
+session.start(gameCode, {
+  username: 'alex',
+  data: { context: 'A short reaction game.' },
+  assets: {
+    player: {
+      kind: 'image',
+      url: 'https://cdn.example.com/games/player.png',
+      maxBytes: 500000,
+      preload: true,
+    },
+    success: {
+      kind: 'audio',
+      url: 'https://cdn.example.com/games/success.ogg',
+    },
+    titleFont: {
+      kind: 'font',
+      url: 'https://cdn.example.com/games/title.woff2',
+    },
+    scene: {
+      kind: 'model',
+      url: 'https://cdn.example.com/games/scene.glb',
+    },
+  },
+});
+```
+
+Only approved HTTPS backend/CDN entries are accepted. The runtime rejects
+unknown IDs, mismatched asset kinds, non-HTTPS URLs, and assets larger than
+the hard limits: 5 MB for images, 10 MB for audio, 2 MB for fonts, and 15 MB
+for models. `maxBytes` may impose a smaller per-asset limit, but cannot raise
+the runtime limit. The runtime also limits the CSP to the origins in the
+manifest.
+
+Load assets by ID. Loads are cached and concurrent requests for one ID share
+the same promise:
+
+```js
+async function init(api) {
+  const player = await api.assets.loadImage('player');
+  const success = await api.assets.loadAudio('success');
+  await api.assets.preload(['titleFont', 'scene']);
+
+  if (player) drawPlayer(player);
+  if (success) playSuccess(success);
+}
+```
+
+Entries marked `preload: true` begin loading before `init`. Calling
+`api.assets.preload()` with no arguments waits for all manifest-declared
+preloads; passing IDs preloads only those entries. Loading progress is live:
+
+```js
+const progress = api.assets.progress;
+// progress.loaded, progress.total, progress.bytesLoaded, progress.bytesTotal
+```
+
+`loadImage` returns an `HTMLImageElement`, `loadAudio` an `HTMLAudioElement`,
+`loadFont` a boolean, and `loadModel` an `ArrayBuffer`. Missing, blocked,
+oversized, or failed assets resolve to `null` (or `false` for fonts) and never
+throw. Always provide a gameplay-safe fallback when an optional asset is not
+available. Asset bytes are fetched with credentials omitted and the sandbox
+does not expose arbitrary network access to game code.
+
+Keyboard, touch, and gamepad input is available through `input.keys`. The
+runtime currently tracks `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and
+`Space`. Each key has the same edge-aware shape regardless of its source:
+
+```js
+const space = input.keys.Space;
+if (space.justPressed) startAction();
+if (space.held) continueAction();
+if (space.justReleased) finishAction();
+```
+
+`justPressed` and `justReleased` are true only during the update frame where
+the transition occurs. Gamepad button 0 maps to `Space`, the D-pad maps to the
+arrow keys, and the left stick maps to the arrow keys with a 0.5 deadzone.
+
+On touch screens the runtime presses the same keys, so a game written for the
+keyboard also works on phones without extra code:
+
+| Gesture | Key |
+| --- | --- |
+| Tap | `Space`, pressed for about 100 ms |
+| Swipe up, down, left or right | The matching arrow key, pressed for about 100 ms |
+| Press and hold on the left or right half | `ArrowLeft` or `ArrowRight`, held until the finger lifts (dragging across switches it) |
+
+Design controls around these gestures: use Space to confirm or act, arrow
+presses to choose, and held left/right for continuous movement. Use
+`justPressed` for one-shot actions instead of keeping a separate previous-key
+snapshot.
 
 ## Outputs
 
@@ -209,6 +449,7 @@ function init(gameApi) {
   api = gameApi;
   width = api.width;
   height = api.height;
+  console.log(api.viewport.orientation); // 'portrait' or 'landscape'
   console.log(api.data.context); // context supplied to the AI
   api.setUiDesign({
     pauseMenu: {
@@ -224,15 +465,11 @@ function init(gameApi) {
   });
 }
 
-let previousKeys = {};
-
 function update(dt, input) {
   if (finished) return;
 
   time += dt;
-  const spacePressed = input.keys.Space && !previousKeys.Space;
-  previousKeys = { ...input.keys };
-  if (spacePressed) {
+  if (input.keys.Space.justPressed) {
     finished = true;
     api.submitResult({
       score: Math.floor(time * 10),
@@ -248,7 +485,7 @@ function render(ctx) {
   ctx.fillText('Press Space to finish', 20, 30);
 }
 
-function resize(newWidth, newHeight) {
+function resize(newWidth, newHeight, viewport) {
   width = newWidth;
   height = newHeight;
 }
@@ -368,10 +605,36 @@ duplicates, or when a required gameplay relationship is invalid. Do not throw:
 an uncaught game error ends the session.
 
 `input.keys` is the current held state for `ArrowUp`, `ArrowDown`, `ArrowLeft`,
-`ArrowRight`, and `Space`. For one-shot actions, detect a transition from
-`false` to `true` by comparing the current state with a previous snapshot. For
-continuous movement, use the held state directly. The runtime clears keys when
-focus or page visibility changes.
+`ArrowRight`, and `Space`. For one-shot keyboard actions, detect a transition
+from `false` to `true` by comparing the current state with a previous snapshot.
+For continuous movement, use the held state directly. The runtime clears keys
+when focus or page visibility changes.
+
+Mobile and pointer input is available through `input.pointer`:
+
+```js
+function update(dt, input) {
+  if (input.pointer.justPressed) {
+    // Start or select something once, on touch or mouse press.
+  }
+  if (input.pointer.down) {
+    player.x = input.pointer.normalizedX * api.width;
+  }
+}
+```
+
+Pointer Events cover touch, pen, and mouse input. The pointer coordinates are
+provided in logical canvas pixels (`x`, `y`) and normalized coordinates from
+`0` to `1` (`normalizedX`, `normalizedY`). `down` remains true while a pointer
+is held. `justPressed` and `justReleased` are true only during the frame where
+the transition occurs. `deltaX` and `deltaY` contain movement since the last
+game frame. The runtime applies `touch-action: none` to the canvas so vertical
+swipes do not scroll the iframe while a game is being played.
+
+Use pointer input for mobile controls and keep keyboard input as a desktop
+fallback. Avoid relying on hover, right-click, or precise multi-button mouse
+controls on a phone. The runtime tracks one active pointer; games needing
+multi-touch should be added through a future multi-pointer contract.
 
 Keep a round between 20 and 60 seconds because games appear between videos in
 a swipe feed. Submit a result with `api.submitResult({ score, ... })` when the
@@ -402,6 +665,7 @@ must be unique.
 - The runtime calls `init` before the first update.
 - The game should not create its own animation loop. The runtime owns it.
 - The runtime clears keyboard state when focus or page visibility changes.
+- Touch input follows one finger at a time; other fingers are ignored.
 - `destroy()` is called when the host stops the game, when the view is removed,
   or after a runtime failure.
 - The iframe has a restrictive Content Security Policy and no network access.

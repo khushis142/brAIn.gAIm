@@ -30,7 +30,7 @@ describe('ApiService', () => {
       username: 'alex',
       password: 'password123',
     });
-    request.flush({ id: 'user-id', username: 'alex', field: 'biology' });
+    request.flush({ id: 'user-id', username: 'alex', interests: 'biology' });
   });
 
   it('logs in with form-encoded credentials and uses the returned bearer token', () => {
@@ -48,18 +48,18 @@ describe('ApiService', () => {
     const meRequest = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me`);
     expect(meRequest.request.method).toBe('GET');
     expect(meRequest.request.headers.get('Authorization')).toBe('Bearer access-token');
-    meRequest.flush({ id: 'user-id', username: 'alex', field: 'biology' });
+    meRequest.flush({ id: 'user-id', username: 'alex', interests: 'biology' });
   });
 
   it('updates the authenticated user', () => {
     authenticate();
-    api.updateMe({ field: 'physics' }).subscribe();
+    api.updateMe({ interests: 'physics' }).subscribe();
 
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me`);
     expect(request.request.method).toBe('PATCH');
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
-    expect(request.request.body).toEqual({ field: 'physics' });
-    request.flush({ id: 'user-id', username: 'alex', field: 'physics' });
+    expect(request.request.body).toEqual({ interests: 'physics' });
+    request.flush({ id: 'user-id', username: 'alex', interests: 'physics' });
   });
 
   it('lists study fields', () => {
@@ -108,6 +108,30 @@ describe('ApiService', () => {
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/health`);
     expect(request.request.method).toBe('GET');
     request.flush({ status: 'ok' });
+  });
+
+  it('registers a video from an already-uploaded CDN file', () => {
+    authenticate();
+    api.createContent({ id: 'cdn-1', filename: 'clip.mp4', title: 'My clip', tags: ['bio'] }).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/content`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    expect(request.request.body).toEqual({
+      id: 'cdn-1',
+      filename: 'clip.mp4',
+      title: 'My clip',
+      tags: ['bio'],
+    });
+    request.flush({
+      id: 'content-1',
+      kind: 'video',
+      title: 'My clip',
+      tags: ['bio'],
+      owner: 'alex',
+      url: 'http://cdn/clip.mp4',
+      created_at: '2026-01-01T00:00:00Z',
+    });
   });
 
   function authenticate(): void {

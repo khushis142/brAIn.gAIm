@@ -1,13 +1,3 @@
-// import { Component } from '@angular/core';
-
-// @Component({
-//   imports: [],
-//   selector: 'app-home',
-//   styleUrl: './home.css',
-//   templateUrl: './home.html',
-// })
-// export class Home {}
-
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   afterNextRender,
@@ -19,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideChevronDown } from '@lucide/angular';
+import { LucideBrain, LucideChevronDown } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, FeedItem } from '../../core/api.service';
 import { GameEngineService } from '../../engine/gameEngineService';
@@ -30,59 +20,20 @@ type Phase = 'idle' | 'leaving' | 'entering';
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
-const USE_MOCK_FEED = true;
+const DOUBLE_TAP_MS = 300;
+const TAP_SLOP_PX = 10; // more movement than this is a swipe, not a tap
+const BURST_MS = 800; // keep in sync with the burst animation in home.css
 
-const MOCK_FEED: FeedItem[] = [
-  {
-    type: 'video',
-    id: 'mock-video-1',
-    title: 'Study focus: getting started',
-    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  },
-  {
-    type: 'video',
-    id: 'mock-video-2',
-    title: 'Study focus: keep going',
-    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  },
-  {
-    type: 'game',
-    id: 'dodge-demo',
-    title: 'Focus Dodge',
-    url: 'assets/games/dodge/game.js',
-    data: {
-      context: 'A short reaction game for a learning feed.',
-      difficulty: 'normal',
-      pauseTitle: 'Ready for a focus break?',
-      pauseMessage: 'Pause safely. Your current run will be waiting.',
-      resumeLabel: 'Continue Dodge',
-      leaderboardTitle: 'Focus break results',
-      leaderboardSubtitle: 'Your survival time from this learning feed.',
-      scoreLabel: 'Focus score',
-    },
-  },
-  {
-    type: 'game',
-    id: 'collect-men-demo',
-    title: 'Collect Men',
-    url: 'assets/games/collect-men/game.js',
-    data: {
-      context: 'Collect friendly 3D figures while staying focused.',
-      difficulty: 'normal',
-      pauseTitle: 'Keep collecting?',
-      pauseMessage: 'Take a breath and return when you are ready.',
-      resumeLabel: 'Continue collecting',
-      leaderboardTitle: 'Collection results',
-      leaderboardSubtitle: 'How many figures can you collect?',
-      scoreLabel: 'Collection score',
-    },
-  },
-];
+interface Burst {
+  id: number;
+  x: number;
+  y: number;
+}
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 @Component({
-  imports: [LucideChevronDown],
+  imports: [LucideBrain, LucideChevronDown],
   selector: 'app-home',
   styleUrl: './home.css',
   templateUrl: './home.html',
@@ -105,9 +56,20 @@ export class Home {
       this.loadError() ?? (this.item()?.type === 'game' ? this.session()?.error() : null) ?? null,
   );
 
+  // Likes are cosmetic for now: kept in memory until the backend has an endpoint
+  private readonly likedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly liked = computed(() => {
+    const current = this.item();
+    return current !== null && this.likedIds().has(current.id);
+  });
+  protected readonly bursts = signal<Burst[]>([]);
+
   private busy = false;
-  private mockFeedIndex = 0;
+  private username: string | null = null;
   private touchStartY: number | null = null;
+  private tapStart: { x: number; y: number } | null = null;
+  private lastTapAt = 0;
+  private nextBurstId = 0;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -129,9 +91,7 @@ export class Home {
     try {
       // Fetch the next item while the leave animation plays
       const [nextItem] = await Promise.all([
-        USE_MOCK_FEED
-          ? Promise.resolve(this.nextMockItem())
-          : firstValueFrom(this.api.nextItem()),
+        firstValueFrom(this.api.nextItem()),
         wait(hasItem ? LEAVE_MS : 0),
       ]);
       await this.show(nextItem);
@@ -152,7 +112,8 @@ export class Home {
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    this.touchStartY = event.touches[0].clientY;
+    // Swipes during a game belong to the game; the ↓ button still moves on
+    this.touchStartY = this.item()?.type === 'game' ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
@@ -160,6 +121,44 @@ export class Home {
     const swipedUp = this.touchStartY - event.changedTouches[0].clientY;
     this.touchStartY = null;
     if (swipedUp > SWIPE_MIN_PX) this.next();
+  }
+
+  protected toggleLike(): void {
+    const current = this.item();
+    if (current === null) return;
+    this.setLiked(current.id, !this.liked());
+  }
+
+  protected onTapStart(event: PointerEvent): void {
+    this.tapStart = { x: event.clientX, y: event.clientY };
+  }
+
+  protected onTapEnd(event: PointerEvent): void {
+    const start = this.tapStart;
+    this.tapStart = null;
+    const current = this.item();
+    if (start === null || current === null) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return;
+
+    if (event.timeStamp - this.lastTapAt > DOUBLE_TAP_MS) {
+      this.lastTapAt = event.timeStamp;
+      return;
+    }
+    // Double tap only likes, never unlikes; the button does that
+    this.lastTapAt = 0;
+    this.setLiked(current.id, true);
+    const burst = { id: this.nextBurstId++, x: event.offsetX, y: event.offsetY };
+    this.bursts.update((all) => [...all, burst]);
+    setTimeout(() => this.bursts.update((all) => all.filter((b) => b !== burst)), BURST_MS);
+  }
+
+  private setLiked(id: string, liked: boolean): void {
+    this.likedIds.update((ids) => {
+      const next = new Set(ids);
+      if (liked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   protected onResize(): void {
@@ -172,14 +171,15 @@ export class Home {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
     const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
+    if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
 
     this.session()?.stop();
     this.item.set(item);
 
-    if (gameCode !== null) {
+    if (gameCode !== null && item.type === 'game') {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
-        username: 'guest', // TODO: use the logged-in user once there is a login page
+        username: this.username ?? '',
         data: gameItem?.data ?? {
           context: `"${item.title}", a short game in a learning feed.`,
         },
@@ -187,12 +187,6 @@ export class Home {
         height: host.clientHeight,
       });
     }
-  }
-
-  private nextMockItem(): FeedItem {
-    const item = MOCK_FEED[this.mockFeedIndex % MOCK_FEED.length];
-    this.mockFeedIndex += 1;
-    return item;
   }
 }
 

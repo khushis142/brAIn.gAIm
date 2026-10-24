@@ -3,6 +3,8 @@ import {
   GameCustomData,
   GameResult,
   GameStartInput,
+  GamePerformanceOptions,
+  GameAssetManifest,
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
@@ -20,6 +22,8 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
   extends GameStartInput<CustomData> {
   readonly width?: number;
   readonly height?: number;
+  readonly performance?: GamePerformanceOptions;
+  readonly assets?: GameAssetManifest;
 }
 
 /**
@@ -28,6 +32,7 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
  */
 export class GameSession {
   private iframe?: HTMLIFrameElement;
+  private resizeObserver?: ResizeObserver;
   private lastBeat = 0;
   private watchdog?: ReturnType<typeof setInterval>;
 
@@ -70,12 +75,45 @@ export class GameSession {
     iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.tabIndex = 0;
     iframe.style.cssText = `width:${width}px;height:${height}px;border:0;display:block`;
+    const forwardTouches = (event: TouchEvent): void => {
+      event.preventDefault();
+      const rect = iframe.getBoundingClientRect();
+      const phase = event.type === 'touchstart'
+        ? 'start'
+        : event.type === 'touchmove'
+          ? 'move'
+          : event.type === 'touchcancel'
+            ? 'cancel'
+            : 'end';
+      for (const touch of Array.from(event.changedTouches)) {
+        iframe.contentWindow?.postMessage({
+          type: 'touch',
+          phase,
+          id: touch.identifier,
+          x: touch.clientX - rect.left,
+          y: touch.clientY - rect.top,
+        }, '*');
+      }
+    };
+    iframe.addEventListener('touchstart', forwardTouches, { passive: false });
+    iframe.addEventListener('touchmove', forwardTouches, { passive: false });
+    iframe.addEventListener('touchend', forwardTouches, { passive: false });
+    iframe.addEventListener('touchcancel', forwardTouches, { passive: false });
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => iframe.contentWindow?.focus());
 
     this.container.appendChild(iframe);
     this.iframe = iframe;
+    const ResizeObserverConstructor = this.doc.defaultView?.ResizeObserver;
+    if (ResizeObserverConstructor) {
+      this.resizeObserver = new ResizeObserverConstructor(() => {
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+        if (width > 0 && height > 0) this.resize(width, height);
+      });
+      this.resizeObserver.observe(this.container);
+    }
 
     this.lastBeat = Date.now();
     this.watchdog = setInterval(() => this.checkHeartbeat(), WATCHDOG_INTERVAL_MS);
@@ -84,6 +122,8 @@ export class GameSession {
   stop(): void {
     clearInterval(this.watchdog);
     this.watchdog = undefined;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
 
     if (this.iframe) {
       this.retire(this.iframe);
@@ -106,7 +146,9 @@ export class GameSession {
   }
 
   resize(width: number, height: number): void {
-    if (!this.iframe) return;
+    if (!this.iframe || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
     this.iframe.style.width = `${width}px`;
     this.iframe.style.height = `${height}px`;
     this.send({ type: 'resize', width, height });
@@ -216,9 +258,10 @@ export class GameSession {
       "default-src 'none'",
       "script-src 'unsafe-inline' https://esm.sh",
       "style-src 'unsafe-inline'",
-      "connect-src 'self' https://esm.sh blob:",
-      "img-src 'self' data: blob:",
-      'media-src data: blob:',
+      `img-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `media-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `font-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
+      `connect-src ${this.assetOrigins(options.assets).join(' ') || "'none'"}`,
     ].join('; ');
 
     // Stop generated code from closing the script tag or opening an HTML comment
@@ -229,6 +272,13 @@ export class GameSession {
       protocolVersion: 2,
       username: options.username,
       data: options.data,
+      performance: {
+        targetFps: options.performance?.targetFps ?? 60,
+        adaptiveQuality: options.performance?.adaptiveQuality ?? true,
+        maxPixelRatio: options.performance?.maxPixelRatio ?? 2,
+        reducedEffects: options.performance?.reducedEffects ?? false,
+      },
+      assets: options.assets ?? {},
     })
       .replace(/</g, '\\u003c')
       .replace(/\u2028/g, '\\u2028')
@@ -239,7 +289,7 @@ export class GameSession {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
-<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<style>html,body{margin:0;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}canvas{display:block;touch-action:none}</style>
 </head>
 <body>
 <canvas id="c" width="${width}" height="${height}"></canvas>
@@ -248,5 +298,18 @@ export class GameSession {
 <script>${safeCode}</script>
 </body>
 </html>`;
+  }
+
+  private assetOrigins(assets: GameAssetManifest | undefined): string[] {
+    const origins = new Set<string>();
+    for (const asset of Object.values(assets ?? {})) {
+      try {
+        const url = new URL(asset.url);
+        if (url.protocol === 'https:') origins.add(url.origin);
+      } catch {
+        // Invalid entries are ignored here and rejected by the runtime.
+      }
+    }
+    return [...origins];
   }
 }

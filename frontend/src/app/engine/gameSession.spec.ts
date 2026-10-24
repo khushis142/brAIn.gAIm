@@ -35,6 +35,53 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('embeds the configured mobile performance profile', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    session.start(gameCode, {
+      ...options,
+      performance: {
+        targetFps: 30,
+        adaptiveQuality: false,
+        maxPixelRatio: 1,
+        reducedEffects: true,
+      },
+    });
+
+    const srcdoc = container.querySelector('iframe')?.srcdoc;
+    expect(srcdoc).toContain('"targetFps":30');
+    expect(srcdoc).toContain('"adaptiveQuality":false');
+    expect(srcdoc).toContain('"maxPixelRatio":1');
+    expect(srcdoc).toContain('"reducedEffects":true');
+
+    session.destroy();
+  });
+
+  it('embeds the approved asset manifest', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    session.start(gameCode, {
+      ...options,
+      assets: {
+        player: {
+          kind: 'image',
+          url: 'https://cdn.example.test/games/player.png',
+          maxBytes: 1024 * 1024,
+          preload: true,
+        },
+      },
+    });
+
+    const iframe = container.querySelector('iframe');
+    expect(iframe?.srcdoc).toContain('"player"');
+    expect(iframe?.srcdoc).toContain('https://cdn.example.test/games/player.png');
+    expect(iframe?.srcdoc).toContain('connect-src https://cdn.example.test');
+
+    session.destroy();
+  });
+
   it('updates status, UI design, and result only from the active iframe', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');
@@ -88,6 +135,28 @@ describe('GameSession', () => {
     expect(iframe.style.height).toBe('450px');
 
     session.destroy();
+  });
+
+  it('forwards touches on the iframe element to the game', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
+    vi.spyOn(iframe, 'getBoundingClientRect').mockReturnValue({ left: 10, top: 20 } as DOMRect);
+
+    const touch = new Event('touchstart', { cancelable: true });
+    Object.defineProperty(touch, 'changedTouches', {
+      value: [{ identifier: 1, clientX: 60, clientY: 70 }],
+    });
+    iframe.dispatchEvent(touch);
+
+    expect(post).toHaveBeenCalledWith({ type: 'touch', phase: 'start', id: 1, x: 50, y: 50 }, '*');
+    expect(touch.defaultPrevented).toBe(true);
+
+    session.destroy();
+    container.remove();
   });
 
   it('rejects oversized or unsafe game code before creating an iframe', () => {

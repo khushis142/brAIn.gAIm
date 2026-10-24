@@ -41,10 +41,29 @@ export interface GameItem {
   id: string;
   title: string;
   url: string;
+  round_id: string;
+  /** Generated input for this round; pass it to GameSession.start as `data` */
   data?: GameCustomData;
 }
 
 export type FeedItem = VideoItem | GameItem;
+
+export interface ContentRead {
+  id: string;
+  kind: 'video' | 'game';
+  title: string;
+  tags: string[];
+  owner: string;
+  url: string;
+  created_at: string;
+}
+
+export interface ContentCreate {
+  id: string;
+  filename: string;
+  title: string;
+  tags?: string[];
+}
 
 export interface ScoreCreate {
   score: number;
@@ -131,6 +150,16 @@ export class ApiService {
 
   listFields(): Observable<StudyFieldRead[]> {
     return this.http.get<StudyFieldRead[]>(this.url('fields'));
+  }
+
+  listContent(kind?: ContentRead['kind'], limit = 100): Observable<ContentRead[]> {
+    let params = new HttpParams().set('limit', limit);
+    if (kind) params = params.set('kind', kind);
+    return this.http.get<ContentRead[]>(this.url('content'), { params });
+  }
+
+  createContent(content: ContentCreate): Observable<ContentRead> {
+    return this.http.post<ContentRead>(this.url('content'), content, this.authOptions());
   }
 
   nextItem(): Observable<FeedItem> {
