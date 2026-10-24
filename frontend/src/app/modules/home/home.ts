@@ -31,6 +31,8 @@ const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
 const USE_MOCK_FEED = true;
+// Games live in the backend (games/ there); the mock feed plays this published one.
+const MOCK_GAME_TITLE = 'Dodge 3D';
 
 const MOCK_FEED: FeedItem[] = [
   {
@@ -47,9 +49,9 @@ const MOCK_FEED: FeedItem[] = [
   },
   {
     type: 'game',
-    id: 'dodge-demo',
+    id: 'dodge3d-demo',
     title: 'Focus Dodge',
-    url: 'assets/games/dodge/game.js',
+    url: '', // filled in from the published game, see nextMockItem()
     data: {
       context: 'A short reaction game for a learning feed.',
       difficulty: 'normal',
@@ -114,7 +116,7 @@ export class Home {
       // Fetch the next item while the leave animation plays
       const [nextItem] = await Promise.all([
         USE_MOCK_FEED
-          ? Promise.resolve(this.nextMockItem())
+          ? this.nextMockItem()
           : firstValueFrom(this.api.nextItem()),
         wait(hasItem ? LEAVE_MS : 0),
       ]);
@@ -173,10 +175,14 @@ export class Home {
     }
   }
 
-  private nextMockItem(): FeedItem {
+  private async nextMockItem(): Promise<FeedItem> {
     const item = MOCK_FEED[this.mockFeedIndex % MOCK_FEED.length];
     this.mockFeedIndex += 1;
-    return item;
+    if (item.type !== 'game') return item;
+    const games = await firstValueFrom(this.api.listContent('game'));
+    const game = games.find((g) => g.title === MOCK_GAME_TITLE);
+    if (!game) throw new Error(`The game "${MOCK_GAME_TITLE}" is not published.`);
+    return { ...item, id: game.id, url: game.url };
   }
 }
 

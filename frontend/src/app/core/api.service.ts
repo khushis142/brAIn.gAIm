@@ -46,6 +46,16 @@ export interface GameItem {
 
 export type FeedItem = VideoItem | GameItem;
 
+export interface ContentRead {
+  id: string;
+  kind: 'video' | 'game';
+  title: string;
+  tags: string[];
+  owner: string;
+  url: string;
+  created_at: string;
+}
+
 export interface ScoreCreate {
   score: number;
 }
@@ -131,6 +141,12 @@ export class ApiService {
 
   listFields(): Observable<StudyFieldRead[]> {
     return this.http.get<StudyFieldRead[]>(this.url('fields'));
+  }
+
+  listContent(kind?: ContentRead['kind'], limit = 100): Observable<ContentRead[]> {
+    let params = new HttpParams().set('limit', limit);
+    if (kind) params = params.set('kind', kind);
+    return this.http.get<ContentRead[]>(this.url('content'), { params });
   }
 
   nextItem(): Observable<FeedItem> {
