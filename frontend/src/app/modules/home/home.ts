@@ -1,13 +1,3 @@
-// import { Component } from '@angular/core';
-
-// @Component({
-//   imports: [],
-//   selector: 'app-home',
-//   styleUrl: './home.css',
-//   templateUrl: './home.html',
-// })
-// export class Home {}
-
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   afterNextRender,
@@ -58,6 +48,7 @@ export class Home {
   );
 
   private busy = false;
+  private username?: Promise<string>;
   private touchStartY: number | null = null;
 
   constructor() {
@@ -101,7 +92,8 @@ export class Home {
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    this.touchStartY = event.touches[0].clientY;
+    // Swipes during a game belong to the game; the ↓ button still moves on
+    this.touchStartY = this.item()?.type === 'game' ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
@@ -124,16 +116,29 @@ export class Home {
     this.session()?.stop();
     this.item.set(item);
 
-    if (gameCode !== null) {
+    if (gameCode !== null && item.type === 'game') {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
-        username: 'guest', // TODO: use the logged-in user once there is a login page
-        data: { context: `"${item.title}", a short game in a learning feed.` },
+        username: await this.loadUsername(),
+        // The backend generates `data` for every round; the quiz reads its questions from it
+        data: { context: item.title, ...item.data },
         width: host.clientWidth,
         height: host.clientHeight,
       });
     }
   }
+
+  /** Loads the logged-in user's name once and reuses it for every game. */
+  private loadUsername(): Promise<string> {
+    this.username ??= firstValueFrom(this.api.getMe()).then(
+      (user) => user.username,
+      () => 'player',
+    );
+    return this.username;
+  }
+
+
+
 }
 
 async function loadGameCode(url: string): Promise<string> {

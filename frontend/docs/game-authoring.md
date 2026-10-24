@@ -63,6 +63,20 @@ changing the game lifecycle.
 Keyboard input is available through `input.keys`. The runtime currently tracks
 `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.
 
+On touch screens the runtime presses the same keys, so a game written for the
+keyboard also works on phones without extra code:
+
+| Gesture | Key |
+| --- | --- |
+| Tap | `Space`, pressed for about 100 ms |
+| Swipe up, down, left or right | The matching arrow key, pressed for about 100 ms |
+| Press and hold on the left or right half | `ArrowLeft` or `ArrowRight`, held until the finger lifts (dragging across switches it) |
+
+Design controls around these gestures: use Space to confirm or act, arrow
+presses to choose, and held left/right for continuous movement. A brief press
+lasts several frames, so detect it as a key edge (pressed this frame, not the
+previous one) when an action should happen once.
+
 ## Outputs
 
 A game reports its result with a finite numeric score:
@@ -239,6 +253,7 @@ displayed as text, not interpreted as markup.
 - The runtime calls `init` before the first update.
 - The game should not create its own animation loop. The runtime owns it.
 - The runtime clears keyboard state when focus or page visibility changes.
+- Touch input follows one finger at a time; other fingers are ignored.
 - `destroy()` is called when the host stops the game, when the view is removed,
   or after a runtime failure.
 - The iframe has a restrictive Content Security Policy and no network access.

@@ -123,7 +123,11 @@ export type HostCommand =
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'stop' }
-  | { type: 'resize'; width: number; height: number };
+  | { type: 'resize'; width: number; height: number }
+  /** A touch the host received on the iframe element; x/y are relative to the iframe. */
+  | { type: 'touch'; phase: TouchPhase; id: number; x: number; y: number };
+
+export type TouchPhase = 'start' | 'move' | 'end' | 'cancel';
 
 export function isSandboxEvent(value: unknown): value is SandboxEvent {
   if (typeof value !== 'object' || value === null) return false;

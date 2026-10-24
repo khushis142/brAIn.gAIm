@@ -15,6 +15,15 @@
         <p class="placeholder">Loading your feed…</p>
       }
 
+      @if (item()?.type === 'game' ? session()?.result() : null; as result) {
+        <div class="result">
+          <p>{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
+          <p class="result-score">{{ result.score }}</p>
+          <button type="button" (click)="next()">Next</button>
+        </div>
+      }
+
+
       @if (error(); as message) {
         <div class="error" role="alert">
           <p>{{ message }}</p>
