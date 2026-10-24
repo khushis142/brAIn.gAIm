@@ -75,7 +75,14 @@ export interface ScoreCreate {
 
 export interface ScoreRead {
   newly_unlocked: string[];
+  newly_unlocked_avatars: string[];
   games_completed: number;
+}
+
+export interface AvatarRead {
+  id: string;
+  name: string;
+  unlock_description: string;
 }
 
 export type ZombieSlot = 'head' | 'eyes' | 'neck' | 'feet';
@@ -100,6 +107,10 @@ export interface ZombieRead {
   equipped: ZombieEquipped;
   games_completed: number;
   progress: ZombieProgress[];
+  /** The character drawn under the accessories */
+  avatar: string;
+  unlocked_avatars: string[];
+  avatar_progress: ZombieProgress[];
 }
 
 export interface LeaderboardEntry {
@@ -217,6 +228,19 @@ export class ApiService {
 
   listAccessories(): Observable<AccessoryRead[]> {
     return this.http.get<AccessoryRead[]>(this.url('zombie/accessories'), this.authOptions());
+  }
+
+  listAvatars(): Observable<AvatarRead[]> {
+    return this.http.get<AvatarRead[]>(this.url('zombie/avatars'), this.authOptions());
+  }
+
+  /** Switching avatar keeps unlocked and equipped accessories as they are */
+  updateAvatar(avatar: string): Observable<ZombieRead> {
+    return this.http.put<ZombieRead>(
+      this.url('users/me/zombie/avatar'),
+      { avatar },
+      this.authOptions(),
+    );
   }
 
   getMyZombie(): Observable<ZombieRead> {

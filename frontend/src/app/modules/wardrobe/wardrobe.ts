@@ -1,15 +1,27 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { LucideLock, LucideSkull } from '@lucide/angular';
-import { AccessoryRead, ZombieProgress } from '../../core/api.service';
+import { AccessoryRead, AvatarRead, ZombieProgress } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
-import { ACCESSORY_ART, AccessoryArt } from '../../shared/zombie/zombie-art';
+import {
+  ACCESSORY_ART,
+  AccessoryArt,
+  AVATAR_THUMB_VIEW_BOX,
+  avatarHref,
+} from '../../shared/zombie/zombie-art';
 import { Zombie } from '../../shared/zombie/zombie';
 
 interface WardrobeItem extends AccessoryRead {
   art: AccessoryArt | null;
   unlocked: boolean;
   equipped: boolean;
+  progress: ZombieProgress | null;
+}
+
+interface AvatarChoice extends AvatarRead {
+  thumbHref: string;
+  unlocked: boolean;
+  selected: boolean;
   progress: ZombieProgress | null;
 }
 
@@ -22,8 +34,20 @@ interface WardrobeItem extends AccessoryRead {
 export class Wardrobe {
   protected readonly zombie = inject(ZombieService);
   protected readonly error = signal<string | null>(null);
-  /** Id of the accessory being saved; other taps wait for it */
+  /** Id of the avatar or accessory being saved; other taps wait for it */
   protected readonly saving = signal<string | null>(null);
+  protected readonly avatarThumbViewBox = AVATAR_THUMB_VIEW_BOX;
+
+  protected readonly avatars = computed<AvatarChoice[]>(() => {
+    const state = this.zombie.state();
+    return this.zombie.avatars().map((avatar) => ({
+      ...avatar,
+      thumbHref: avatarHref(avatar.id, 'head'),
+      unlocked: state?.unlocked_avatars.includes(avatar.id) ?? false,
+      selected: state?.avatar === avatar.id,
+      progress: state?.avatar_progress.find((progress) => progress.id === avatar.id) ?? null,
+    }));
+  });
 
   protected readonly items = computed<WardrobeItem[]>(() => {
     const state = this.zombie.state();
@@ -40,12 +64,22 @@ export class Wardrobe {
     this.zombie.load().catch((err) => this.error.set(describeError(err)));
   }
 
-  protected async toggle(item: WardrobeItem): Promise<void> {
-    if (!item.unlocked || this.saving() !== null) return;
-    this.saving.set(item.id);
+  protected choose(avatar: AvatarChoice): void {
+    if (!avatar.unlocked || avatar.selected) return;
+    void this.save(avatar.id, () => this.zombie.selectAvatar(avatar.id));
+  }
+
+  protected toggle(item: WardrobeItem): void {
+    if (!item.unlocked) return;
+    void this.save(item.id, () => this.zombie.equip(item.slot, item.equipped ? null : item.id));
+  }
+
+  private async save(id: string, change: () => Promise<void>): Promise<void> {
+    if (this.saving() !== null) return;
+    this.saving.set(id);
     this.error.set(null);
     try {
-      await this.zombie.equip(item.slot, item.equipped ? null : item.id);
+      await change();
     } catch (err) {
       this.error.set(describeError(err));
       // Our copy of the wardrobe was out of date; show what the server has
@@ -61,9 +95,9 @@ export class Wardrobe {
 function describeError(err: unknown): string {
   if (err instanceof HttpErrorResponse) {
     if (err.status === 0) return 'Cannot reach the server.';
-    if (err.status === 401) return 'Please log in to see your zombie.';
-    if (err.status === 403) return 'You have not unlocked that item yet.';
-    if (err.status === 422) return 'That item cannot be worn there.';
+    if (err.status === 401) return 'Please log in to see your avatar.';
+    if (err.status === 403) return 'You have not unlocked that yet.';
+    if (err.status === 422) return 'That choice is not available.';
     return `Server error (${err.status}).`;
   }
   return err instanceof Error ? err.message : String(err);

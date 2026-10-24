@@ -26,8 +26,26 @@ export interface AccessoryArt {
   readonly thumbViewBox: string;
 }
 
-export const zombieHref = (anchor: ZombieAnchor) => `${ART_DIR}/zombie.svg#${anchor}`;
 const href = (file: string, id: string) => `${ART_DIR}/${file}#${id}`;
+
+export const DEFAULT_AVATAR = 'zombie';
+
+/**
+ * Keyed by backend avatar id. Each file has the same groups and outline as
+ * zombie.svg, so every accessory fits every avatar.
+ */
+const AVATAR_FILES: Readonly<Record<string, string>> = {
+  zombie: 'zombie.svg',
+  'half-human': 'half-human.svg',
+  human: 'human.svg',
+};
+
+/** Avatars without art fall back to the zombie */
+export const avatarHref = (avatar: string, anchor: ZombieAnchor) =>
+  href(AVATAR_FILES[avatar] ?? AVATAR_FILES[DEFAULT_AVATAR], anchor);
+
+/** Crop of the shared canvas showing just the face, for avatar thumbnails */
+export const AVATAR_THUMB_VIEW_BOX = '62 16 76 90';
 
 /** Keyed by backend accessory id; ids without art are listed but not drawn */
 export const ACCESSORY_ART: Readonly<Record<string, AccessoryArt>> = {

@@ -77,12 +77,17 @@
 
       @if (item()?.type === 'game' ? session()?.result() : null; as result) {
         <div class="result">
-          <app-zombie class="result-zombie" [equipped]="zombie.equipped()" walkIn />
+          <app-zombie
+            class="result-zombie"
+            [avatar]="zombie.avatar()"
+            [equipped]="zombie.equipped()"
+            walkIn
+          />
           <p>{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
           <p class="result-score">{{ result.score }}</p>
           @if (unlockedNames().length > 0) {
             <p class="unlock" role="status">Unlocked: {{ unlockedNames().join(', ') }}!</p>
-            <a class="unlock-link" routerLink="/wardrobe">Dress up your zombie</a>
+            <a class="unlock-link" routerLink="/wardrobe">Dress up your avatar</a>
           }
           <button type="button" (click)="next()">Next</button>
         </div>

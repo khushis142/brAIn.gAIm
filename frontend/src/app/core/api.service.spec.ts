@@ -135,6 +135,20 @@ describe('ApiService', () => {
     zombie.flush({ unlocked: [], equipped: {}, games_completed: 0, progress: [] });
   });
 
+  it('loads avatars and switches the selected one', () => {
+    authenticate();
+    api.listAvatars().subscribe();
+    api.updateAvatar('half-human').subscribe();
+
+    const avatars = httpTesting.expectOne(`${environment.apiBaseUrl}/zombie/avatars`);
+    expect(avatars.request.headers.get('Authorization')).toBe('Bearer access-token');
+    avatars.flush([]);
+    const update = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me/zombie/avatar`);
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body).toEqual({ avatar: 'half-human' });
+    update.flush({});
+  });
+
   it('updates only the given zombie slots', () => {
     authenticate();
     api.updateEquipped({ head: 'hat', feet: null }).subscribe();
