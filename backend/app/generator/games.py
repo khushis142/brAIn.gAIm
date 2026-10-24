@@ -133,8 +133,8 @@ Runtime contract (protocol v2):
 - The code runs in a sandboxed iframe on a canvas. Register exactly once with
   `registerGame({{ init(api), update(dt, input), render(ctx), resize(w, h), destroy() }})`;
   `resize` and `destroy` are optional. The runtime owns the animation loop; `dt` is seconds.
-- `api.viewport.width`, `api.viewport.height`, `api.data` (validated against your schema, but treat strings as
-  untrusted text: draw them, never build code, HTML or URLs from them),
+- `api.viewport.width`, `api.viewport.height`, `api.data` (validated against your schema,
+  but treat strings as untrusted text: draw them, never build code, HTML or URLs from them),
   `api.submitResult({{ score, ...json }})` when the round ends (score is a finite number),
   `api.setUiDesign({{ pauseMenu: {{ title, message, resumeLabel }},
   leaderboard: {{ title, subtitle, scoreLabel }} }})` in `init`.
