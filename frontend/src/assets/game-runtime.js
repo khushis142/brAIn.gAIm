@@ -5,7 +5,7 @@
  * Expects a <canvas id="c"> in the document.
  *
  * Game contract (what the game passes to registerGame):
- *   init(api)            required   api = { width, height, username, data, submitResult }
+ *   init(api)            required   api = { width, height, username, data, submitResult, setUiDesign }
  *   update(dt, input)    required   dt in seconds, input = { keys }
  *   render(ctx)          required   2D canvas context
  *   resize(w, h)         optional   called after the host resized the canvas
@@ -69,12 +69,17 @@
   let lastFrame = last;
 
   const input = { keys: {} };
-  const gameInput = window.__GAME_INPUT__ || {
-    protocolVersion: 1,
-    username: '',
-    data: null,
-  };
+  const gameInput = window.__GAME_INPUT__;
   delete window.__GAME_INPUT__;
+
+  if (gameInput === null || typeof gameInput !== 'object' ||
+      gameInput.protocolVersion !== 2 || typeof gameInput.username !== 'string' ||
+      gameInput.data === null || typeof gameInput.data !== 'object' ||
+      typeof gameInput.data.context !== 'string' ||
+      gameInput.data.context.trim().length === 0) {
+    post({ type: 'error', message: 'Runtime: game input must include a context string' });
+    return;
+  }
 
   // Getters so width/height reflect later resizes.
   const api = Object.freeze({
@@ -88,6 +93,22 @@
         throw new Error('submitResult() expects an object with a finite score');
       }
       post({ type: 'result', result });
+    },
+    setUiDesign(design) {
+      const validSection = (section) => {
+        if (section === undefined) return true;
+        return section !== null && typeof section === 'object' &&
+          typeof section.title === 'string' &&
+          (section.message === undefined || typeof section.message === 'string') &&
+          (section.resumeLabel === undefined || typeof section.resumeLabel === 'string') &&
+          (section.subtitle === undefined || typeof section.subtitle === 'string') &&
+          (section.scoreLabel === undefined || typeof section.scoreLabel === 'string');
+      };
+      if (design === null || typeof design !== 'object' ||
+          !validSection(design.pauseMenu) || !validSection(design.leaderboard)) {
+        throw new Error('setUiDesign() expects a design object');
+      }
+      post({ type: 'ui-design', design });
     },
   });
 

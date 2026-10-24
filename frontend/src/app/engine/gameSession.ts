@@ -1,7 +1,9 @@
 import { signal } from '@angular/core';
 import {
+  GameCustomData,
   GameResult,
   GameStartInput,
+  GameUiDesign,
   HostCommand,
   isSandboxEvent,
 } from './gameProtocol';
@@ -13,7 +15,8 @@ const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 
-export interface GameSessionOptions<CustomData = unknown> extends GameStartInput<CustomData> {
+export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
+  extends GameStartInput<CustomData> {
   readonly width?: number;
   readonly height?: number;
 }
@@ -30,10 +33,12 @@ export class GameSession {
   private readonly _status = signal<SessionStatus>('idle');
   private readonly _error = signal<string | null>(null);
   private readonly _result = signal<GameResult | null>(null);
+  private readonly _uiDesign = signal<GameUiDesign>({});
 
   readonly status = this._status.asReadonly();
   readonly error = this._error.asReadonly();
   readonly result = this._result.asReadonly();
+  readonly uiDesign = this._uiDesign.asReadonly();
 
   constructor(
     private readonly doc: Document,
@@ -45,30 +50,16 @@ export class GameSession {
 
   // ------------------------------------------------------------ public API
 
-  start(gameCode: string, width?: number, height?: number): void;
-  start<CustomData>(gameCode: string, options: GameSessionOptions<CustomData>): void;
-  start<CustomData>(
+  start<CustomData extends GameCustomData>(
     gameCode: string,
-    optionsOrWidth?: GameSessionOptions<CustomData> | number,
-    legacyHeight = 600,
+    options: GameSessionOptions<CustomData>,
   ): void {
     this.stop();
     this._error.set(null);
     this._result.set(null);
+    this._uiDesign.set({});
     this._status.set('starting');
 
-    const options: GameSessionOptions<CustomData> =
-      typeof optionsOrWidth === 'number'
-        ? {
-            username: '',
-            data: undefined as CustomData,
-            width: optionsOrWidth,
-            height: legacyHeight,
-          }
-        : optionsOrWidth ?? {
-            username: '',
-            data: undefined as CustomData,
-          };
     const width = options.width ?? 800;
     const height = options.height ?? 600;
 
@@ -132,6 +123,9 @@ export class GameSession {
       case 'heartbeat':
         this.lastBeat = Date.now();
         break;
+      case 'ui-design':
+        this._uiDesign.set(e.data.design);
+        break;
       case 'result':
         this._result.set(e.data.result);
         break;
@@ -169,7 +163,7 @@ export class GameSession {
     setTimeout(() => iframe.remove(), IFRAME_REMOVE_DELAY_MS);
   }
 
-  private buildSrcdoc<CustomData>(
+  private buildSrcdoc<CustomData extends GameCustomData>(
     gameCode: string,
     width: number,
     height: number,
@@ -188,7 +182,7 @@ export class GameSession {
       .replace(/<\/script/gi, '<\\/script')
       .replace(/<!--/g, '<\\!--');
     const serializedInput = JSON.stringify({
-      protocolVersion: 1,
+      protocolVersion: 2,
       username: options.username,
       data: options.data,
     })

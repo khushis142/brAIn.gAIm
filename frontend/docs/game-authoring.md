@@ -32,6 +32,7 @@ The host starts a game with a game-code string and an input object:
 session.start(gameCode, {
   username: 'alex',
   data: {
+    context: 'A short reaction game for a learning feed.',
     difficulty: 'hard',
     questions: ['one', 'two'],
   },
@@ -49,10 +50,15 @@ function init(api) {
 }
 ```
 
-`data` is game-defined and may contain nested JSON-compatible values: objects,
-arrays, strings, numbers, booleans, and `null`. Do not rely on functions,
-class instances, DOM nodes, or circular references. The host can add fields to
-the startup object later without changing the game lifecycle.
+`data.context` is required. It describes the learning or product context that
+the AI used to create or configure the game. The AI may fill the remaining
+game-specific fields, such as difficulty, questions, or content identifiers.
+
+The remaining `data` fields are game-defined and may contain nested
+JSON-compatible values: objects, arrays, strings, numbers, booleans, and
+`null`. Do not rely on functions, class instances, DOM nodes, or circular
+references. The host can add fields to the startup object later without
+changing the game lifecycle.
 
 Keyboard input is available through `input.keys`. The runtime currently tracks
 `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.
@@ -90,6 +96,19 @@ function init(gameApi) {
   api = gameApi;
   width = api.width;
   height = api.height;
+  console.log(api.data.context); // context supplied to the AI
+  api.setUiDesign({
+    pauseMenu: {
+      title: 'Ready when you are',
+      message: 'Pause and return when you are focused.',
+      resumeLabel: 'Continue',
+    },
+    leaderboard: {
+      title: 'Reaction results',
+      subtitle: 'Your result compared with the feed.',
+      scoreLabel: 'Points',
+    },
+  });
 }
 
 function update(dt, input) {
@@ -120,6 +139,65 @@ function resize(newWidth, newHeight) {
 registerGame({ init, update, render, resize });
 ```
 
+## Designing the host UI
+
+Games may design the host-controlled pause menu and end-of-run leaderboard by
+calling `api.setUiDesign(design)`. This is a declarative design, not HTML: the
+Angular host owns the layout, buttons, styling, accessibility, and behavior.
+The game supplies text and chooses which supported surfaces it wants to use.
+
+### Pause menu
+
+```js
+api.setUiDesign({
+  pauseMenu: {
+    title: 'Focus break',
+    message: 'The timer is stopped. Continue when ready.',
+    resumeLabel: 'Continue game',
+  },
+});
+```
+
+The host shows a Pause control when `pauseMenu` exists. Selecting it sends a
+`pause` command to the runtime and displays the title, message, and resume
+label. Selecting the resume action sends `resume`. The runtime stops the game
+loop while paused and clears pressed keys so a key held during the pause cannot
+leak into the next frame.
+
+### Leaderboard
+
+```js
+api.setUiDesign({
+  leaderboard: {
+    title: 'Dodge leaderboard',
+    subtitle: 'Survive longer to move up.',
+    scoreLabel: 'Survival points',
+  },
+});
+```
+
+When the game submits a result, the host displays the leaderboard surface. The
+design controls its heading, supporting text, and label for the player score.
+The submitted result supplies the score and any game-specific metadata. The
+current application uses mock leaderboard rows; a future feed implementation
+can replace those rows with backend data without changing the game contract.
+
+Only the documented text fields are rendered. Games cannot provide HTML,
+Angular templates, event handlers, CSS, or arbitrary components. This keeps
+generated designs safe and lets the host maintain a consistent feed experience.
+
+### Design timing and updates
+
+Call `setUiDesign` during `init`, before gameplay starts. Calling it later is
+allowed and replaces the previous design, which can support stages or modes,
+but a game should avoid changing labels every frame. Starting a new session
+clears the previous design. UI design is optional; games that omit it use the
+host defaults.
+
+The design object is JSON-compatible and extensible. Unknown fields are ignored
+by the current host and may be supported by a future protocol version. Text is
+displayed as text, not interpreted as markup.
+
 ## Lifecycle and limitations
 
 - The runtime calls `init` before the first update.
@@ -132,6 +210,9 @@ registerGame({ init, update, render, resize });
   the host embeds the code in an inline script element.
 - Runtime errors, rejected promises, invalid registration, and missing
   registration are reported to the host and stop the session.
+- A malformed UI design causes the runtime to report an error rather than
+  passing unsafe values to the host.
 
-The protocol version is currently `1`. Games should depend only on the public
+The protocol version is currently `2`. Every game input must contain a non-empty
+`data.context` string. Games should depend only on the public
 registration contract and the `api` fields described above.

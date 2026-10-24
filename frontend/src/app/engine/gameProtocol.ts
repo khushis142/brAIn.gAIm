@@ -1,9 +1,14 @@
 /** Version of the host/game contract. Increase when the contract changes incompatibly. */
-export const GAME_PROTOCOL_VERSION = 1;
+export const GAME_PROTOCOL_VERSION = 2;
 
 /** Contract shared between the host app and the sandboxed runtime. */
 
-export interface GameStartInput<CustomData = unknown> {
+export interface GameCustomData {
+  readonly context: string;
+  readonly [key: string]: unknown;
+}
+
+export interface GameStartInput<CustomData extends GameCustomData = GameCustomData> {
   readonly username: string;
   readonly data: CustomData;
 }
@@ -14,12 +19,55 @@ export interface GameResult {
   readonly [key: string]: unknown;
 }
 
-export interface GameApi<CustomData = unknown> {
+export interface PauseMenuDesign {
+  readonly title: string;
+  readonly message?: string;
+  readonly resumeLabel?: string;
+}
+
+export interface LeaderboardDesign {
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly scoreLabel?: string;
+}
+
+export interface GameUiDesign {
+  readonly pauseMenu?: PauseMenuDesign;
+  readonly leaderboard?: LeaderboardDesign;
+}
+
+export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
   readonly width: number;
   readonly height: number;
   readonly username: string;
   readonly data: CustomData;
   submitResult(result: GameResult): void;
+  setUiDesign(design: GameUiDesign): void;
+}
+
+export function isGameUiDesign(value: unknown): value is GameUiDesign {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const design = value as {
+    pauseMenu?: unknown;
+    leaderboard?: unknown;
+  };
+  for (const section of [design.pauseMenu, design.leaderboard]) {
+    if (section === undefined) continue;
+    if (typeof section !== 'object' || section === null || Array.isArray(section)) return false;
+    const { title, message, resumeLabel, subtitle, scoreLabel } = section as {
+      title?: unknown;
+      message?: unknown;
+      resumeLabel?: unknown;
+      subtitle?: unknown;
+      scoreLabel?: unknown;
+    };
+    if (typeof title !== 'string') return false;
+    if (message !== undefined && typeof message !== 'string') return false;
+    if (resumeLabel !== undefined && typeof resumeLabel !== 'string') return false;
+    if (subtitle !== undefined && typeof subtitle !== 'string') return false;
+    if (scoreLabel !== undefined && typeof scoreLabel !== 'string') return false;
+  }
+  return true;
 }
 
 export interface InputState {
@@ -27,7 +75,7 @@ export interface InputState {
 }
 
 /** What a game has to provide (hooks marked with ? are optional). */
-export interface GameModule<CustomData = unknown> {
+export interface GameModule<CustomData extends GameCustomData = GameCustomData> {
   init(api: GameApi<CustomData>): void;
   update(dt: number, input: InputState): void;
   render(ctx: CanvasRenderingContext2D): void;
@@ -39,6 +87,7 @@ export interface GameModule<CustomData = unknown> {
 export type SandboxEvent =
   | { type: 'started' }
   | { type: 'heartbeat' }
+  | { type: 'ui-design'; design: GameUiDesign }
   | { type: 'result'; result: GameResult }
   | { type: 'error'; message: string };
 
@@ -51,12 +100,14 @@ export type HostCommand =
 
 export function isSandboxEvent(value: unknown): value is SandboxEvent {
   if (typeof value !== 'object' || value === null) return false;
-  const { type, message, result } = value as {
+  const { type, message, design, result } = value as {
     type?: unknown;
     message?: unknown;
+    design?: unknown;
     result?: unknown;
   };
   if (type === 'started' || type === 'heartbeat') return true;
+  if (type === 'ui-design') return isGameUiDesign(design);
   if (type === 'result') {
     return (
       typeof result === 'object' &&
