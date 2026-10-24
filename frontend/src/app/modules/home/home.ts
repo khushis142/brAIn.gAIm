@@ -30,7 +30,7 @@ type Phase = 'idle' | 'leaving' | 'entering';
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
-const USE_MOCK_FEED = false;
+const USE_MOCK_FEED = true;
 
 const MOCK_FEED: FeedItem[] = [
   {
