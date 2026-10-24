@@ -146,6 +146,10 @@ class GameItem(BaseModel):
     data: dict[str, Any] = Field(
         description="Generated game input; pass it as `data` to the game runtime's session.start"
     )
+    assets: list[str] = Field(
+        description="JSON Pointers into `data` holding CDN URLs (e.g. TTS audio). The game "
+        "iframe has no network access: fetch each and replace it with a data: URL first."
+    )
 
 
 FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]

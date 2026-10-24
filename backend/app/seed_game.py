@@ -11,14 +11,12 @@ This is the only way games enter the system besides the generator: the API never
 import argparse
 import asyncio
 import json
-import uuid
 from pathlib import Path
 
-import httpx
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app import cdn
 from app.db import SessionLocal, engine
 from app.generator.inputs import GameConfig
 from app.models import Content, GameRound, Impression, Score, User
@@ -37,16 +35,6 @@ def _check_game_code(path: Path) -> None:
         raise SystemExit(f"{path} contains '</script', which breaks the inline embedding")
 
 
-async def upload_to_cdn(path: Path) -> tuple[uuid.UUID, str]:
-    url = f"{get_settings().cdn_base_url.rstrip('/')}/api/v1/files"
-    async with httpx.AsyncClient(timeout=60) as client:
-        with path.open("rb") as file:
-            res = await client.post(url, files={"file": (path.name, file, "text/javascript")})
-    res.raise_for_status()
-    body = res.json()
-    return uuid.UUID(body["id"]), body["filename"]
-
-
 def _load_game(directory: Path) -> tuple[GameConfig, Path]:
     config = GameConfig.model_validate_json((directory / "config.json").read_text())
     game_js = directory / "game.js"
@@ -63,7 +51,7 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
     if await session.scalar(existing) is not None:
         raise SystemExit(f"a game titled {title!r} already exists")
 
-    file_id, filename = await upload_to_cdn(game_js)
+    file_id, filename = await cdn.upload(game_js.read_bytes(), game_js.name, "text/javascript")
     game = Content(
         id=file_id,
         kind="game",
@@ -82,7 +70,8 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
 
     The id is the CDN file id, so new code means a new id: the game's row is re-created under
     it (same title, owner, tags and creation time) and its scores, rounds and impressions are
-    moved over in the same transaction. The old file stays on the CDN.
+    moved over in the same transaction; rounds prepared but not yet served are discarded. The
+    old file stays on the CDN.
     """
     config, game_js = _load_game(directory)
     old = await session.scalar(
@@ -91,7 +80,7 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
     if old is None:
         raise SystemExit(f"no game titled {title!r} to update")
 
-    file_id, filename = await upload_to_cdn(game_js)
+    file_id, filename = await cdn.upload(game_js.read_bytes(), game_js.name, "text/javascript")
     game = Content(
         id=file_id,
         kind="game",
@@ -104,6 +93,10 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
     )
     session.add(game)
     await session.flush()
+    # Prepared rounds were generated for the old config; the feed prepares fresh ones.
+    await session.execute(
+        delete(GameRound).where(GameRound.game_id == old.id, GameRound.served_at.is_(None))
+    )
     for column in (Score.game_id, GameRound.game_id, Impression.content_id):
         await session.execute(
             update(column.class_).where(column == old.id).values({column.key: file_id})

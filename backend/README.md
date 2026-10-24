@@ -51,7 +51,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
-| POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data}` |
+| POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
 
@@ -65,6 +65,11 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 writes `data` matching the schema from the context and the user's projects; it is
 validated, stored as a game round and returned with the game's `url`. The frontend starts
 the game with it (`session.start(code, {username, data})`, see `games/README.md`).
+Rounds are prepared ahead of time: after every `/feed/next`, a background task tops the
+user up to one ready round (LLM plus the game's `preconditions`, e.g. TTS via Piper at
+`TTS_URL`), so serving a game never waits. `assets` lists JSON Pointers into `data` whose
+values are CDN URLs (e.g. audio); the frontend fetches them and swaps in `data:` URLs,
+because the game iframe has no network access (its CSP allows `data:` media).
 Games cannot be registered through the API; publish one with the seed command:
 
 ```sh

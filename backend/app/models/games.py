@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Text, func
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -24,7 +24,11 @@ class Score(Base):
 
 
 class GameRound(Base):
-    """One play of a game by a user, with the input the LLM generated for it."""
+    """One play of a game by a user, with the input generated for it.
+
+    Rounds are prepared ahead of time (LLM + preconditions) and wait with `served_at` unset
+    until the feed hands them out, so serving a game never waits on the LLM.
+    """
 
     __tablename__ = "game_rounds"
     __table_args__ = (Index("ix_game_rounds_user_created_at", "user_id", "created_at"),)
@@ -33,4 +37,7 @@ class GameRound(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     game_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("content.id", ondelete="CASCADE"))
     input: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # JSON Pointers into `input` whose values are CDN URLs the host must fetch (e.g. TTS audio).
+    assets: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    served_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

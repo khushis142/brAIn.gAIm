@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     # Public base URL of the CDN service, e.g. https://cdn.example.com
     cdn_base_url: str
+    # Piper's HTTP server (POST /synthesize), e.g. http://piper:5000; only games with a
+    # `tts` precondition need it.
+    tts_url: str | None = None
     # LLM adapter for the game generator; only the keyless fake exists so far (#27, #44)
     llm_provider: Literal["fake"] = "fake"
 

@@ -50,6 +50,26 @@ my-game/
   "`answer` is the index of the correct option; exactly one option is correct"). The LLM
   also gets the player's own notes as "study material", so don't hard-code a topic.
 
+## Preconditions (optional)
+
+Some games need more than text, e.g. spoken audio. List server-side steps under
+`preconditions` in `config.json`; they run on the generated data before the round is
+ready. Rounds are prepared in the background ahead of time, so this never delays the feed.
+
+```json
+"preconditions": [
+  { "type": "tts", "path": "/questions/*/question", "into": "questionAudio" }
+]
+```
+
+- **`tts`**: speaks every string `path` selects (a JSON Pointer; `*` matches every array
+  item) and writes the audio URL into the sibling field `into`. Here, every question gets a
+  `questionAudio` next to its `question`.
+- `path` must point to a string in `input_schema`, and `into` must *not* be in the schema
+  (the LLM does not produce it). Both are checked on publish.
+- In the game, the field holds a `data:` URL the host prepared (the iframe has no network
+  access), e.g. `new Audio(api.data.questions[0].questionAudio).play()`. Audio is WAV.
+
 ## `game.js`
 
 Follow the frontend guide. In addition:

@@ -8,12 +8,13 @@ against the schema before the frontend hands it to the game as `api.data`.
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Self
 
 from jsonschema import Draft202012Validator, SchemaError
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from app.generator.llm import LLM, Message
+from app.generator.preconditions import TtsStep
 
 MAX_ATTEMPTS = 2
 _MAX_TOKENS = 4000
@@ -26,6 +27,8 @@ class GameConfig(BaseModel):
 
     input_schema: dict[str, Any]
     context: str
+    # Run on the generated input before a round is ready; see app/generator/preconditions.py.
+    preconditions: list[TtsStep] = []
 
     @field_validator("input_schema")
     @classmethod
@@ -46,6 +49,12 @@ class GameConfig(BaseModel):
                 "input_schema must be an object that requires a non-empty string `context`"
             )
         return schema
+
+    @model_validator(mode="after")
+    def _preconditions_fit_schema(self) -> Self:
+        for step in self.preconditions:
+            step.check_against(self.input_schema)
+        return self
 
 
 class InputGenerationError(Exception):

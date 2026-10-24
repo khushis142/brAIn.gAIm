@@ -31,6 +31,8 @@ review the generated file (add data conversion where needed), `alembic upgrade h
   through `app/seed_game.py`; never add an API path that accepts game code or files.
 - Games are fixed templates; the LLM only produces their `input` (data, validated against
   the game's `config.input_schema` in `app/generator/inputs.py`), never code.
+- Game rounds are prepared in the background (`feed.top_up`) and served from the ready
+  pool; never put LLM, TTS or other slow calls on the `/feed/next` request path.
 - Feed decisions live in `app/feed.py`; routers stay thin.
 - Settings come from env via `app/config.py`; add a variable only when the value
   really differs between environments, and update `.env.example` and

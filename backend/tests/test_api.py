@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 from jsonschema import validate
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
+from app import cdn, feed
 from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
 from app.generator.inputs import GameConfig
@@ -58,7 +59,7 @@ async def _auth(client: AsyncClient, username: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
 
-async def _create_game(owner: str) -> str:
+async def _create_game(owner: str, config: GameConfig = EXAMPLE_GAME) -> str:
     """Games are created by server code only (generator, seeding), never via the API."""
     async with SessionLocal() as session:
         owner_id = await session.scalar(select(User.id).where(User.username == owner))
@@ -67,7 +68,7 @@ async def _create_game(owner: str) -> str:
             kind="game",
             filename="game.js",
             title="a game",
-            config=EXAMPLE_GAME.model_dump(),
+            config=config.model_dump(),
             owner_id=owner_id,
         )
         session.add(game)
@@ -166,19 +167,63 @@ async def test_feed_interleaves_games(client: AsyncClient) -> None:
     assert {items[0]["id"], items[1]["id"]} == videos
     assert all(item["url"].startswith("https://cdn.test/files/") for item in items)
 
-    # Every game comes with a freshly generated, schema-valid input stored as a round.
+    # Every game is a round prepared in the background, with schema-valid data.
     games = [item for item in items if item["type"] == "game"]
     for game in games:
         validate(game["data"], EXAMPLE_GAME.input_schema)
+        assert game["assets"] == []
     async with SessionLocal() as session:
         rounds = (await session.scalars(select(GameRound))).all()
-    assert {str(r.id): r.input for r in rounds} == {g["round_id"]: g["data"] for g in games}
+    served = {str(r.id): r.input for r in rounds if r.served_at is not None}
+    assert served == {g["round_id"]: g["data"] for g in games}
+    # ...and the next one is already waiting.
+    assert len([r for r in rounds if r.served_at is None]) == feed.READY_ROUNDS
+
+
+async def test_game_only_catalog_serves_prepared_rounds(client: AsyncClient) -> None:
+    await _auth(client, "maker2")
+    await _create_game("maker2")
+    headers = await _auth(client, "solo")
+    # Nothing is prepared yet on the first call; the background task prepares a round.
+    assert (await client.post("/feed/next", headers=headers)).status_code == 404
+    first = (await client.post("/feed/next", headers=headers)).json()
+    second = (await client.post("/feed/next", headers=headers)).json()
+    assert first["type"] == second["type"] == "game"
+    assert first["round_id"] != second["round_id"]
+
+
+async def test_feed_serves_tts_assets(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.generator import preconditions
+
+    async def synthesize(text: str) -> bytes:
+        return b"RIFF" + text.encode()
+
+    async def upload(content: bytes, filename: str, content_type: str) -> tuple[uuid.UUID, str]:
+        return uuid.uuid4(), filename
+
+    monkeypatch.setattr(preconditions.tts, "synthesize", synthesize)
+    monkeypatch.setattr(preconditions.cdn, "upload", upload)
+    config = EXAMPLE_GAME.model_copy(
+        update={
+            "preconditions": [
+                preconditions.TtsStep(type="tts", path="/questions/*/question", into="audio")
+            ]
+        }
+    )
+    await _auth(client, "voice")
+    await _create_game("voice", config=config)
+    headers = await _auth(client, "listener")
+    await client.post("/feed/next", headers=headers)  # prepares the round
+    game = (await client.post("/feed/next", headers=headers)).json()
+
+    count = len(game["data"]["questions"])
+    assert game["assets"] == [f"/questions/{i}/audio" for i in range(count)]
+    assert all(q["audio"].endswith("/speech.wav") for q in game["data"]["questions"])
 
 
 async def test_feed_skips_games_whose_input_fails(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app import feed
     from app.generator.inputs import InputGenerationError
 
     async def broken(*args: object) -> dict:
@@ -195,15 +240,18 @@ async def test_feed_skips_games_whose_input_fails(
 
 
 async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    from app import seed_game as seed_module
-
     file_id = uuid.uuid4()
 
-    async def fake_upload(path: Path) -> tuple[uuid.UUID, str]:
-        assert path == EXAMPLE_DIR / "game.js"
-        return file_id, "game.js"
+    async def fake_upload(
+        content: bytes, filename: str, content_type: str
+    ) -> tuple[uuid.UUID, str]:
+        assert (content, content_type) == (
+            (EXAMPLE_DIR / "game.js").read_bytes(),
+            "text/javascript",
+        )
+        return file_id, filename
 
-    monkeypatch.setattr(seed_module, "upload_to_cdn", fake_upload)
+    monkeypatch.setattr(cdn, "upload", fake_upload)
     await _auth(client, "publisher")
     async with SessionLocal() as session:
         game = await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
@@ -217,14 +265,14 @@ async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -
 async def test_update_game_keeps_history(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app import seed_game as seed_module
-
     file_ids = iter([uuid.uuid4(), uuid.uuid4()])
 
-    async def fake_upload(path: Path) -> tuple[uuid.UUID, str]:
-        return next(file_ids), "game.js"
+    async def fake_upload(
+        content: bytes, filename: str, content_type: str
+    ) -> tuple[uuid.UUID, str]:
+        return next(file_ids), filename
 
-    monkeypatch.setattr(seed_module, "upload_to_cdn", fake_upload)
+    monkeypatch.setattr(cdn, "upload", fake_upload)
     await _auth(client, "publisher")
     async with SessionLocal() as session:
         old = await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
@@ -232,7 +280,10 @@ async def test_update_game_keeps_history(
         session.add_all(
             [
                 Score(user_id=owner_id, game_id=old_id, score=7),
-                GameRound(user_id=owner_id, game_id=old_id, input={"context": "x"}),
+                GameRound(
+                    user_id=owner_id, game_id=old_id, input={"context": "x"}, served_at=func.now()
+                ),
+                GameRound(user_id=owner_id, game_id=old_id, input={"context": "prepared"}),
                 Impression(user_id=owner_id, content_id=old_id),
             ]
         )
@@ -244,6 +295,9 @@ async def test_update_game_keeps_history(
         assert await session.get(Content, old_id) is None
         for column in (Score.game_id, GameRound.game_id, Impression.content_id):
             assert set(await session.scalars(select(column))) == {new.id}
+        # The played round moved over; the prepared one (old config) was discarded.
+        rounds = (await session.scalars(select(GameRound))).all()
+        assert [r.input for r in rounds] == [{"context": "x"}]
         with pytest.raises(SystemExit, match="no game titled"):
             await update_game(session, EXAMPLE_DIR, "Missing")
 
