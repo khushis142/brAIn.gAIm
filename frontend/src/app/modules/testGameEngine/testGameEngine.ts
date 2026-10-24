@@ -8,6 +8,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { ApiService, ContentRead } from '../../core/api.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
 
@@ -16,11 +18,13 @@ import { GameSession } from '../../engine/gameSession';
   template: `
     <div class="flex flex-col items-start gap-3">
       <div class="flex gap-2">
-        <button
-          class="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-400"
-          (click)="loadGame('dodge3d')">
-          Play 3D Dodge
-        </button>
+        @for (game of games(); track game.id) {
+          <button
+            class="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-400"
+            (click)="loadGame(game)">
+            Play {{ game.title }}
+          </button>
+        }
         <button
           class="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
           (click)="session()?.stop()">
@@ -126,10 +130,13 @@ import { GameSession } from '../../engine/gameSession';
 })
 export class GameViewComponent {
   private readonly engine = inject(GameEngineService);
+  private readonly api = inject(ApiService);
   private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
 
   protected readonly session = signal<GameSession | null>(null);
   protected readonly isPaused = signal(false);
+  // Published games (the backend's games/); the sample data below fits the dodge games
+  protected readonly games = signal<ContentRead[]>([]);
   private readonly loadError = signal<string | null>(null);
   protected readonly error = computed(
     () => this.loadError() ?? this.session()?.error() ?? null,
@@ -168,15 +175,18 @@ export class GameViewComponent {
     afterNextRender(() => {
       this.session.set(this.engine.createSession(this.host().nativeElement));
     });
+    firstValueFrom(this.api.listContent('game'))
+      .then((games) => this.games.set(games))
+      .catch((err) => this.loadError.set(`Could not list games: ${String(err?.message ?? err)}`));
     inject(DestroyRef).onDestroy(() => this.session()?.destroy());
   }
 
-  protected async loadGame(name: string): Promise<void> {
+  protected async loadGame(game: ContentRead): Promise<void> {
     this.loadError.set(null);
     this.isPaused.set(false);
     try {
-      const res = await fetch(`assets/games/${name}/game.js`);
-      if (!res.ok) throw new Error(`Could not load ${name}/game.js (${res.status})`);
+      const res = await fetch(game.url);
+      if (!res.ok) throw new Error(`Could not load ${game.title} (${res.status})`);
       this.session()?.start(await res.text(), {
         username: 'demo-user',
         data: {
