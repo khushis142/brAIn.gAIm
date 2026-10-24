@@ -30,6 +30,12 @@ Each game must include a `config.json` like this:
 ```json
 {
   "context": "Create short biology quiz data about the player's study notes.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "questions"],
@@ -64,6 +70,26 @@ Each game must include a `config.json` like this:
   }
 }
 ```
+
+The package metadata describes the mobile requirements used by the feed when
+selecting and presenting a game:
+
+- `renderer` is `2d` or `webgl` and must match the game registration.
+- `orientation` is the preferred `portrait` or `landscape` layout. Games must
+  still respond to `api.viewport.orientation` changes when the device rotates.
+- `minDurationSeconds` and `maxDurationSeconds` are positive integer bounds;
+  `minDurationSeconds` must not exceed `maxDurationSeconds`. The game should
+  submit its result within this window and avoid requiring a longer session.
+- `input` lists every supported input source: `touch`, `keyboard`, and/or
+  `gamepad`. Include only inputs the game genuinely supports, and always list
+  `touch` for a phone-first game.
+- `assets` is the list of approved asset IDs used by the package. It is not a
+  list of URLs; URLs, types, and byte limits belong to the host-provided asset
+  manifest described below. Every listed ID must exist in that manifest.
+
+The backend should validate these fields before publishing a package. Keep
+the metadata strict and use an allowlist for `renderer`, `orientation`, and
+`input`; reject unknown fields when validating package configuration.
 
 `input_schema` is JSON Schema Draft 2020-12. It describes exactly what the
 game reads from `api.data`. The backend validates every LLM response against

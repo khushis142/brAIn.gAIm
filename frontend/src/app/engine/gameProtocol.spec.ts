@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { isGameUiDesign, isSandboxEvent } from './gameProtocol';
-import type { GameApi, GameModule } from './gameProtocol';
+import type { GameApi, GameModule, GamePackageMetadata } from './gameProtocol';
 
 describe('game protocol validation', () => {
+  it('supports mobile package metadata', () => {
+    const metadata: GamePackageMetadata = {
+      renderer: '2d',
+      orientation: 'portrait',
+      minDurationSeconds: 20,
+      maxDurationSeconds: 60,
+      input: ['touch', 'keyboard'],
+      assets: ['player'],
+    };
+
+    expect(metadata.maxDurationSeconds).toBeGreaterThanOrEqual(metadata.minDurationSeconds);
+    expect(metadata.input).toContain('touch');
+  });
+
   it('supports both renderer declarations in the game contract', () => {
     const webglGame: GameModule = {
       renderer: 'webgl',

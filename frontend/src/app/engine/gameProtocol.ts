@@ -3,6 +3,18 @@ export const GAME_PROTOCOL_VERSION = 2;
 
 export type GameRenderer = '2d' | 'webgl';
 
+export type GameInputKind = 'touch' | 'keyboard' | 'gamepad';
+
+export interface GamePackageMetadata {
+  readonly renderer: GameRenderer;
+  readonly orientation: GameOrientation;
+  readonly minDurationSeconds: number;
+  readonly maxDurationSeconds: number;
+  readonly input: readonly GameInputKind[];
+  /** Asset IDs used by the package; URLs remain in the approved asset manifest. */
+  readonly assets: readonly string[];
+}
+
 export interface WebGlCapabilities {
   readonly available: boolean;
   readonly webgl2: boolean;
