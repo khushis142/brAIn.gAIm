@@ -30,7 +30,7 @@ describe('ApiService', () => {
       username: 'alex',
       password: 'password123',
     });
-    request.flush({ id: 'user-id', username: 'alex', field: 'biology' });
+    request.flush({ id: 'user-id', username: 'alex', interests: 'biology' });
   });
 
   it('logs in with form-encoded credentials and uses the returned bearer token', () => {
@@ -48,18 +48,18 @@ describe('ApiService', () => {
     const meRequest = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me`);
     expect(meRequest.request.method).toBe('GET');
     expect(meRequest.request.headers.get('Authorization')).toBe('Bearer access-token');
-    meRequest.flush({ id: 'user-id', username: 'alex', field: 'biology' });
+    meRequest.flush({ id: 'user-id', username: 'alex', interests: 'biology' });
   });
 
   it('updates the authenticated user', () => {
     authenticate();
-    api.updateMe({ field: 'physics' }).subscribe();
+    api.updateMe({ interests: 'physics' }).subscribe();
 
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me`);
     expect(request.request.method).toBe('PATCH');
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
-    expect(request.request.body).toEqual({ field: 'physics' });
-    request.flush({ id: 'user-id', username: 'alex', field: 'physics' });
+    expect(request.request.body).toEqual({ interests: 'physics' });
+    request.flush({ id: 'user-id', username: 'alex', interests: 'physics' });
   });
 
   it('lists study fields', () => {
