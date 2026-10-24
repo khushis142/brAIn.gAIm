@@ -7,7 +7,7 @@ services:
       - "8081:8080"
     environment:
       PORT: "8080"
-      CDN_BASE_URL: ${CDN_BASE_URL:-http://localhost:8081}
+      CDN_BASE_URL: ${CDN_BASE_URL:-http://192.168.188.67:8081}
       MAX_UPLOAD_SIZE_MB: "500"
       S3_ENDPOINT: "http://rustfs:9000"
       S3_REGION: "us-east-1"

@@ -27,6 +27,9 @@ func Load() *Config {
 	s3SecretKey := getEnv("S3_SECRET_ACCESS_KEY", "braingain-secret")
 	s3UsePathStyle := getEnvBool("S3_USE_PATH_STYLE", true)
 	cdnBaseURL := strings.TrimRight(getEnv("CDN_BASE_URL", "http://localhost:"+port), "/")
+	if cdnBaseURL != "" && !strings.HasPrefix(cdnBaseURL, "http://") && !strings.HasPrefix(cdnBaseURL, "https://") {
+		cdnBaseURL = "http://" + cdnBaseURL
+	}
 
 	maxUploadMB, err := strconv.ParseInt(getEnv("MAX_UPLOAD_SIZE_MB", "500"), 10, 64)
 	if err != nil || maxUploadMB <= 0 {
