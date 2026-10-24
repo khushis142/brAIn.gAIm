@@ -1,0 +1,110 @@
+.preview {
+  display: grid;
+  justify-items: center;
+  margin-top: 24px;
+}
+
+.preview-zombie {
+  width: min(200px, 60vw);
+}
+
+.games,
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
+.error {
+  color: #e23b3b;
+  font-weight: 600;
+}
+
+.items {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.item {
+  align-items: center;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  gap: 4px;
+  height: 100%;
+  padding: 12px;
+  text-align: center;
+  transition: border-color 150ms ease, transform 150ms ease;
+  width: 100%;
+}
+
+.item:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.item.equipped {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.item:disabled {
+  cursor: default;
+}
+
+.item small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.thumb {
+  display: grid;
+  height: 64px;
+  place-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.thumb > svg:first-child {
+  height: 100%;
+  width: 100%;
+}
+
+/* Locked items show as a silhouette under a padlock */
+.item:has(.lock) .thumb > svg:first-child {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.35;
+}
+
+.lock {
+  color: var(--muted);
+  position: absolute;
+}
+
+.progress {
+  background: var(--border);
+  border-radius: 999px;
+  height: 6px;
+  margin-top: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress > span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+}

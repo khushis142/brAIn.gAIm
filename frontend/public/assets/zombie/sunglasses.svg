@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <g id="sunglasses">
+    <path d="M 62 52 L 138 52" fill="none" stroke="#2b2433" stroke-width="3" stroke-linecap="round" />
+    <rect x="74" y="50" width="22" height="18" rx="5" fill="#1c1a22" stroke="#2b2433" stroke-width="3" stroke-linejoin="round" />
+    <path d="M 78 54 L 86 54" stroke="#f4f1e8" stroke-width="3" stroke-linecap="round" />
+    <rect x="104" y="50" width="22" height="18" rx="5" fill="#1c1a22" stroke="#2b2433" stroke-width="3" stroke-linejoin="round" />
+    <path d="M 108 54 L 116 54" stroke="#f4f1e8" stroke-width="3" stroke-linecap="round" />
+  </g>
+</svg>

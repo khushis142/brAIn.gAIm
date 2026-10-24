@@ -1,0 +1,64 @@
+<section>
+  <div class="flex flex-row gap-3">
+    <svg lucideSkull></svg>
+    <h2>Wardrobe</h2>
+  </div>
+
+  <div class="card preview">
+    <app-zombie class="preview-zombie" [equipped]="zombie.equipped()" />
+    <p class="games">{{ zombie.state()?.games_completed ?? 0 }} games finished</p>
+  </div>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <div class="card">
+    <h3>Accessories</h3>
+    @if (items().length === 0 && !error()) {
+      <p class="hint">Loading…</p>
+    }
+    <ul class="items">
+      @for (item of items(); track item.id) {
+        <li>
+          <button
+            class="item"
+            type="button"
+            [class.equipped]="item.equipped"
+            [disabled]="!item.unlocked || saving() !== null"
+            [attr.aria-pressed]="item.unlocked ? item.equipped : null"
+            (click)="toggle(item)"
+          >
+            <span class="thumb">
+              @if (item.art; as art) {
+                <svg [attr.viewBox]="art.thumbViewBox" aria-hidden="true">
+                  @for (part of art.parts; track part.href) {
+                    <use [attr.href]="part.href" />
+                  }
+                </svg>
+              }
+              @if (!item.unlocked) {
+                <svg lucideLock class="lock" aria-hidden="true"></svg>
+              }
+            </span>
+            <strong>{{ item.name }}</strong>
+            <small>
+              @if (item.equipped) {
+                Wearing · tap to take off
+              } @else if (item.unlocked) {
+                Tap to wear
+              } @else {
+                {{ item.unlock_description }}
+              }
+            </small>
+            @if (item.progress; as progress) {
+              <span class="progress" [attr.aria-label]="progress.current + ' of ' + progress.target">
+                <span [style.width.%]="(progress.current / progress.target) * 100"></span>
+              </span>
+            }
+          </button>
+        </li>
+      }
+    </ul>
+  </div>
+</section>

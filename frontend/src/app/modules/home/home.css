@@ -173,6 +173,22 @@
   text-align: center;
 }
 
+.result-zombie {
+  justify-self: center;
+  width: 140px;
+}
+
+.unlock {
+  color: #f2c14e;
+  font-weight: 700;
+  margin: 0;
+}
+
+.unlock-link {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
 .error button,
 .result button,
 .next {
@@ -360,7 +376,8 @@
   .next,
   .like.liked svg,
   .burst,
-  .warp.active::before {
+  .warp.active::before,
+  .warp.active::after {
     animation: none;
   }
 

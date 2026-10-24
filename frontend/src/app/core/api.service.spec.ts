@@ -111,13 +111,38 @@ describe('ApiService', () => {
 
   it('submits scores for a game', () => {
     authenticate();
-    api.submitScore('game/id', { score: 42 }).subscribe();
+    let response: unknown;
+    api.submitScore('game/id', { score: 42, round_id: 'round-1' }).subscribe((r) => (response = r));
 
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/games/game%2Fid/scores`);
     expect(request.request.method).toBe('POST');
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
-    expect(request.request.body).toEqual({ score: 42 });
-    request.flush(null);
+    expect(request.request.body).toEqual({ score: 42, round_id: 'round-1' });
+    request.flush({ newly_unlocked: ['hat'], games_completed: 1 });
+    expect(response).toEqual({ newly_unlocked: ['hat'], games_completed: 1 });
+  });
+
+  it('loads the accessory catalog and the current zombie', () => {
+    authenticate();
+    api.listAccessories().subscribe();
+    api.getMyZombie().subscribe();
+
+    const catalog = httpTesting.expectOne(`${environment.apiBaseUrl}/zombie/accessories`);
+    expect(catalog.request.headers.get('Authorization')).toBe('Bearer access-token');
+    catalog.flush([]);
+    const zombie = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me/zombie`);
+    expect(zombie.request.method).toBe('GET');
+    zombie.flush({ unlocked: [], equipped: {}, games_completed: 0, progress: [] });
+  });
+
+  it('updates only the given zombie slots', () => {
+    authenticate();
+    api.updateEquipped({ head: 'hat', feet: null }).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me/zombie/equipped`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ head: 'hat', feet: null });
+    request.flush({ unlocked: ['hat'], equipped: {}, games_completed: 1, progress: [] });
   });
 
   it('loads a game leaderboard with a limit', () => {
