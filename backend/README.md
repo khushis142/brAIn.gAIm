@@ -64,7 +64,8 @@ CI (`.github/workflows/`) builds `ghcr.io/brain-gaim/backend` (amd64 + arm64) an
 tags it `:<version>` and `:latest` whenever `version.txt` changes on `main`.
 **To deploy, bump `version.txt`.**
 
-The container runs `alembic upgrade head` on start, then serves on port 8000
+The container runs `alembic upgrade head` on start, then serves on port 8000,
+published on host port 8080
 (healthcheck: `/health`).
 
 Portainer setup (once):
