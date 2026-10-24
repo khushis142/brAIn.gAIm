@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 ARG PIPER_VERSION=1.8.0
-ARG VOICE=en_US-hfc_female-medium
+ARG VOICE
 
 RUN pip install --no-cache-dir "piper-tts[http]==${PIPER_VERSION}"
 

@@ -1,7 +1,11 @@
 services:
   piper:
-    build: .
-    image: braingain/piper:1.8.0
+    # A new voice needs a new image tag, or redeploys reuse the old image.
+    build:
+      context: .
+      args:
+        VOICE: en_US-hfc_female-medium
+    image: braingain/piper:1.8.0-en_US-hfc_female-medium
     container_name: piper
     restart: unless-stopped
     ports:
