@@ -1,0 +1,13 @@
+{
+  "format": "braingain-game@1",
+  "id": "fake-planet-order",
+  "version": 1,
+  "title": "Planet Order",
+  "description": "Placeholder ordering game from the fake LLM adapter.",
+  "kind": "puzzle",
+  "concepts": [{ "id": "planet-order", "label": "Order of the inner planets" }],
+  "estimated_seconds": 30,
+  "max_score": 100,
+  "pass_score": 70,
+  "difficulty": 1
+}

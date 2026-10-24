@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +14,8 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     # Public base URL of the CDN service, e.g. https://cdn.example.com
     cdn_base_url: str
+    # LLM adapter for the game generator; only the keyless fake exists so far (#27, #44)
+    llm_provider: Literal["fake"] = "fake"
 
     @field_validator("database_url")
     @classmethod
