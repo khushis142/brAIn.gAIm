@@ -49,7 +49,7 @@ function init(gameApi) {
 
   api.setUiDesign({
     theme: {
-      accent: 'emerald',
+      accent: 'sky',
       panel: 'dark',
       density: 'comfortable',
     },
