@@ -62,6 +62,23 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 
 Never use `:latest`. The container runs migrations on start.
 
+## Publishing & Updating Games on Server
+
+Games are stored on the CDN and registered in the `content` table. Deploying backend code does NOT automatically update game templates; publish or update them via `app/seed_game.py`:
+
+```sh
+# Update existing game on the team server (192.168.188.67):
+DATABASE_URL="postgresql+asyncpg://braingain:braingain@192.168.188.67:5432/braingain" \
+CDN_BASE_URL="http://192.168.188.67:8081" \
+JWT_SECRET="01234567890123456789012345678901" \
+python -m app.seed_game games/<dir> --title "<Title>" --update
+
+# Register a brand new game on the server:
+... python -m app.seed_game games/<dir> --title "<Title>" --owner <username>
+```
+
+`--update` uploads new JS to CDN, creates a new CDN-backed Content entry, re-links scores/history, and purges stale prepared rounds. Titles can be listed via `GET /games`.
+
 ## Pitfalls
 
 - Nix flakes only see files tracked by git: `git add` new files before `nix develop`.

@@ -158,6 +158,7 @@ function resetGame() {
         side: 'left',
         isCorrect: q.correct === 'left',
         broken: false,
+        cleared: false,
       },
       right: {
         x: W - optW - 10,
@@ -168,6 +169,7 @@ function resetGame() {
         side: 'right',
         isCorrect: q.correct === 'right',
         broken: false,
+        cleared: false,
       },
       cleared: false,
     });
@@ -324,53 +326,64 @@ function update(dt, input) {
       const feetY = player.y + player.h;
       const prevFeetY = feetY - player.vy * dt;
 
-      const lvl = levels[currentQuestionIndex];
-      if (lvl) {
-        const platformsToCheck = [lvl.middle, lvl.left, lvl.right];
+      const platformsToCheck = [];
+      const maxLvl = Math.min(levels.length - 1, currentQuestionIndex);
+      for (let i = 0; i <= maxLvl; i++) {
+        const l = levels[i];
+        if (!l.middle.broken) platformsToCheck.push(l.middle);
+        if (!l.left.broken) platformsToCheck.push(l.left);
+        if (!l.right.broken) platformsToCheck.push(l.right);
+      }
 
-        if (currentQuestionIndex > 0) {
-          platformsToCheck.push(levels[currentQuestionIndex - 1].middle);
-        }
+      for (const plat of platformsToCheck) {
+        if (plat.broken) continue;
 
-        for (const plat of platformsToCheck) {
-          if (plat.broken) continue;
+        const withinX =
+          player.x + player.w * 0.8 >= plat.x && player.x + player.w * 0.2 <= plat.x + plat.w;
+        const crossedTop = prevFeetY <= plat.y + 4 && feetY >= plat.y - 2;
 
-          const withinX =
-            player.x + player.w * 0.8 >= plat.x && player.x + player.w * 0.2 <= plat.x + plat.w;
-          const crossedTop = prevFeetY <= plat.y + 4 && feetY >= plat.y - 2;
-
-          if (withinX && crossedTop) {
-            if (plat.type === 'safe') {
-              // Safe middle platform bounce
+        if (withinX && crossedTop) {
+          if (plat.type === 'safe' || plat.cleared) {
+            // Safe bounce on middle platform or cleared correct platform
+            player.y = plat.y - player.h;
+            player.vy = plat.cleared ? SUPER_BOUNCE_VELOCITY : BOUNCE_VELOCITY;
+            squishAnim = 1;
+            spawnParticles(player.x + player.w / 2, plat.y, '#10b981', 8);
+            break;
+          } else if (plat.type === 'option') {
+            if (plat.isCorrect) {
+              // Correct platform: launch upward, stays stable permanently!
               player.y = plat.y - player.h;
-              player.vy = BOUNCE_VELOCITY;
+              player.vy = SUPER_BOUNCE_VELOCITY;
               squishAnim = 1;
-              spawnParticles(player.x + player.w / 2, plat.y, '#10b981', 6);
-              break;
-            } else if (plat.type === 'option') {
-              if (plat.isCorrect) {
-                // Correct platform: launch upward, advance question!
-                player.y = plat.y - player.h;
-                player.vy = SUPER_BOUNCE_VELOCITY;
-                squishAnim = 1;
-                spawnParticles(player.x + player.w / 2, plat.y, '#3b82f6', 22);
+              spawnParticles(player.x + player.w / 2, plat.y, '#3b82f6', 22);
 
-                lvl.cleared = true;
-                currentQuestionIndex++;
+              plat.cleared = true;
+              plat.type = 'safe';
 
-                if (currentQuestionIndex >= levels.length) {
-                  // Summit reached: 1000 pts per question + speed bonus
-                  const baseScore = questions.length * 1000;
-                  const speedBonus = Math.max(0, Math.round((60 - elapsedTime) * 50));
-                  finishGame(baseScore + speedBonus, true);
+              const activeLevel = levels[currentQuestionIndex];
+              if (activeLevel) {
+                activeLevel.cleared = true;
+                const wrongPlat = plat.side === 'left' ? activeLevel.right : activeLevel.left;
+                if (!wrongPlat.broken) {
+                  breakPlatform(wrongPlat);
                 }
-                break;
-              } else {
-                // Wrong platform breaks!
-                breakPlatform(plat);
-                gameState = 'FALLING';
-                break;
               }
+
+              currentQuestionIndex++;
+
+              if (currentQuestionIndex >= levels.length) {
+                // Summit reached: 1000 pts per question + speed bonus
+                const baseScore = questions.length * 1000;
+                const speedBonus = Math.max(0, Math.round((60 - elapsedTime) * 50));
+                finishGame(baseScore + speedBonus, true);
+              }
+              break;
+            } else {
+              // Wrong platform breaks!
+              breakPlatform(plat);
+              gameState = 'FALLING';
+              break;
             }
           }
         }
@@ -563,18 +576,19 @@ function render(ctx) {
 
       const isLeft = opt.side === 'left';
       const label = isLeft ? lvl.leftOption : lvl.rightOption;
+      const isCleared = opt.cleared;
 
       // Platform body
-      ctx.fillStyle = '#0284c7'; // Rich sky blue
+      ctx.fillStyle = isCleared ? '#16a34a' : '#0284c7';
       ctx.beginPath();
       ctx.roundRect(opt.x, opt.y, opt.w, opt.h, 8);
       ctx.fill();
-      ctx.strokeStyle = '#0369a1';
+      ctx.strokeStyle = isCleared ? '#15803d' : '#0369a1';
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // Top step indicator line
-      ctx.fillStyle = '#38bdf8';
+      ctx.fillStyle = isCleared ? '#4ade80' : '#38bdf8';
       ctx.fillRect(opt.x + 4, opt.y + 2, opt.w - 8, 3);
 
       // Platform text label with wrapping
