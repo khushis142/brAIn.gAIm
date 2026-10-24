@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /build
 
@@ -11,7 +11,7 @@ RUN go mod download || true
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-w -s" -o cdn-server ./cmd/server
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 ARG VERSION
 ARG GIT_COMMIT
