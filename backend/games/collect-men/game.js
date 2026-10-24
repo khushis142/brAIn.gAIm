@@ -1,6 +1,6 @@
 // collect-men/game.js: answer questions by choosing one of three lanes.
 // Arrow keys or tapping the left/right half of the screen switches lanes.
-let gl, api, program, positionBuffer, colorBuffer, canvas;
+let gl, api, program, positionBuffer, colorBuffer, canvas, W, H;
 let playerLane, playerX, worldZ, wallTimer, walls, score, gameOver;
 let username, context, difficulty;
 let questionBank, questions, questionIndex, activeQuestion, feedback, feedbackTimer, ui, styleEl;
@@ -32,6 +32,8 @@ function isPressed(keyState) {
 
 function init(gameApi) {
   api = gameApi;
+  W = api.viewport.width;
+  H = api.viewport.height;
   username = api.username;
   context = api.data.context;
   difficulty = api.data.difficulty;
@@ -452,7 +454,7 @@ function drawGeometry(vertices, colors) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(color);
   gl.vertexAttribPointer(color, 3, gl.FLOAT, false, 0, 0);
-  gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projection'), false, perspective(Math.PI / 3, api.width / api.height, 0.1, 100));
+  gl.uniformMatrix4fv(gl.getUniformLocation(program, 'projection'), false, perspective(Math.PI / 3, W / H, 0.1, 100));
   gl.uniformMatrix4fv(gl.getUniformLocation(program, 'view'), false, lookAt([0, 4, 8], [0, 0, -4], [0, 1, 0]));
   gl.uniformMatrix4fv(gl.getUniformLocation(program, 'model'), false, identity());
   gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
@@ -472,7 +474,10 @@ function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function normalize(v) { const l = Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; }
 
-function resize(width, height, viewport) {}
+function resize(width, height, viewport) {
+  W = width;
+  H = height;
+}
 
 function contextLost() {
   gl = null;

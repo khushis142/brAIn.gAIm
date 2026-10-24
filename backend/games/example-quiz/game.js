@@ -17,8 +17,8 @@ let tap = null; // last tap in canvas pixels, handled in update()
 
 function init(gameApi) {
   api = gameApi;
-  W = api.width;
-  H = api.height;
+  W = api.viewport.width;
+  H = api.viewport.height;
   // Skip malformed questions instead of crashing: the schema cannot check that
   // `answer` points at an existing option.
   questions = (api.data.questions || []).filter(

@@ -34,8 +34,8 @@ const PLATFORM_Y_OFFSET = 125; // Up from middle platform
 
 function init(gameApi) {
   api = gameApi;
-  W = api.width || 360;
-  H = api.height || 640;
+  W = api.viewport.width || 360;
+  H = api.viewport.height || 640;
 
   // Defensive data extraction
   const rawQuestions = Array.isArray(api.data?.questions) ? api.data.questions : [];

@@ -537,8 +537,8 @@ function onPointerDown(event) {
 
 function init(gameApi) {
   api = gameApi;
-  W = api.width;
-  H = api.height;
+  W = api.viewport.width;
+  H = api.viewport.height;
   layout();
   chains = loadChains(api.data);
   const context = clean(api.data.context, 120) || 'Chain Snake';

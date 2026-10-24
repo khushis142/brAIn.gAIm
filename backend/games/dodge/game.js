@@ -8,8 +8,8 @@ const touches = new Map(); // pointerId -> 'left' | 'right'
 
 function init(api) {
   gameApi = api;
-  W = api.width;
-  H = api.height;
+  W = api.viewport.width;
+  H = api.viewport.height;
   username = api.username;
   difficulty = api.data.difficulty;
   context = api.data.context;

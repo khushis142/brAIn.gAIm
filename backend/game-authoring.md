@@ -524,8 +524,8 @@ let finished = false;
 
 function init(gameApi) {
   api = gameApi;
-  width = api.width;
-  height = api.height;
+  width = api.viewport.width;
+  height = api.viewport.height;
   console.log(api.viewport.orientation); // 'portrait' or 'landscape'
   console.log(api.data.context); // context supplied to the AI
   api.setUiDesign({
@@ -696,7 +696,7 @@ function update(dt, input) {
     // Start or select something once, on touch or mouse press.
   }
   if (input.pointer.down) {
-    player.x = input.pointer.normalizedX * api.width;
+    player.x = input.pointer.normalizedX * api.viewport.width;
   }
 }
 ```
