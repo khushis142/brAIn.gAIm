@@ -1,25 +1,6 @@
 <div class="app-shell">
+  <app-header />
   @if (isAuthenticated()) {
-    <header class="app-header">
-      <a class="brand" routerLink="/" aria-label="Go to braingain home">
-        <span>{{ title() }}</span>
-      </a>
-
-      <div class="header-actions">
-        <app-health-badge />
-
-        <button
-          class="theme-toggle"
-          type="button"
-          (click)="toggleTheme()"
-          [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
-          [attr.aria-pressed]="isDarkMode()"
-        >
-          <svg [lucideIcon]="icon()"></svg>
-          <span class="sr-only">{{ isDarkMode() ? 'Light mode' : 'Dark mode' }}</span>
-        </button>
-      </div>
-    </header>
 
     <main class="page-content">
       <router-outlet></router-outlet>
