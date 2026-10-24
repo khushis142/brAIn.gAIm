@@ -61,8 +61,13 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 ## Deployment
 
 CI (`.github/workflows/`) builds `ghcr.io/brain-gaim/backend` (amd64 + arm64) and
-tags it `:<version>` and `:latest` whenever `version.txt` changes on `main`.
-**To deploy, bump `version.txt`.**
+tags it `:<version>` whenever `version.txt` changes on `main`. To release and deploy:
+
+1. Bump `version.txt` and push; wait for the *Release and Build* run to finish.
+2. Set the image tag in `docker-compose.yaml` to that version and push.
+
+Renovate's automatic version bumps also publish images but never deploy them;
+deploying stays step 2.
 
 The container runs `alembic upgrade head` on start, then serves on port 8000,
 published on host port 3000
@@ -71,10 +76,8 @@ published on host port 3000
 Portainer setup (once):
 
 1. *Stacks → Add stack → Repository*: this repo, compose path `docker-compose.yaml`.
-2. Enable *GitOps updates* with polling, plus *Re-pull image* and *Force
-   redeployment*. Every poll then pulls `:latest` and recreates the container only
-   if the image changed. Without force, Portainer can redeploy on the version-bump
-   commit before CI has pushed the new image, and stay on the old one.
+2. Enable *GitOps updates* (polling or webhook). Pushing a new image tag in
+   `docker-compose.yaml` then redeploys the stack.
 3. Set the stack environment variables (all required): `DATABASE_URL`,
    `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
    `JWT_SECRET`. Easiest: import `.env.example` via *Load variables from .env file*

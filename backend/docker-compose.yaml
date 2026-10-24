@@ -2,7 +2,8 @@
 # stack environment variables; Postgres and S3 are provided externally.
 services:
   backend:
-    image: ghcr.io/brain-gaim/backend:latest
+    # Deployed version, updated by hand after CI has published it (see README).
+    image: ghcr.io/brain-gaim/backend:0.0.4
     container_name: backend
     restart: unless-stopped
     ports: ["3000:8000"]
