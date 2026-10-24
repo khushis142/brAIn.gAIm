@@ -97,14 +97,20 @@
     setUiDesign(design) {
       const validSection = (section) => {
         if (section === undefined) return true;
-        return section !== null && typeof section === 'object' &&
+        return section !== null && typeof section === 'object' && !Array.isArray(section) &&
           typeof section.title === 'string' &&
           (section.message === undefined || typeof section.message === 'string') &&
           (section.resumeLabel === undefined || typeof section.resumeLabel === 'string') &&
           (section.subtitle === undefined || typeof section.subtitle === 'string') &&
           (section.scoreLabel === undefined || typeof section.scoreLabel === 'string');
       };
+      const validTheme = (theme) => theme === undefined || (theme !== null &&
+        typeof theme === 'object' && !Array.isArray(theme) &&
+        (theme.accent === undefined || ['teal', 'amber', 'rose', 'sky'].includes(theme.accent)) &&
+        (theme.panel === undefined || ['dark', 'light'].includes(theme.panel)) &&
+        (theme.density === undefined || ['compact', 'comfortable'].includes(theme.density)));
       if (design === null || typeof design !== 'object' ||
+          !validTheme(design.theme) ||
           !validSection(design.pauseMenu) || !validSection(design.leaderboard)) {
         throw new Error('setUiDesign() expects a design object');
       }

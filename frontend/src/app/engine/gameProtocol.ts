@@ -31,7 +31,18 @@ export interface LeaderboardDesign {
   readonly scoreLabel?: string;
 }
 
+export type GameUiAccent = 'teal' | 'amber' | 'rose' | 'sky';
+export type GameUiPanel = 'dark' | 'light';
+export type GameUiDensity = 'compact' | 'comfortable';
+
+export interface GameUiTheme {
+  readonly accent?: GameUiAccent;
+  readonly panel?: GameUiPanel;
+  readonly density?: GameUiDensity;
+}
+
 export interface GameUiDesign {
+  readonly theme?: GameUiTheme;
   readonly pauseMenu?: PauseMenuDesign;
   readonly leaderboard?: LeaderboardDesign;
 }
@@ -48,9 +59,25 @@ export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
 export function isGameUiDesign(value: unknown): value is GameUiDesign {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const design = value as {
+    theme?: unknown;
     pauseMenu?: unknown;
     leaderboard?: unknown;
   };
+  if (design.theme !== undefined) {
+    if (typeof design.theme !== 'object' || design.theme === null || Array.isArray(design.theme)) {
+      return false;
+    }
+    const theme = design.theme as { accent?: unknown; panel?: unknown; density?: unknown };
+    if (theme.accent !== undefined && !['teal', 'amber', 'rose', 'sky'].includes(theme.accent as string)) {
+      return false;
+    }
+    if (theme.panel !== undefined && !['dark', 'light'].includes(theme.panel as string)) {
+      return false;
+    }
+    if (theme.density !== undefined && !['compact', 'comfortable'].includes(theme.density as string)) {
+      return false;
+    }
+  }
   for (const section of [design.pauseMenu, design.leaderboard]) {
     if (section === undefined) continue;
     if (typeof section !== 'object' || section === null || Array.isArray(section)) return false;

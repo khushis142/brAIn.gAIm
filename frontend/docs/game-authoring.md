@@ -150,6 +150,11 @@ The game supplies text and chooses which supported surfaces it wants to use.
 
 ```js
 api.setUiDesign({
+  theme: {
+    accent: 'amber',
+    panel: 'dark',
+    density: 'compact',
+  },
   pauseMenu: {
     title: 'Focus break',
     message: 'The timer is stopped. Continue when ready.',
@@ -157,6 +162,37 @@ api.setUiDesign({
   },
 });
 ```
+
+### Safe visual theme
+
+The optional `theme` object lets the game influence the look and feel without
+injecting CSS:
+
+- `accent`: one of `teal`, `amber`, `rose`, or `sky`.
+- `panel`: `dark` or `light`.
+- `density`: `compact` or `comfortable`.
+
+These are design tokens, not CSS values. The Angular host maps them to its own
+approved colors, spacing, contrast, and layout. Missing or invalid values use
+the host defaults. Raw colors, CSS strings, URLs, HTML, templates, and event
+handlers are not accepted.
+
+Games may use `theme` together with `pauseMenu` and `leaderboard`:
+
+```js
+api.setUiDesign({
+  theme: { accent: 'rose', panel: 'dark', density: 'comfortable' },
+  leaderboard: {
+    title: 'Reaction results',
+    scoreLabel: 'Points',
+  },
+});
+```
+
+The runtime validates the token names before sending the design to the host,
+and the host validates the design again before storing it. This defense in
+depth is important because game code is untrusted. The host still controls DOM
+creation, accessibility, click behavior, and the final visual system.
 
 The host shows a Pause control when `pauseMenu` exists. Selecting it sends a
 `pause` command to the runtime and displays the title, message, and resume

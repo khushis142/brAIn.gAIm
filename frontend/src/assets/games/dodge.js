@@ -11,6 +11,11 @@ function init(api) {
   difficulty = api.data?.difficulty || 'normal';
   context = api.data.context;
   api.setUiDesign({
+    theme: {
+      accent: 'teal',
+      panel: 'dark',
+      density: 'comfortable',
+    },
     pauseMenu: {
       title: api.data.pauseTitle || 'Dodge pause',
       message: api.data.pauseMessage || `Context: ${context}`,

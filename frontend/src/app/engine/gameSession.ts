@@ -66,6 +66,7 @@ export class GameSession {
     const iframe = this.doc.createElement('iframe');
     // No allow-same-origin: the game gets an opaque origin and cannot touch the host.
     iframe.setAttribute('sandbox', 'allow-scripts');
+    iframe.tabIndex = 0;
     iframe.style.cssText = `width:${width}px;height:${height}px;border:0;display:block`;
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
@@ -95,6 +96,11 @@ export class GameSession {
 
   resume(): void {
     this.send({ type: 'resume' });
+  }
+
+  focus(): void {
+    this.iframe?.focus();
+    this.iframe?.contentWindow?.focus();
   }
 
   resize(width: number, height: number): void {
