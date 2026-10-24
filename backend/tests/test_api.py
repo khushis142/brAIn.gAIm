@@ -14,8 +14,8 @@ from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
 from app.generator.inputs import GameConfig
 from app.main import app
-from app.models import Base, Content, GameRound, User
-from app.seed_game import seed_game
+from app.models import Base, Content, GameRound, Impression, Score, User
+from app.seed_game import seed_game, update_game
 
 EXAMPLE_DIR = Path(__file__).parents[1] / "games/example-quiz"
 EXAMPLE_GAME = GameConfig.model_validate_json((EXAMPLE_DIR / "config.json").read_text())
@@ -212,6 +212,40 @@ async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -
             await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
         with pytest.raises(SystemExit, match="unknown user"):
             await seed_game(session, EXAMPLE_DIR, "Other", "nobody")
+
+
+async def test_update_game_keeps_history(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import seed_game as seed_module
+
+    file_ids = iter([uuid.uuid4(), uuid.uuid4()])
+
+    async def fake_upload(path: Path) -> tuple[uuid.UUID, str]:
+        return next(file_ids), "game.js"
+
+    monkeypatch.setattr(seed_module, "upload_to_cdn", fake_upload)
+    await _auth(client, "publisher")
+    async with SessionLocal() as session:
+        old = await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
+        old_id, owner_id, created_at = old.id, old.owner_id, old.created_at
+        session.add_all(
+            [
+                Score(user_id=owner_id, game_id=old_id, score=7),
+                GameRound(user_id=owner_id, game_id=old_id, input={"context": "x"}),
+                Impression(user_id=owner_id, content_id=old_id),
+            ]
+        )
+        await session.commit()
+
+        new = await update_game(session, EXAMPLE_DIR, "Example quiz")
+        assert new.id != old_id
+        assert (new.owner_id, new.created_at, new.title) == (owner_id, created_at, "Example quiz")
+        assert await session.get(Content, old_id) is None
+        for column in (Score.game_id, GameRound.game_id, Impression.content_id):
+            assert set(await session.scalars(select(column))) == {new.id}
+        with pytest.raises(SystemExit, match="no game titled"):
+            await update_game(session, EXAMPLE_DIR, "Missing")
 
 
 @pytest.mark.parametrize(

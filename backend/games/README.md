@@ -7,7 +7,8 @@ projects, the backend validates it, and the frontend starts the game with it.
 How games run (lifecycle, `registerGame`, canvas, UI design) is defined by the frontend in
 [`Frontend/docs/game-authoring.md`](https://github.com/brAIn-gAIm/Frontend/blob/main/docs/game-authoring.md)
 (protocol v2). This page adds what the backend needs. `example-quiz/` is a complete,
-working reference; copy it to start.
+working reference; copy it to start. `chain-snake/` is a larger one: an action game on
+ordered sequences with a bitmap font, effects, touch controls and per-item results.
 
 ## What you deliver
 
@@ -76,3 +77,13 @@ python -m app.seed_game my-game --title "My game" --owner <username>
 This checks the config and the code (schema valid and requiring `context`, `registerGame(`
 present, no `</script`, size), uploads `game.js` to the CDN and registers the game. Titles
 must be unique.
+
+To publish a new version of a game, run the same command with `--update` instead of
+`--owner`:
+
+```sh
+python -m app.seed_game my-game --title "My game" --update
+```
+
+The CDN id is the game's id, so the new `game.js` gets a new id. The game keeps its title
+and owner, and its scores, rounds and impressions move to the new id.
