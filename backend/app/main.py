@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import engine
-from app.routers import auth, content, feed, games, users
+from app.routers import auth, content, feed, games, projects, users
 
 
 @asynccontextmanager
@@ -28,6 +28,7 @@ for router in (
     auth.router,
     users.router,
     content.router,
+    projects.router,
     feed.router,
     games.router,
 ):

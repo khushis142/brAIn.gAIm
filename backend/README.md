@@ -44,6 +44,13 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | GET    | `/content/{id}`              |      | One item with `url`                        |
 | PATCH  | `/content/{id}`              | ✓    | Owner only: `{title?, tags?}`              |
 | DELETE | `/content/{id}`              | ✓    | Owner only; the CDN file is kept           |
+| GET    | `/projects`                  | ✓    | Own projects (private to the owner)        |
+| POST   | `/projects`                  | ✓    | `{name, body}`, body is Markdown           |
+| GET    | `/projects/{id}`             | ✓    | One project with its attachments           |
+| PATCH  | `/projects/{id}`             | ✓    | `{name?, body?}`                           |
+| DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
+| POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, webp, gif, txt, md, csv) |
+| DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
 | POST   | `/feed/next`                 | ✓    | Next item: `{type: "video" \| "game", id, title, url}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
@@ -66,6 +73,9 @@ Grant it directly in the database:
   Every served item is stored as an `Impression`, which is the feed state.
 - **Content**: the CDN only stores files. All metadata (owner, kind, title, tags)
   lives in the `content` table, keyed by the CDN file id.
+- **Projects**: a user's private knowledge (Markdown body plus CDN attachments), the
+  input for enriching generated games later. They replace the planned decks and
+  documents (#20). Other users get 404, not 403, so projects don't reveal they exist.
 - **Migrations**: Alembic. After changing a model in `app/models/` (one module per domain;
   re-export new models in `app/models/__init__.py` so autogenerate sees them):
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.

@@ -25,6 +25,8 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 - Delivery URLs are always built by `app/cdn.py` from `CDN_BASE_URL`; never store or
   return a client-supplied URL (games are JS that runs in the app).
 - Users' free-text `interests` are the input for feed personalization (not built yet).
+- Projects (`app/models/projects.py`) are private to their owner and replace the planned
+  decks and documents; their attachments are CDN files like content.
 - Only developers (`users.is_developer`, granted via SQL) may publish games; videos
   are open to every logged-in user.
 - Feed decisions live in `app/feed.py`; routers stay thin.

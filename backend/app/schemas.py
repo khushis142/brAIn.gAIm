@@ -9,6 +9,15 @@ Kind = Literal["video", "game"]
 
 # File types the frontend can play/run, per kind (the CDN accepts more).
 _EXTENSIONS: dict[str, set[str]] = {"video": {".mp4"}, "game": {".js", ".mjs"}}
+# Project attachments: documents and images. No SVG, it can carry scripts.
+_ATTACHMENT_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".txt", ".md", ".csv"}
+
+
+def _check_cdn_filename(filename: str, allowed: set[str], what: str) -> None:
+    if "/" in filename or "\\" in filename:
+        raise ValueError("filename must not contain path separators")
+    if PurePosixPath(filename).suffix.lower() not in allowed:
+        raise ValueError(f"{what} must be one of: {', '.join(sorted(allowed))}")
 
 
 class UserCreate(BaseModel):
@@ -62,11 +71,7 @@ class ContentCreate(BaseModel):
 
     @model_validator(mode="after")
     def _check_filename(self) -> Self:
-        if "/" in self.filename or "\\" in self.filename:
-            raise ValueError("filename must not contain path separators")
-        if PurePosixPath(self.filename).suffix.lower() not in _EXTENSIONS[self.kind]:
-            allowed = ", ".join(sorted(_EXTENSIONS[self.kind]))
-            raise ValueError(f"a {self.kind} must be one of: {allowed}")
+        _check_cdn_filename(self.filename, _EXTENSIONS[self.kind], f"a {self.kind}")
         return self
 
 
@@ -83,6 +88,44 @@ class ContentRead(BaseModel):
     owner: str
     url: str
     created_at: datetime
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    body: str = Field("", max_length=100_000, description="Markdown")
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=200)
+    body: str | None = Field(None, max_length=100_000, description="Markdown")
+
+
+class AttachmentCreate(BaseModel):
+    """Registers a file the client already uploaded to the CDN."""
+
+    id: uuid.UUID = Field(description="File id returned by the CDN upload")
+    filename: str = Field(min_length=1, max_length=255, description="As returned by the CDN")
+
+    @model_validator(mode="after")
+    def _check_filename(self) -> Self:
+        _check_cdn_filename(self.filename, _ATTACHMENT_EXTENSIONS, "an attachment")
+        return self
+
+
+class AttachmentRead(BaseModel):
+    id: uuid.UUID
+    filename: str
+    url: str
+    created_at: datetime
+
+
+class ProjectRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    body: str
+    attachments: list[AttachmentRead]
+    created_at: datetime
+    updated_at: datetime
 
 
 class VideoItem(BaseModel):

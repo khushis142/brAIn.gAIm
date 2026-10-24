@@ -185,3 +185,73 @@ async def test_leaderboard_keeps_best_score_per_user(client: AsyncClient) -> Non
     assert neg.status_code == 422
     assert (await client.get(f"/games/{video}/leaderboard")).status_code == 404
     assert (await client.get(f"/games/{uuid.uuid4()}/leaderboard")).status_code == 404
+
+
+async def test_projects_are_private_crud(client: AsyncClient) -> None:
+    owner = await _auth(client, "maker")
+    other = await _auth(client, "snoop")
+
+    res = await client.post(
+        "/projects", json={"name": "Thesis", "body": "# Notes\n\n*FSRS* basics"}, headers=owner
+    )
+    assert res.status_code == 201
+    project = res.json()
+    assert project["body"] == "# Notes\n\n*FSRS* basics"
+    assert project["attachments"] == []
+    path = f"/projects/{project['id']}"
+
+    patched = (await client.patch(path, json={"name": "Thesis v2"}, headers=owner)).json()
+    assert patched["name"] == "Thesis v2"
+    assert patched["body"] == project["body"]
+    assert patched["updated_at"] >= project["updated_at"]
+
+    assert [p["id"] for p in (await client.get("/projects", headers=owner)).json()] == [
+        project["id"]
+    ]
+    # Other users neither see nor touch it, and cannot tell it exists.
+    assert (await client.get("/projects", headers=other)).json() == []
+    assert (await client.get(path, headers=other)).status_code == 404
+    assert (await client.patch(path, json={"name": "x"}, headers=other)).status_code == 404
+    assert (await client.delete(path, headers=other)).status_code == 404
+    assert (await client.get(path)).status_code == 401
+
+    assert (await client.post("/projects", json={"name": ""}, headers=owner)).status_code == 422
+    assert (await client.delete(path, headers=owner)).status_code == 204
+    assert (await client.get(path, headers=owner)).status_code == 404
+
+
+async def test_project_attachments(client: AsyncClient) -> None:
+    owner = await _auth(client, "researcher")
+    other = await _auth(client, "intruder")
+    project = (await client.post("/projects", json={"name": "P"}, headers=owner)).json()
+    base = f"/projects/{project['id']}/attachments"
+
+    file_id = str(uuid.uuid4())
+    res = await client.post(base, json={"id": file_id, "filename": "paper.pdf"}, headers=owner)
+    assert res.status_code == 201
+    assert res.json()["url"] == f"https://cdn.test/files/{file_id}/paper.pdf"
+    listed = (await client.get(f"/projects/{project['id']}", headers=owner)).json()
+    assert [a["id"] for a in listed["attachments"]] == [file_id]
+
+    dup = await client.post(base, json={"id": file_id, "filename": "paper.pdf"}, headers=owner)
+    assert dup.status_code == 409
+    for filename in ["logo.svg", "run.exe", "../paper.pdf", "noext"]:
+        body = {"id": str(uuid.uuid4()), "filename": filename}
+        assert (await client.post(base, json=body, headers=owner)).status_code == 422
+    foreign = {"id": str(uuid.uuid4()), "filename": "x.png"}
+    assert (await client.post(base, json=foreign, headers=other)).status_code == 404
+
+    assert (await client.delete(f"{base}/{file_id}", headers=other)).status_code == 404
+    assert (await client.delete(f"{base}/{file_id}", headers=owner)).status_code == 204
+    assert (await client.delete(f"{base}/{file_id}", headers=owner)).status_code == 404
+
+    # Deleting a project removes its attachment records.
+    kept = str(uuid.uuid4())
+    await client.post(base, json={"id": kept, "filename": "img.png"}, headers=owner)
+    assert (await client.delete(f"/projects/{project['id']}", headers=owner)).status_code == 204
+    again = await client.post("/projects", json={"name": "Q"}, headers=owner)
+    reuse = {"id": kept, "filename": "img.png"}
+    reused = await client.post(
+        f"/projects/{again.json()['id']}/attachments", json=reuse, headers=owner
+    )
+    assert reused.status_code == 201
