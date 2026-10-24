@@ -17,11 +17,6 @@ import { GameSession } from '../../engine/gameSession';
     <div class="flex flex-col items-start gap-3">
       <div class="flex gap-2">
         <button
-          class="rounded-md bg-teal-500 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-teal-400"
-          (click)="loadGame('dodge')">
-          Play Dodge
-        </button>
-        <button
           class="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-400"
           (click)="loadGame('dodge3d')">
           Play 3D Dodge

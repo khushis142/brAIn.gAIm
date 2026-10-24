@@ -47,9 +47,9 @@ const MOCK_FEED: FeedItem[] = [
   },
   {
     type: 'game',
-    id: 'dodge-demo',
+    id: 'dodge3d-demo',
     title: 'Focus Dodge',
-    url: 'assets/games/dodge/game.js',
+    url: 'assets/games/dodge3d/game.js',
     data: {
       context: 'A short reaction game for a learning feed.',
       difficulty: 'normal',
