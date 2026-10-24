@@ -18,32 +18,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import cdn
 from app.db import SessionLocal, engine
+from app.generator.games import check_game_code
 from app.generator.inputs import GameConfig
 from app.models import Content, GameRound, Impression, Score, User
 
-MAX_GAME_BYTES = 200_000
 
-
-def _check_game_code(path: Path) -> None:
-    """The frontend runtime's hard requirements (Frontend `docs/game-authoring.md`)."""
-    if path.stat().st_size > MAX_GAME_BYTES:
-        raise SystemExit(f"{path} is larger than {MAX_GAME_BYTES} bytes")
-    code = path.read_text()
-    if "registerGame(" not in code:
-        raise SystemExit(f"{path} never calls registerGame(...)")
-    if "</script" in code.lower():
-        raise SystemExit(f"{path} contains '</script', which breaks the inline embedding")
-
-
-def _load_game(directory: Path) -> tuple[GameConfig, Path]:
+def _load_game(directory: Path) -> tuple[GameConfig, str]:
     config = GameConfig.model_validate_json((directory / "config.json").read_text())
     game_js = directory / "game.js"
-    _check_game_code(game_js)
-    return config, game_js
+    code = game_js.read_text()
+    if errors := check_game_code(code):
+        raise SystemExit(f"{game_js}: {'; '.join(errors)}")
+    return config, code
 
 
 async def seed_game(session: AsyncSession, directory: Path, title: str, owner: str) -> Content:
-    config, game_js = _load_game(directory)
+    config, code = _load_game(directory)
     owner_id = await session.scalar(select(User.id).where(User.username == owner))
     if owner_id is None:
         raise SystemExit(f"unknown user: {owner}")
@@ -51,7 +41,7 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
     if await session.scalar(existing) is not None:
         raise SystemExit(f"a game titled {title!r} already exists")
 
-    file_id, filename = await cdn.upload(game_js.read_bytes(), game_js.name, "text/javascript")
+    file_id, filename = await cdn.upload(code.encode(), "game.js", "text/javascript")
     game = Content(
         id=file_id,
         kind="game",
@@ -73,14 +63,14 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
     moved over in the same transaction; rounds prepared but not yet served are discarded. The
     old file stays on the CDN.
     """
-    config, game_js = _load_game(directory)
+    config, code = _load_game(directory)
     old = await session.scalar(
         select(Content).where(Content.kind == "game", Content.title == title)
     )
     if old is None:
         raise SystemExit(f"no game titled {title!r} to update")
 
-    file_id, filename = await cdn.upload(game_js.read_bytes(), game_js.name, "text/javascript")
+    file_id, filename = await cdn.upload(code.encode(), "game.js", "text/javascript")
     game = Content(
         id=file_id,
         kind="game",

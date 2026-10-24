@@ -61,16 +61,18 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 `CDN_BASE_URL` and the id; client-supplied URLs are never stored.
 
 **Games** are fixed JS files on the CDN with a `config` in the database:
-`{"input_schema": <JSON Schema>, "context": "..."}`. When the feed serves a game, the LLM
-writes `data` matching the schema from the context and the user's projects; it is
-validated, stored as a game round and returned with the game's `url`. The frontend starts
-the game with it (`session.start(code, {username, data})`, see `games/README.md`).
-Rounds are prepared ahead of time: after every `/feed/next`, a background task tops the
+`{"input_schema": <JSON Schema>, "context": "..."}`. The LLM writes `data` matching the
+schema from the context and the user's projects; it is validated, stored as a game round
+and returned with the game's `url`. The frontend starts the game with it
+(`session.start(code, {username, data})`, see `games/README.md`). Rounds are prepared ahead of time: after every `/feed/next`, a background task tops the
 user up to one ready round (LLM plus the game's `preconditions`, e.g. TTS via Piper at
 `TTS_URL`), so serving a game never waits. `assets` lists JSON Pointers into `data` whose
 values are CDN URLs (e.g. audio); the frontend fetches them and swaps in `data:` URLs,
 because the game iframe has no network access (its CSP allows `data:` media).
-Games cannot be registered through the API; publish one with the seed command:
+The generator can also write whole new games for a user's material
+(`app/generator/games.py`, not triggered by anything yet); their code passes the same checks
+as seeded games. Games cannot be registered through the API; publish one with the seed
+command:
 
 ```sh
 python -m app.seed_game games/example-quiz --title "Example quiz" --owner <username>
@@ -121,9 +123,32 @@ Portainer setup (once):
 1. *Stacks → Add stack → Repository*: this repo, compose path `docker-compose.yaml`.
 2. Enable *GitOps updates* (polling or webhook). Pushing a new image tag in
    `docker-compose.yaml` then redeploys the stack.
-3. Set the stack environment variables (all required): `DATABASE_URL`,
-   `JWT_SECRET`, `CDN_BASE_URL`. Easiest: import `.env.example` via *Load variables from .env file*
-   and replace every value.
+3. Set the stack environment variables: `DATABASE_URL`, `JWT_SECRET`, `CDN_BASE_URL`, and
+   for the LLM proxy `ANTHROPIC_API_KEY`, `LITELLM_MASTER_KEY`, `LITELLM_SALT_KEY`,
+   `LITELLM_DATABASE_URL`. Easiest: import `.env.example` via *Load variables from .env
+   file* and replace every value.
+
+LLM proxy (once): the stack runs a [LiteLLM](https://docs.litellm.ai/) proxy that routes the
+aliases in `litellm/config.yaml` (`smart`, `fast`) to Anthropic, tracks spend and stops at
+the proxy-wide budget there. Prompts are not logged. To switch the backend to it:
+
+1. Create the proxy's database: `createdb litellm` on the external Postgres.
+2. Deploy, then create a key for the backend with its own budget (USD):
+   ```sh
+   docker exec litellm curl -s -X POST localhost:4000/key/generate \
+     -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' \
+     -d '{"key_alias": "backend", "max_budget": 20, "budget_duration": "30d"}'
+   ```
+3. Set `LLM_PROVIDER=litellm` and `LLM_API_KEY=<the returned key>` on the stack.
+4. Set a monthly spend limit on the Anthropic workspace as a backstop.
+
+When a key's budget is used up the proxy answers `budget_exceeded`, and the generator raises
+`LLMBudgetError` without calling Anthropic.
+
+Self-hosted model instead (no key, no cost): set `LLM_PROVIDER=ollama`,
+`LLM_BASE_URL=<server>/v1` (e.g. the team's server, `http://192.168.188.67:8082/v1`) and
+`LLM_MODEL` to a model it serves (`curl <server>/v1/models`). Any server with an
+OpenAI-compatible chat completions API works.
 
 ## Tests
 

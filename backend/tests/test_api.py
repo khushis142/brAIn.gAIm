@@ -13,7 +13,9 @@ from sqlalchemy import func, select, text
 from app import cdn, feed
 from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
-from app.generator.inputs import GameConfig
+from app.generator.games import generate_game, publish_generated_game
+from app.generator.inputs import GameConfig, InputGenerationError
+from app.generator.llm import FakeLLM, LLMError
 from app.main import app
 from app.models import Base, Content, GameRound, Impression, Score, User
 from app.seed_game import seed_game, update_game
@@ -221,13 +223,12 @@ async def test_feed_serves_tts_assets(client: AsyncClient, monkeypatch: pytest.M
     assert all(q["audio"].endswith("/speech.wav") for q in game["data"]["questions"])
 
 
+@pytest.mark.parametrize("error", [InputGenerationError("invalid"), LLMError("provider down")])
 async def test_feed_skips_games_whose_input_fails(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, error: Exception
 ) -> None:
-    from app.generator.inputs import InputGenerationError
-
     async def broken(*args: object) -> dict:
-        raise InputGenerationError("llm down")
+        raise error
 
     monkeypatch.setattr(feed, "generate_input", broken)
     await _auth(client, "gamer")
@@ -237,6 +238,26 @@ async def test_feed_skips_games_whose_input_fails(
     video = await _register(client, headers)
     for _ in range(VIDEOS_PER_GAME + 1):
         assert (await client.post("/feed/next", headers=headers)).json()["id"] == video["id"]
+
+
+async def test_publish_generated_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    file_id = uuid.uuid4()
+
+    async def fake_upload(
+        content: bytes, filename: str, content_type: str
+    ) -> tuple[uuid.UUID, str]:
+        assert b"registerGame(" in content and content_type == "text/javascript"
+        return file_id, filename
+
+    monkeypatch.setattr(cdn, "upload", fake_upload)
+    await _auth(client, "learner")
+    async with SessionLocal() as session:
+        user = await session.scalar(select(User).where(User.username == "learner"))
+        game = await generate_game(FakeLLM(), ["# Biology\n\nCells divide."])
+        content = await publish_generated_game(session, game, user)
+        await session.commit()
+        assert (content.id, content.kind, content.owner_id) == (file_id, "game", user.id)
+        assert GameConfig(**content.config) == game.config
 
 
 async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:

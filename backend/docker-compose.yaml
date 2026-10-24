@@ -12,7 +12,27 @@ services:
       JWT_SECRET: ${JWT_SECRET:?at least 32 characters}
       CDN_BASE_URL: ${CDN_BASE_URL:?public CDN URL, e.g. https://cdn.example.com}
       LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      # Defaults to the proxy below; for LLM_PROVIDER=ollama, the model server's /v1 URL.
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://litellm:4000}
+      LLM_MODEL: ${LLM_MODEL:-smart}
+      # litellm only: a budgeted LiteLLM virtual key (see README), not the Anthropic key.
+      LLM_API_KEY: ${LLM_API_KEY:-}
       TTS_URL: ${TTS_URL:-}
+    depends_on: [litellm]
+
+  # LLM proxy (#44): routes model aliases to Anthropic and enforces spend budgets.
+  # Reachable only inside the stack network, at http://litellm:4000.
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.106.2
+    container_name: litellm
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes: ["./litellm/config.yaml:/app/config.yaml:ro"]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Anthropic API key of the production workspace}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?admin key for the proxy, starts with sk-}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?encrypts stored keys; never change it after first start}
+      DATABASE_URL: ${LITELLM_DATABASE_URL:?postgresql://user:pass@host:5432/litellm}
 
 networks:
   default:
