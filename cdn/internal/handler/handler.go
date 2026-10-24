@@ -88,10 +88,16 @@ func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(h.cfg.MaxUploadSize); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxUploadSize)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		writeError(w, http.StatusBadRequest, "file exceeds maximum allowed size or invalid multipart: "+err.Error())
 		return
 	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
 
 	// Gather file headers from "file" and "files" form keys
 	var fileHeaders []*multipart.FileHeader
@@ -107,72 +113,28 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var results []model.FileUploadResult
-	var ids []string
-	ctx := r.Context()
-
-	for _, header := range fileHeaders {
-		contentType, err := validateAssetType(header.Filename, header.Header.Get("Content-Type"))
+	contentTypes := make([]string, len(fileHeaders))
+	for i, header := range fileHeaders {
+		ct, err := validateAssetType(header.Filename, header.Header.Get("Content-Type"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid file %q: %v", header.Filename, err))
 			return
 		}
+		contentTypes[i] = ct
+	}
 
-		file, err := header.Open()
+	var results []model.FileUploadResult
+	var ids []string
+	ctx := r.Context()
+
+	for i, header := range fileHeaders {
+		res, status, err := h.uploadSingleHeader(ctx, uuid.New().String(), header, contentTypes[i])
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to read file: "+err.Error())
+			writeError(w, status, err.Error())
 			return
 		}
-
-		tempFile, err := os.CreateTemp("", "cdn-upload-*")
-		if err != nil {
-			file.Close()
-			writeError(w, http.StatusInternalServerError, "failed to create temp file: "+err.Error())
-			return
-		}
-
-		fileSize, err := io.Copy(tempFile, file)
-		file.Close()
-		if err != nil {
-			tempFile.Close()
-			_ = os.Remove(tempFile.Name())
-			writeError(w, http.StatusInternalServerError, "failed to process file: "+err.Error())
-			return
-		}
-
-		if _, err := tempFile.Seek(0, io.SeekStart); err != nil {
-			tempFile.Close()
-			_ = os.Remove(tempFile.Name())
-			writeError(w, http.StatusInternalServerError, "failed to rewind file: "+err.Error())
-			return
-		}
-
-		fileID := uuid.New().String()
-		sanitizedName := filepath.Base(header.Filename)
-		s3Key := fmt.Sprintf("%s/%s", fileID, sanitizedName)
-
-		meta := map[string]string{
-			"filename": sanitizedName,
-		}
-
-		uploadErr := h.storage.Upload(ctx, s3Key, tempFile, fileSize, contentType, meta)
-		tempFile.Close()
-		_ = os.Remove(tempFile.Name())
-
-		if uploadErr != nil {
-			writeError(w, http.StatusInternalServerError, "failed to upload to S3: "+uploadErr.Error())
-			return
-		}
-
-		staticURL := fmt.Sprintf("%s/files/%s/%s", h.cfg.CDNBaseURL, fileID, sanitizedName)
-		results = append(results, model.FileUploadResult{
-			ID:          fileID,
-			Filename:    sanitizedName,
-			ContentType: contentType,
-			FileSize:    fileSize,
-			URL:         staticURL,
-		})
-		ids = append(ids, fileID)
+		results = append(results, res)
+		ids = append(ids, res.ID)
 	}
 
 	// Single file upload returns direct ID and URL
@@ -192,35 +154,16 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) UpdateFile(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "file id required")
-		return
-	}
-
-	if err := r.ParseMultipartForm(h.cfg.MaxUploadSize); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid multipart form: "+err.Error())
-		return
-	}
-
-	file, header, err := r.FormFile("file")
+func (h *Handler) uploadSingleHeader(ctx context.Context, fileID string, header *multipart.FileHeader, contentType string) (model.FileUploadResult, int, error) {
+	file, err := header.Open()
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "file field required: "+err.Error())
-		return
+		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to read file: %w", err)
 	}
 	defer file.Close()
 
-	contentType, err := validateAssetType(header.Filename, header.Header.Get("Content-Type"))
+	tempFile, err := os.CreateTemp("", "cdn-upload-*")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	tempFile, err := os.CreateTemp("", "cdn-update-*")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create temp file: "+err.Error())
-		return
+		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer func() {
 		tempFile.Close()
@@ -229,34 +172,76 @@ func (h *Handler) UpdateFile(w http.ResponseWriter, r *http.Request) {
 
 	fileSize, err := io.Copy(tempFile, file)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read uploaded file: "+err.Error())
-		return
+		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to process file: %w", err)
 	}
 
 	if _, err := tempFile.Seek(0, io.SeekStart); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to rewind file: "+err.Error())
-		return
+		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to rewind file: %w", err)
 	}
 
-	ctx := r.Context()
-	_ = h.storage.DeleteByID(ctx, id)
-
 	sanitizedName := filepath.Base(header.Filename)
-	s3Key := fmt.Sprintf("%s/%s", id, sanitizedName)
+	s3Key := fmt.Sprintf("%s/%s", fileID, sanitizedName)
 	meta := map[string]string{
 		"filename": sanitizedName,
 	}
 
+	_ = h.storage.DeleteByID(ctx, fileID)
 	if err := h.storage.Upload(ctx, s3Key, tempFile, fileSize, contentType, meta); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to upload to S3: "+err.Error())
+		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to upload to S3: %w", err)
+	}
+
+	staticURL := fmt.Sprintf("%s/files/%s/%s", h.cfg.CDNBaseURL, fileID, sanitizedName)
+	return model.FileUploadResult{
+		ID:          fileID,
+		Filename:    sanitizedName,
+		ContentType: contentType,
+		FileSize:    fileSize,
+		URL:         staticURL,
+	}, http.StatusOK, nil
+}
+
+func (h *Handler) UpdateFile(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "file id required")
 		return
 	}
 
-	staticURL := fmt.Sprintf("%s/files/%s/%s", h.cfg.CDNBaseURL, id, sanitizedName)
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxUploadSize)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid multipart form: "+err.Error())
+		return
+	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file field required: "+err.Error())
+		return
+	}
+	file.Close()
+
+	contentType, err := validateAssetType(header.Filename, header.Header.Get("Content-Type"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ctx := r.Context()
+	res, status, err := h.uploadSingleHeader(ctx, id, header, contentType)
+	if err != nil {
+		writeError(w, status, err.Error())
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":       id,
-		"filename": sanitizedName,
-		"url":      staticURL,
+		"id":       res.ID,
+		"filename": res.Filename,
+		"url":      res.URL,
 	})
 }
 
@@ -304,6 +289,7 @@ func (h *Handler) DeliverFile(w http.ResponseWriter, r *http.Request) {
 		// If explicit filename was not found, attempt prefix lookup fallback
 		if filename != "" {
 			if foundKey, fErr := h.storage.FindKeyByID(ctx, id); fErr == nil {
+				s3Key = foundKey
 				obj, err = h.storage.Get(ctx, foundKey, rangeHeader)
 			}
 		}
@@ -428,7 +414,7 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 			hType == "application/pdf" ||
 			strings.HasPrefix(hType, "text/") ||
 			strings.HasPrefix(hType, "image/") {
-			return headerContentType, nil
+			return hType, nil
 		}
 	}
 

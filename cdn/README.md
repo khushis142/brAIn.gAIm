@@ -4,7 +4,7 @@
 [![Storage](https://img.shields.io/badge/storage-RustFS%20%2F%20S3-DEA584?style=flat&logo=rust)](https://github.com/rustfs)
 [![API Spec](https://img.shields.io/badge/OpenAPI-3.0.3-85EA2D?style=flat&logo=openapiinitiative)](/swagger/)
 
-Lightweight, high-performance static asset CDN written in Go. Delivers video (`.mp4`), code/scripts (`.js`), and documents (`.pdf`, text, images) directly from S3-compatible storage ([RustFS](https://github.com/rustfs) / MinIO).
+Lightweight, high-performance static asset CDN written in Go. Delivers video (`.mp4`), audio (`.mp3`, `.wav`, `.ogg`, etc.), code/scripts (`.js`), and documents (`.pdf`, text, images) directly from S3-compatible storage ([RustFS](https://github.com/rustfs) / MinIO).
 
 > [!NOTE]
 > Asset metadata (ownership, tags, topics, user relations) is managed externally in the **Backend**. The CDN acts purely as a content delivery engine: receiving binary streams, assigning UUIDs, storing to S3, and streaming with byte-range support and immutable caching.
@@ -56,7 +56,7 @@ flowchart TD
 ---
 
 ### 1. Upload File(s)
-Upload single file using `file`, or multiple files using `files`.
+Upload single file using `file`, or multiple files using `files` (`POST /api/v1/files`, aliases: `POST /api/v1/assets`, `POST /upload`).
 
 ```bash
 # Single upload
@@ -130,7 +130,7 @@ curl -i -H 'If-None-Match: "79af441c3939143d0019a6a23d350803"' http://localhost:
 ---
 
 ### 3. Replace / Update File
-Replace underlying content for an existing ID:
+Replace underlying content for an existing ID (`PUT /api/v1/files/{id}`, alias: `PUT /files/{id}`):
 
 ```bash
 curl -X PUT http://localhost:8080/api/v1/files/634d4145-b73a-496d-be30-f7d8b41e5fb5 \
@@ -140,7 +140,7 @@ curl -X PUT http://localhost:8080/api/v1/files/634d4145-b73a-496d-be30-f7d8b41e5
 ---
 
 ### 4. Delete File
-Deletes the object and its prefixes from S3:
+Deletes the object and its prefixes from S3 (`DELETE /api/v1/files/{id}`, alias: `DELETE /files/{id}`):
 
 ```bash
 curl -i -X DELETE http://localhost:8080/api/v1/files/634d4145-b73a-496d-be30-f7d8b41e5fb5
@@ -178,9 +178,9 @@ All configuration is managed via environment variables (see `.env.example`):
 ## Development & Testing
 
 ### 1. Start Storage Infra
-Start RustFS from `../Infra`:
+Start RustFS locally via `docker-compose.dev.yaml` (or from `../Infra/rustfs/docker-compose.yml`):
 ```bash
-docker compose -f ../Infra/rustfs/docker-compose.yml up -d
+docker compose -f docker-compose.dev.yaml up -d
 ```
 
 ### 2. Run CDN Server
@@ -198,7 +198,7 @@ go test -v ./...
 ## CI / CD
 
 Configured identical to `../Frontend`:
-- `version.txt`: Semantic version tracking (`0.0.1`)
+- `version.txt`: Semantic version tracking (`0.0.5`)
 - `renovate.json`: Automated dependency upgrades with automerge for patch/minor updates
 - `.github/workflows/pr-bump-version.yaml`: Automatic version bumps for Renovate PRs
 - `.github/workflows/release-and-build.yaml`: Container image build and GitHub release pipeline

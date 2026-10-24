@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 )
 
@@ -35,11 +34,7 @@ func TestLoadCDNBaseURL(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.envVal != "" {
-				t.Setenv("CDN_BASE_URL", tc.envVal)
-			} else {
-				os.Unsetenv("CDN_BASE_URL")
-			}
+			t.Setenv("CDN_BASE_URL", tc.envVal)
 
 			cfg := Load()
 			if cfg.CDNBaseURL != tc.expected {

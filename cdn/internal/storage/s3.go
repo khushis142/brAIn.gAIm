@@ -71,20 +71,16 @@ func (s *S3Client) ensureBucket(ctx context.Context) error {
 		return nil
 	}
 
-	var notFound *s3types.NotFound
-	var noSuchBucket *s3types.NoSuchBucket
-	if errors.As(err, &notFound) || errors.As(err, &noSuchBucket) || true {
-		_, createErr := s.client.CreateBucket(ctx, &s3.CreateBucketInput{
-			Bucket: aws.String(s.bucket),
-		})
-		if createErr != nil {
-			var bExists *s3types.BucketAlreadyExists
-			var bOwned *s3types.BucketAlreadyOwnedByYou
-			if errors.As(createErr, &bExists) || errors.As(createErr, &bOwned) {
-				return nil
-			}
-			return fmt.Errorf("create bucket: %w", createErr)
+	_, createErr := s.client.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(s.bucket),
+	})
+	if createErr != nil {
+		var bExists *s3types.BucketAlreadyExists
+		var bOwned *s3types.BucketAlreadyOwnedByYou
+		if errors.As(createErr, &bExists) || errors.As(createErr, &bOwned) {
+			return nil
 		}
+		return fmt.Errorf("create bucket: %w", createErr)
 	}
 	return nil
 }
@@ -189,10 +185,11 @@ func (s *S3Client) DeleteByID(ctx context.Context, id string) error {
 
 	for _, obj := range out.Contents {
 		if obj.Key != nil {
-			_ = s.Delete(ctx, *obj.Key)
+			if err := s.Delete(ctx, *obj.Key); err != nil {
+				return err
+			}
 		}
 	}
 	// Also attempt to delete key matching id directly
-	_ = s.Delete(ctx, id)
-	return nil
+	return s.Delete(ctx, id)
 }

@@ -36,7 +36,7 @@ func main() {
 	h.RegisterRoutes(mux)
 
 	// Top-level middleware: CORS, logging, recovery
-	srvHandler := withCORS(withLogging(mux))
+	srvHandler := withCORS(withLogging(withRecovery(mux)))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -66,6 +66,18 @@ func main() {
 		log.Printf("[CDN] Shutdown error: %v", err)
 	}
 	log.Printf("[CDN] Server stopped")
+}
+
+func withRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("[CDN] Panic recovered: %v", rec)
+				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 func withLogging(next http.Handler) http.Handler {

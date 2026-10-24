@@ -5,7 +5,7 @@ info:
     Lean, high-performance CDN service for uploading, updating, delivering,
     and deleting static mp4, audio, js, and doc files (pdf, text, images) using
     S3/RustFS object storage. Metadata is managed externally by the Backend.
-  version: 0.0.1
+  version: 0.0.5
 servers:
   - url: http://localhost:8080
     description: Local development server
@@ -244,6 +244,34 @@ components:
           format: uri
           example: "http://localhost:8080/files/d0702b92-3252-4316-8faf-3b22966a1231/intro.mp4"
 
+    BatchFileUpload:
+      type: object
+      required:
+        - id
+        - filename
+        - content_type
+        - file_size
+        - url
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b91b400a-abfe-4ddf-858b-9aa48838b87e"
+        filename:
+          type: string
+          example: "video.mp4"
+        content_type:
+          type: string
+          example: "video/mp4"
+        file_size:
+          type: integer
+          format: int64
+          example: 16420120
+        url:
+          type: string
+          format: uri
+          example: "http://localhost:8080/files/b91b400a-abfe-4ddf-858b-9aa48838b87e/video.mp4"
+
     UploadResult:
       oneOf:
         - $ref: '#/components/schemas/SingleFileUpload'
@@ -256,7 +284,7 @@ components:
             files:
               type: array
               items:
-                $ref: '#/components/schemas/SingleFileUpload'
+                $ref: '#/components/schemas/BatchFileUpload'
 
     HealthResponse:
       type: object
