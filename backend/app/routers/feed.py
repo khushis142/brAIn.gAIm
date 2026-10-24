@@ -12,8 +12,12 @@ router = APIRouter(prefix="/feed", tags=["feed"])
 # POST because serving an item advances the user's feed state.
 @router.post("/next", response_model=FeedItem)
 async def next_item(user: CurrentUser, session: SessionDep) -> VideoItem | GameItem:
-    item = await feed.next_item(session, user)
-    if item is None:
+    served = await feed.next_item(session, user)
+    if served is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No content yet")
-    model = VideoItem if item.kind == "video" else GameItem
-    return model(id=item.id, title=item.title, url=file_url(item.id, item.filename))
+    item, url = served.item, file_url(served.item.id, served.item.filename)
+    if served.round is None:
+        return VideoItem(id=item.id, title=item.title, url=url)
+    return GameItem(
+        id=item.id, title=item.title, url=url, round_id=served.round.id, input=served.round.input
+    )

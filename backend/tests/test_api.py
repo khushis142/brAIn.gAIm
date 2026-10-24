@@ -3,15 +3,22 @@
 import os
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from jsonschema import validate
 from sqlalchemy import select, text
 
 from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
+from app.generator.inputs import GameConfig
 from app.main import app
-from app.models import Base, Content, User
+from app.models import Base, Content, GameRound, User
+from app.seed_game import seed_game
+
+EXAMPLE_DIR = Path(__file__).parents[1] / "games/example-quiz"
+EXAMPLE_GAME = GameConfig.model_validate_json((EXAMPLE_DIR / "config.json").read_text())
 
 pytestmark = pytest.mark.skipif(
     "TEST_DATABASE_URL" not in os.environ, reason="TEST_DATABASE_URL not set"
@@ -56,7 +63,12 @@ async def _create_game(owner: str) -> str:
     async with SessionLocal() as session:
         owner_id = await session.scalar(select(User.id).where(User.username == owner))
         game = Content(
-            id=uuid.uuid4(), kind="game", filename="game.js", title="a game", owner_id=owner_id
+            id=uuid.uuid4(),
+            kind="game",
+            filename="game.js",
+            title="a game",
+            config=EXAMPLE_GAME.model_dump(),
+            owner_id=owner_id,
         )
         session.add(game)
         await session.commit()
@@ -153,6 +165,53 @@ async def test_feed_interleaves_games(client: AsyncClient) -> None:
     # Unseen videos are preferred before repeating.
     assert {items[0]["id"], items[1]["id"]} == videos
     assert all(item["url"].startswith("https://cdn.test/files/") for item in items)
+
+    # Every game comes with a freshly generated, schema-valid input stored as a round.
+    games = [item for item in items if item["type"] == "game"]
+    for game in games:
+        validate(game["input"], EXAMPLE_GAME.input_schema)
+    async with SessionLocal() as session:
+        rounds = (await session.scalars(select(GameRound))).all()
+    assert {str(r.id): r.input for r in rounds} == {g["round_id"]: g["input"] for g in games}
+
+
+async def test_feed_skips_games_whose_input_fails(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import feed
+    from app.generator.inputs import InputGenerationError
+
+    async def broken(*args: object) -> dict:
+        raise InputGenerationError("llm down")
+
+    monkeypatch.setattr(feed, "generate_input", broken)
+    await _auth(client, "gamer")
+    await _create_game("gamer")
+    headers = await _auth(client, "player")
+    assert (await client.post("/feed/next", headers=headers)).status_code == 404  # no video either
+    video = await _register(client, headers)
+    for _ in range(VIDEOS_PER_GAME + 1):
+        assert (await client.post("/feed/next", headers=headers)).json()["id"] == video["id"]
+
+
+async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app import seed_game as seed_module
+
+    file_id = uuid.uuid4()
+
+    async def fake_upload(path: Path) -> tuple[uuid.UUID, str]:
+        assert path == EXAMPLE_DIR / "game.js"
+        return file_id, "game.js"
+
+    monkeypatch.setattr(seed_module, "upload_to_cdn", fake_upload)
+    await _auth(client, "publisher")
+    async with SessionLocal() as session:
+        game = await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
+        assert (game.id, game.kind, game.config) == (file_id, "game", EXAMPLE_GAME.model_dump())
+        with pytest.raises(SystemExit, match="already exists"):
+            await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
+        with pytest.raises(SystemExit, match="unknown user"):
+            await seed_game(session, EXAMPLE_DIR, "Other", "nobody")
 
 
 async def test_feed_without_content(client: AsyncClient) -> None:

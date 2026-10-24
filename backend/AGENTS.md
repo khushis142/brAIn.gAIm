@@ -27,9 +27,10 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 - Users' free-text `interests` are the input for feed personalization (not built yet).
 - Projects (`app/models/projects.py`) are private to their owner and replace the planned
   decks and documents; their attachments are CDN files like content.
-- Users can register only videos via the API. Games (JS that runs in the app) are created
-  by server-side code only (generator, seeding) after validation; never add an API path
-  that accepts game code or game files from clients.
+- Users can register only videos via the API. Games (JS that runs in the app) enter only
+  through `app/seed_game.py`; never add an API path that accepts game code or files.
+- Games are fixed templates; the LLM only produces their `input` (data, validated against
+  the game's `config.input_schema` in `app/generator/inputs.py`), never code.
 - Feed decisions live in `app/feed.py`; routers stay thin.
 - Settings come from env via `app/config.py`; add a variable only when the value
   really differs between environments, and update `.env.example` and

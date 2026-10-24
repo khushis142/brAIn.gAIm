@@ -40,7 +40,39 @@ class FakeLLM(LLM):
         json_schema: dict[str, Any] | None = None,
         max_tokens: int,
     ) -> str:
-        # Same prompt, same game, so tests are deterministic; `json_schema` is not enforced.
+        if json_schema is not None:
+            return json.dumps(_example(json_schema))
+        # Same prompt, same game, so tests are deterministic.
         prompt = json.dumps([system, list(messages)]).encode()
         index = int.from_bytes(hashlib.sha256(prompt).digest()[:4]) % len(self._games)
         return self._games[index]
+
+
+def _example(schema: dict[str, Any], index: int = 0) -> Any:
+    """A minimal instance of `schema`, enough for the schemas games declare (no $ref)."""
+    if "const" in schema:
+        return schema["const"]
+    if "enum" in schema:
+        return schema["enum"][0]
+    for combinator in ("oneOf", "anyOf", "allOf"):
+        if combinator in schema:
+            return _example(schema[combinator][0], index)
+    kind = schema.get("type", "object")
+    if isinstance(kind, list):
+        kind = next((k for k in kind if k != "null"), "null")
+    match kind:
+        case "object":
+            properties = schema.get("properties", {})
+            return {name: _example(sub, index) for name, sub in properties.items()}
+        case "array":
+            count = max(schema.get("minItems", 1), 1)
+            return [_example(schema.get("items", {}), i) for i in range(count)]
+        case "string":
+            text = f"example {index + 1}"
+            return text.ljust(schema.get("minLength", 0), ".")
+        case "integer" | "number":
+            return schema.get("minimum", 0)
+        case "boolean":
+            return False
+        case _:
+            return None

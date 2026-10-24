@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -141,7 +141,9 @@ class GameItem(BaseModel):
     type: Literal["game"] = "game"
     id: uuid.UUID
     title: str
-    url: str
+    url: str = Field(description="The game's JS file")
+    round_id: uuid.UUID
+    input: dict[str, Any] = Field(description="Generated input matching the game's schema")
 
 
 FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]

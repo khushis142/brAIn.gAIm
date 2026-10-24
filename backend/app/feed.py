@@ -1,9 +1,16 @@
 """Decides what a user sees next and records it."""
 
+import logging
+from dataclasses import dataclass
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Content, Impression, User
+from app.generator.inputs import GameConfig, InputGenerationError, generate_input
+from app.generator.llm import get_llm
+from app.models import Content, GameRound, Impression, Project, User
+
+logger = logging.getLogger(__name__)
 
 VIDEOS_PER_GAME = 3
 
@@ -32,11 +39,37 @@ async def _pick(session: AsyncSession, user: User, kind: str) -> Content | None:
     )
 
 
-async def next_item(session: AsyncSession, user: User) -> Content | None:
+@dataclass(frozen=True)
+class Served:
+    item: Content
+    round: GameRound | None  # set for games
+
+
+async def _project_materials(session: AsyncSession, user: User) -> list[str]:
+    projects = await session.scalars(
+        select(Project).where(Project.owner_id == user.id).order_by(Project.updated_at.desc())
+    )
+    return [f"# {p.name}\n\n{p.body}" for p in projects]
+
+
+async def _new_round(session: AsyncSession, user: User, game: Content) -> GameRound | None:
+    # Runs in the request for now; generating ahead of time is the planned next step.
+    assert game.config is not None  # guaranteed for games by a check constraint
+    try:
+        game_input = await generate_input(
+            get_llm(), GameConfig(**game.config), await _project_materials(session, user)
+        )
+    except InputGenerationError:
+        logger.exception("input generation failed for game %s", game.id)
+        return None
+    return GameRound(user_id=user.id, game_id=game.id, input=game_input)
+
+
+async def next_item(session: AsyncSession, user: User) -> Served | None:
     """Pick the next feed item for `user`, record the impression, and commit.
 
-    Falls back to the other kind when the preferred one has no content,
-    so a catalog with only videos (or only games) still yields a feed.
+    Falls back to the other kind when the preferred one has no content (or a game's input
+    could not be generated), so the feed keeps going.
     """
     recent_kinds = (
         await session.scalars(
@@ -53,8 +86,14 @@ async def next_item(session: AsyncSession, user: User) -> Content | None:
 
     for kind in kinds:
         item = await _pick(session, user, kind)
-        if item is not None:
-            session.add(Impression(user_id=user.id, content_id=item.id))
-            await session.commit()
-            return item
+        if item is None:
+            continue
+        game_round = await _new_round(session, user, item) if kind == "game" else None
+        if kind == "game" and game_round is None:
+            continue
+        session.add(Impression(user_id=user.id, content_id=item.id))
+        if game_round is not None:
+            session.add(game_round)
+        await session.commit()
+        return Served(item, game_round)
     return None

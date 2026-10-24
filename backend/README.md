@@ -51,7 +51,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
-| POST   | `/feed/next`                 | ✓    | Next item: `{type: "video" \| "game", id, title, url}` |
+| POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, input}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score}`                           |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
 
@@ -60,9 +60,18 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 `POST /content`. Videos must be `.mp4`. Every `url` in this API is built from
 `CDN_BASE_URL` and the id; client-supplied URLs are never stored.
 
-**Games** cannot be registered through the API: they are JS that runs in the app, so only
-server-side code creates them (the AI generator, and a seed step for hand-made reference
-games), after validation.
+**Games** are fixed JS templates on the CDN with a `config` in the database:
+`{"input_schema": <JSON Schema>, "context": "..."}`. When the feed serves a game, the LLM
+writes an `input` matching the schema from the context and the user's projects; the input
+is validated, stored as a game round and returned with the game's `url`. The game JS
+receives it via `BrainGain.onInit(input => …)` and must render it as text, never HTML.
+Games cannot be registered through the API; publish one with the seed command:
+
+```sh
+python -m app.seed_game games/example-quiz --title "Example quiz" --owner <username>
+```
+
+`games/example-quiz/` (`game.js` + `config.json`) is the reference for the format.
 
 ### Bruno collection
 

@@ -1,0 +1,30 @@
+{
+  "context": "A multiple-choice quiz with 3 to 5 questions. Each question tests understanding of the study material, not trivia. `answer` is the zero-based index of the correct option; exactly one option is correct.",
+  "input_schema": {
+    "type": "object",
+    "required": ["questions"],
+    "additionalProperties": false,
+    "properties": {
+      "questions": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "required": ["question", "options", "answer"],
+          "additionalProperties": false,
+          "properties": {
+            "question": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "options": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 4,
+              "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+            },
+            "answer": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        }
+      }
+    }
+  }
+}
