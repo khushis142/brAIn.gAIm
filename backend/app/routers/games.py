@@ -91,11 +91,17 @@ async def submit_score(
     )
     if score_id is None:  # the round was scored already: keep the first score
         return ScoreResult(
-            newly_unlocked=[], games_completed=await zombie.games_completed(session, user.id)
+            newly_unlocked=[],
+            newly_unlocked_avatars=[],
+            games_completed=await zombie.games_completed(session, user.id),
         )
-    stats, newly_unlocked = await zombie.grant_unlocks(session, user.id)
+    unlocks = await zombie.grant_unlocks(session, user.id)
     await session.commit()
-    return ScoreResult(newly_unlocked=newly_unlocked, games_completed=stats.games_completed)
+    return ScoreResult(
+        newly_unlocked=unlocks.accessories,
+        newly_unlocked_avatars=unlocks.avatars,
+        games_completed=unlocks.stats.games_completed,
+    )
 
 
 @router.get("/{game_id}/leaderboard", response_model=list[LeaderboardEntry])

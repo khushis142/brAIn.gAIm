@@ -54,11 +54,13 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, jpeg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
 | POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
-| POST   | `/games/{id}/scores`         | ✓    | Submit `{score, round_id?}` → `{newly_unlocked, games_completed}`; a round is scored once |
+| POST   | `/games/{id}/scores`         | ✓    | Submit `{score, round_id?}` → `{newly_unlocked, newly_unlocked_avatars, games_completed}`; a round is scored once |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
 | GET    | `/zombie/accessories`        | ✓    | Accessory catalog `[{id, name, slot, unlock_description}]` |
-| GET    | `/users/me/zombie`           | ✓    | `{unlocked, equipped, games_completed, progress}` |
+| GET    | `/zombie/avatars`            | ✓    | Avatar catalog `[{id, name, unlock_description}]` |
+| GET    | `/users/me/zombie`           | ✓    | `{unlocked, equipped, games_completed, progress, avatar, unlocked_avatars, avatar_progress}` |
 | PUT    | `/users/me/zombie/equipped`  | ✓    | `{head?, eyes?, neck?, feet?}`, `null` unequips; 403 if not unlocked |
+| PUT    | `/users/me/zombie/avatar`    | ✓    | `{avatar}`; 403 if not unlocked; accessories stay as they are |
 
 **Uploading:** the client uploads the file to the [CDN](https://github.com/brAIn-gAIm/CDN)
 (`POST /api/v1/files`), then registers the returned `id` and `filename` with
@@ -115,6 +117,8 @@ other requests. Uploads set `fileId`/`filename`, project creation sets `projectI
   an earlier score in the same game; never raw scores, as their scales differ per game).
   Rules run after every score and on `GET /users/me/zombie`, so existing players and new
   accessories are backfilled. Unlocks are permanent; one accessory per slot can be worn.
+  Avatars (the character under the accessories) unlock the same way; `zombie` is the
+  default everyone has, and unlocking another never switches to it on its own.
 - **Migrations**: Alembic. After changing a model in `app/models/` (one module per domain;
   re-export new models in `app/models/__init__.py` so autogenerate sees them):
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.

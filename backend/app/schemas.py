@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from app.zombie import ACCESSORIES, Slot
+from app.zombie import ACCESSORIES, AVATARS, Slot
 
 Kind = Literal["video", "game"]
 
@@ -181,6 +181,7 @@ class ScoreCreate(BaseModel):
 
 class ScoreResult(BaseModel):
     newly_unlocked: list[str] = Field(description="Accessory ids this score unlocked")
+    newly_unlocked_avatars: list[str] = Field(description="Avatar ids this score unlocked")
     games_completed: int
 
 
@@ -227,8 +228,31 @@ class AccessoryProgress(BaseModel):
     target: int
 
 
+class AvatarRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    unlock_description: str
+
+
+class AvatarSelect(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    avatar: str
+
+    @model_validator(mode="after")
+    def _check_avatar(self) -> Self:
+        if self.avatar not in AVATARS:
+            raise ValueError(f"unknown avatar {self.avatar!r}")
+        return self
+
+
 class ZombieRead(BaseModel):
     unlocked: list[str]
     equipped: Equipped
     games_completed: int
     progress: list[AccessoryProgress] = Field(description="Locked accessories with a count goal")
+    avatar: str = Field(description="The selected avatar")
+    unlocked_avatars: list[str]
+    avatar_progress: list[AccessoryProgress] = Field(description="Locked avatars with a count goal")

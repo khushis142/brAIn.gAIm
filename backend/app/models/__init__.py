@@ -10,7 +10,7 @@ from app.models.feed import Impression
 from app.models.games import GameRound, Score
 from app.models.projects import Flashcard, Project, ProjectAttachment
 from app.models.users import User
-from app.models.zombie import EquippedAccessory, UserAccessory
+from app.models.zombie import EquippedAccessory, SelectedAvatar, UserAccessory, UserAvatar
 
 __all__ = [
     "Base",
@@ -22,6 +22,8 @@ __all__ = [
     "Project",
     "ProjectAttachment",
     "Score",
+    "SelectedAvatar",
     "User",
     "UserAccessory",
+    "UserAvatar",
 ]

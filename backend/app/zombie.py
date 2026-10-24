@@ -1,8 +1,9 @@
-"""The zombie mascot's wardrobe: the accessory catalog and the rules that unlock it.
+"""The zombie mascot's wardrobe: the accessory and avatar catalogs and the rules unlocking them.
 
 Scores are on different scales per game, so rules never compare raw scores across games.
-Rules are evaluated against the user's whole score history, so a new accessory is granted to
-existing players on their next score or zombie request: add it to CATALOG with its rule.
+Rules are evaluated against the user's whole score history, so a new accessory or avatar is
+granted to existing players on their next score or zombie request: add it to CATALOG or
+AVATAR_CATALOG with its rule.
 """
 
 import uuid
@@ -12,8 +13,9 @@ from typing import Literal, Protocol
 from sqlalchemy import delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 
-from app.models import EquippedAccessory, Score, UserAccessory
+from app.models import EquippedAccessory, Score, SelectedAvatar, UserAccessory, UserAvatar
 
 Slot = Literal["head", "eyes", "neck", "feet"]
 SLOTS: tuple[Slot, ...] = ("head", "eyes", "neck", "feet")
@@ -81,6 +83,25 @@ CATALOG: tuple[Accessory, ...] = (
 ACCESSORIES = {accessory.id: accessory for accessory in CATALOG}
 
 
+@dataclass(frozen=True)
+class Avatar:
+    """The character under the accessories; every accessory fits every avatar."""
+
+    id: str
+    name: str
+    unlock_description: str
+    rule: Rule | None  # None: a starting avatar everyone has (never stored)
+
+
+AVATAR_CATALOG: tuple[Avatar, ...] = (
+    Avatar("zombie", "Zombie", "Your starting avatar", None),
+    Avatar("half-human", "Half-human", "Finish 10 games", GamesCompleted(10)),
+    Avatar("human", "Human", "Finish 100 games", GamesCompleted(100)),
+)
+AVATARS = {avatar.id: avatar for avatar in AVATAR_CATALOG}
+DEFAULT_AVATAR = "zombie"
+
+
 async def games_completed(session: AsyncSession, user_id: uuid.UUID) -> int:
     count = await session.scalar(
         select(func.count()).select_from(Score).where(Score.user_id == user_id)
@@ -102,30 +123,75 @@ async def _stats(session: AsyncSession, user_id: uuid.UUID) -> Stats:
     return Stats(games_completed=await games_completed(session, user_id), beat_personal_best=beat)
 
 
-async def grant_unlocks(session: AsyncSession, user_id: uuid.UUID) -> tuple[Stats, list[str]]:
-    """Grant every accessory the user's history qualifies for; returns the newly granted ones.
+@dataclass(frozen=True)
+class Unlocks:
+    stats: Stats
+    accessories: list[str]  # newly granted, in catalog order
+    avatars: list[str]
+
+
+async def _grant(
+    session: AsyncSession, id_column: InstrumentedAttribute[str], user_id: uuid.UUID, ids: list[str]
+) -> list[str]:
+    """Store unlocks of one kind; returns those that were not stored yet."""
+    if not ids:
+        return []
+    granted = set(
+        await session.scalars(
+            insert(id_column.class_)
+            .values([{"user_id": user_id, id_column.key: id_} for id_ in ids])
+            .on_conflict_do_nothing()
+            .returning(id_column)
+        )
+    )
+    return [id_ for id_ in ids if id_ in granted]
+
+
+async def grant_unlocks(session: AsyncSession, user_id: uuid.UUID) -> Unlocks:
+    """Grant every accessory and avatar the user's history qualifies for.
 
     Idempotent and safe under concurrent calls: existing unlocks are kept, never granted twice.
     """
     stats = await _stats(session, user_id)
-    earned = [accessory.id for accessory in CATALOG if accessory.rule.met(stats)]
-    if not earned:
-        return stats, []
-    granted = set(
-        await session.scalars(
-            insert(UserAccessory)
-            .values([{"user_id": user_id, "accessory_id": id_} for id_ in earned])
-            .on_conflict_do_nothing()
-            .returning(UserAccessory.accessory_id)
-        )
+    accessories = [a.id for a in CATALOG if a.rule.met(stats)]
+    avatars = [a.id for a in AVATAR_CATALOG if a.rule is not None and a.rule.met(stats)]
+    return Unlocks(
+        stats=stats,
+        accessories=await _grant(session, UserAccessory.accessory_id, user_id, accessories),
+        avatars=await _grant(session, UserAvatar.avatar_id, user_id, avatars),
     )
-    return stats, [id_ for id_ in earned if id_ in granted]
 
 
 async def unlocked(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
     return set(
         await session.scalars(
             select(UserAccessory.accessory_id).where(UserAccessory.user_id == user_id)
+        )
+    )
+
+
+async def unlocked_avatars(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
+    stored = await session.scalars(
+        select(UserAvatar.avatar_id).where(UserAvatar.user_id == user_id)
+    )
+    return {a.id for a in AVATAR_CATALOG if a.rule is None} | set(stored)
+
+
+async def selected_avatar(session: AsyncSession, user_id: uuid.UUID) -> str:
+    avatar_id = await session.scalar(
+        select(SelectedAvatar.avatar_id).where(SelectedAvatar.user_id == user_id)
+    )
+    # An avatar dropped from the catalog falls back to the default, like accessories.
+    return avatar_id if avatar_id in AVATARS else DEFAULT_AVATAR
+
+
+async def select_avatar(session: AsyncSession, user_id: uuid.UUID, avatar_id: str) -> None:
+    """Switch the avatar (callers check it is unlocked); accessories are left as they are."""
+    await session.execute(
+        insert(SelectedAvatar)
+        .values(user_id=user_id, avatar_id=avatar_id)
+        .on_conflict_do_update(
+            index_elements=[SelectedAvatar.user_id], set_={"avatar_id": avatar_id}
         )
     )
 
