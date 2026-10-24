@@ -47,3 +47,78 @@ hr {
   margin: 0;
   padding: 8px 12px;
 }
+
+.dialog-backdrop {
+  align-items: center;
+  background: rgb(0 0 0 / 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 100;
+}
+
+.name-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  padding: 24px;
+  width: 100%;
+}
+
+.name-dialog h2 {
+  font-size: 1.2rem;
+  margin: 0 0 4px;
+}
+
+.name-dialog input {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-height: 48px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.name-dialog input:focus-visible,
+.dialog-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.dialog-actions button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 16px;
+}
+
+.dialog-actions button.cancel {
+  background: var(--control);
+  color: var(--text);
+}
+
+.dialog-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

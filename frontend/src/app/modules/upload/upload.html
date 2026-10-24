@@ -6,7 +6,7 @@
   }
 
   <div class="projects" role="list" aria-label="Projekte">
-    <app-project-folder [isNew]="true" (pressed)="addProject()" />
+    <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
     @for (project of projects(); track project.id) {
       <app-project-folder
         [name]="project.name"
@@ -15,7 +15,7 @@
         [selected]="project.id === selectedId()"
         (pressed)="selectedId.set(project.id)"
         (colorChange)="setColor(project.id, $event)"
-        (rename)="renameProject(project)"
+        (rename)="openRenameProject(project)"
         (remove)="removeProject(project.id)"
       />
     }
@@ -38,6 +38,42 @@
   @if (selected()) {
     <div class="dropzone-bar">
       <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
+    </div>
+  }
+
+  @if (nameDialog(); as dialog) {
+    <div class="dialog-backdrop" (click)="nameDialog.set(null)">
+      <form
+        class="name-dialog"
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="'project-name-title'"
+        (click)="$event.stopPropagation()"
+        (submit)="$event.preventDefault(); saveProjectName()"
+      >
+        <h2 id="project-name-title">
+          {{ dialog.mode === 'create' ? 'Neues Projekt' : 'Projekt umbenennen' }}
+        </h2>
+        <label for="project-name">Projektname</label>
+        <input
+          id="project-name"
+          type="text"
+          maxlength="200"
+          required
+          autofocus
+          [value]="dialog.name"
+          [disabled]="busy()"
+          (input)="updateProjectName($event)"
+        />
+        <div class="dialog-actions">
+          <button type="button" class="cancel" [disabled]="busy()" (click)="nameDialog.set(null)">
+            Abbrechen
+          </button>
+          <button type="submit" [disabled]="busy() || !dialog.name.trim()">
+            {{ busy() ? 'Speichert…' : 'Speichern' }}
+          </button>
+        </div>
+      </form>
     </div>
   }
 </section>
