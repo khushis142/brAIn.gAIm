@@ -201,6 +201,7 @@ export class Home {
 
   protected onKeydown(event: KeyboardEvent): void {
     if (event.key !== 'ArrowDown') return;
+    if (this.item()?.type === 'game' && this.phase() === 'idle') return;
     event.preventDefault(); // stop the page from scrolling
     this.next();
   }

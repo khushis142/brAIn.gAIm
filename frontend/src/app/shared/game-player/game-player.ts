@@ -52,6 +52,8 @@ export function defaultGameData(title: string): GameCustomData {
     questions: [
       {
         question: "What is the primary power source of Earth's climate system?",
+        correctAnswer: 'The Sun',
+        wrongAnswer: 'The Moon',
         options: ['The Sun', 'The Moon', 'Geothermal vents', 'Ocean currents'],
         answer: 0,
         left_option: 'The Sun',
@@ -63,6 +65,8 @@ export function defaultGameData(title: string): GameCustomData {
       },
       {
         question: 'Which organ in the human body consumes the most energy?',
+        correctAnswer: 'Brain',
+        wrongAnswer: 'Heart',
         options: ['Brain', 'Heart', 'Liver', 'Kidneys'],
         answer: 0,
         left_option: 'Brain',
@@ -74,6 +78,8 @@ export function defaultGameData(title: string): GameCustomData {
       },
       {
         question: 'Which data structure operates on a Last-In-First-Out (LIFO) basis?',
+        correctAnswer: 'Stack',
+        wrongAnswer: 'Queue',
         options: ['Stack', 'Queue', 'Array', 'Linked List'],
         answer: 0,
         left_option: 'Stack',
@@ -85,6 +91,8 @@ export function defaultGameData(title: string): GameCustomData {
       },
       {
         question: 'What is the speed of light in vacuum (approximate)?',
+        correctAnswer: '300,000 km/s',
+        wrongAnswer: '150,000 km/s',
         options: ['300,000 km/s', '150,000 km/s', '3,000 km/s', '3,000,000 km/s'],
         answer: 0,
         left_option: '300,000 km/s',
@@ -98,24 +106,75 @@ export function defaultGameData(title: string): GameCustomData {
   };
 }
 
+function normalizeQuestions(raw: unknown[]): Record<string, unknown>[] {
+  return raw.map((item, idx) => {
+    if (!item || typeof item !== 'object') {
+      return {
+        question: `Question ${idx + 1}`,
+        correctAnswer: 'Correct',
+        wrongAnswer: 'Incorrect',
+        options: ['Correct', 'Incorrect'],
+        answer: 0,
+      };
+    }
+    const q = item as Record<string, unknown>;
+    const questionText =
+      typeof q['question'] === 'string' && q['question'].trim()
+        ? q['question'].trim()
+        : `Question ${idx + 1}`;
+    const options =
+      Array.isArray(q['options']) && q['options'].length > 0
+        ? (q['options'] as string[])
+        : [];
+    const answerIdx = typeof q['answer'] === 'number' ? q['answer'] : 0;
+
+    const correctAns =
+      (typeof q['correctAnswer'] === 'string' && q['correctAnswer'].trim()) ||
+      (typeof q['answer_correct'] === 'string' && q['answer_correct'].trim()) ||
+      (typeof q['left_option'] === 'string' && q['left_option'].trim()) ||
+      (options[answerIdx] && String(options[answerIdx]).trim()) ||
+      'Correct';
+
+    const wrongAns =
+      (typeof q['wrongAnswer'] === 'string' && q['wrongAnswer'].trim()) ||
+      (typeof q['answer_incorrect'] === 'string' && q['answer_incorrect'].trim()) ||
+      (typeof q['right_option'] === 'string' && q['right_option'].trim()) ||
+      (options[answerIdx === 0 ? 1 : 0] && String(options[answerIdx === 0 ? 1 : 0]).trim()) ||
+      'Incorrect';
+
+    return {
+      ...q,
+      question: questionText,
+      correctAnswer: correctAns,
+      wrongAnswer: wrongAns,
+      answer_correct: q['answer_correct'] ?? correctAns,
+      answer_incorrect: q['answer_incorrect'] ?? wrongAns,
+      left_option: q['left_option'] ?? correctAns,
+      right_option: q['right_option'] ?? wrongAns,
+      correct: q['correct'] ?? 'left',
+      options: options.length >= 2 ? options : [correctAns, wrongAns],
+      answer: answerIdx,
+    };
+  });
+}
+
 export function resolveGameData(title: string, custom?: GameCustomData): GameCustomData {
   const fallback = defaultGameData(title);
-  if (!custom || Object.keys(custom).length === 0) {
-    return fallback;
-  }
+  const base = !custom || Object.keys(custom).length === 0 ? fallback : { ...fallback, ...custom };
+  const rawQuestions =
+    Array.isArray(custom?.['questions']) && custom!['questions'].length > 0
+      ? custom!['questions']
+      : fallback['questions'];
+
   return {
-    ...fallback,
-    ...custom,
-    questions:
-      Array.isArray(custom['questions']) && custom['questions'].length > 0
-        ? custom['questions']
-        : fallback['questions'],
+    ...base,
+    questions: normalizeQuestions(rawQuestions as unknown[]),
     chains:
-      Array.isArray(custom['chains']) && custom['chains'].length > 0
-        ? custom['chains']
+      Array.isArray(custom?.['chains']) && custom!['chains'].length > 0
+        ? custom!['chains']
         : fallback['chains'],
     difficulty:
-      typeof custom['difficulty'] === 'string' &&
+      typeof custom?.['difficulty'] === 'string' &&
       ['easy', 'normal', 'hard'].includes(custom['difficulty'])
         ? custom['difficulty']
         : 'normal',
@@ -129,6 +188,7 @@ export function resolveGameData(title: string, custom?: GameCustomData): GameCus
   templateUrl: './game-player.html',
   host: {
     '(window:resize)': 'onResize()',
+    '(click)': 'focus()',
   },
 })
 export class GamePlayer {
@@ -139,6 +199,7 @@ export class GamePlayer {
   readonly game = input<GamePlayable | null>(null);
   readonly active = input(true);
   readonly showControls = input(true);
+  readonly showTitle = input(false);
   readonly autoSubmitScore = input(true);
 
   readonly close = output<void>();
@@ -261,6 +322,10 @@ export class GamePlayer {
       this.loading.set(false);
       this.busy = false;
     }
+  }
+
+  focus(): void {
+    this.session()?.focus();
   }
 
   restart(): void {

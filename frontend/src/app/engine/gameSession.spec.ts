@@ -209,6 +209,32 @@ describe('GameSession', () => {
     container.remove();
   });
 
+  it('forwards game keys from host window to iframe while playing', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: iframe.contentWindow,
+        data: { type: 'started' },
+      }),
+    );
+    session.setLifecycle('playing');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
+    expect(post).toHaveBeenCalledWith({ type: 'key', code: 'ArrowLeft', pressed: true }, '*');
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowLeft' }));
+    expect(post).toHaveBeenCalledWith({ type: 'key', code: 'ArrowLeft', pressed: false }, '*');
+
+    session.destroy();
+    container.remove();
+  });
+
   it('rejects oversized or unsafe game code before creating an iframe', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');

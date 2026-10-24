@@ -19,6 +19,18 @@ const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
+const GAME_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'KeyA',
+  'KeyD',
+  'KeyW',
+  'KeyS',
+  'Space',
+  'Enter',
+]);
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -59,6 +71,8 @@ export class GameSession {
     private readonly runtimeSource: string,
   ) {
     doc.defaultView?.addEventListener('message', this.onMessage);
+    doc.defaultView?.addEventListener('keydown', this.onHostKeyDown);
+    doc.defaultView?.addEventListener('keyup', this.onHostKeyUp);
   }
 
   // ------------------------------------------------------------ public API
@@ -114,7 +128,10 @@ export class GameSession {
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => {
-      iframe.focus();
+      this.focus();
+    });
+    iframe.addEventListener('pointerdown', () => {
+      this.focus();
     });
 
     this.container.appendChild(iframe);
@@ -164,6 +181,11 @@ export class GameSession {
 
   focus(): void {
     this.iframe?.focus();
+    try {
+      this.iframe?.contentWindow?.focus();
+    } catch (_) {
+      // Best-effort cross-origin focus
+    }
   }
 
   resize(width: number, height: number): void {
@@ -185,7 +207,41 @@ export class GameSession {
     this.runtimeReady = false;
     this._lifecycle.set('disposed');
     this.doc.defaultView?.removeEventListener('message', this.onMessage);
+    this.doc.defaultView?.removeEventListener('keydown', this.onHostKeyDown);
+    this.doc.defaultView?.removeEventListener('keyup', this.onHostKeyUp);
   }
+
+  private readonly onHostKeyDown = (event: KeyboardEvent): void => {
+    if (this.requestedLifecycle !== 'playing' || this._status() !== 'running') return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.tagName === 'INPUT' ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.isContentEditable
+    ) {
+      return;
+    }
+    if (GAME_KEYS.has(event.code)) {
+      event.preventDefault();
+      this.send({ type: 'key', code: event.code, pressed: true });
+    }
+  };
+
+  private readonly onHostKeyUp = (event: KeyboardEvent): void => {
+    if (this.requestedLifecycle !== 'playing' || this._status() !== 'running') return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target?.tagName === 'INPUT' ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.isContentEditable
+    ) {
+      return;
+    }
+    if (GAME_KEYS.has(event.code)) {
+      event.preventDefault();
+      this.send({ type: 'key', code: event.code, pressed: false });
+    }
+  };
 
   // ------------------------------------------------------------ internals
 

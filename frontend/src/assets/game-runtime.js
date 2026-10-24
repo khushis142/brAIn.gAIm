@@ -625,6 +625,7 @@
 
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    try { window.focus(); } catch (_) {}
     updatePointer(event);
     pointer.down = true;
     pointer.justPressed = true;
@@ -1006,6 +1007,14 @@
         if (phase === 'start') touchStart(id, x, y);
         else if (phase === 'move') touchMove(id, x, y);
         else if (phase === 'end' || phase === 'cancel') touchEnd(id, x, y, phase === 'cancel');
+        break;
+      }
+
+      case 'key': {
+        const { code, pressed } = cmd;
+        if (typeof code === 'string' && typeof pressed === 'boolean') {
+          setSourceKey(keySources.keyboard, code, pressed);
+        }
         break;
       }
 

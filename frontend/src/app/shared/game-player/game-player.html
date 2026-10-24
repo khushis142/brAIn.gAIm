@@ -4,11 +4,13 @@
 
   <!-- Optional Top floating control bar -->
   @if (showControls() && game()) {
-    <header class="player-header">
-      <div class="game-meta">
-        <span class="game-badge">Game</span>
-        <h3 class="game-title">{{ game()?.title }}</h3>
-      </div>
+    <header class="player-header" [class.actions-only]="!showTitle()">
+      @if (showTitle()) {
+        <div class="game-meta">
+          <span class="game-badge">Game</span>
+          <h3 class="game-title">{{ game()?.title }}</h3>
+        </div>
+      }
 
       <div class="player-actions">
         <button
