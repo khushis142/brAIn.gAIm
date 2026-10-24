@@ -1,0 +1,122 @@
+:host {
+  display: block;
+}
+
+.app-shell {
+  min-height: 100dvh;
+  padding-bottom: 76px;
+}
+
+.app-header {
+  align-items: center;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  height: 60px;
+  justify-content: space-between;
+  padding: 0 max(20px, calc((100vw - 720px) / 2));
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  align-items: center;
+  color: var(--text);
+  display: inline-flex;
+  font-size: 1.05rem;
+  font-weight: 750;
+  gap: 9px;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.brand-mark {
+  align-items: center;
+  background: var(--accent);
+  border-radius: 9px;
+  color: white;
+  display: inline-flex;
+  font-size: 1.15rem;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.theme-toggle {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  min-width: 58px;
+  padding: 7px 10px;
+  text-transform: capitalize;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.page-content {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 28px 20px;
+}
+
+.bottom-nav {
+  align-items: center;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-top: 1px solid var(--border);
+  bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  left: 0;
+  padding: 8px max(12px, calc((100vw - 560px) / 2)) max(8px, env(safe-area-inset-bottom));
+  position: fixed;
+  right: 0;
+  z-index: 10;
+}
+
+.nav-item {
+  align-items: center;
+  border-radius: 12px;
+  color: var(--muted);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 4px;
+  max-width: 120px;
+  padding: 5px 10px;
+  text-decoration: none;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: var(--control);
+  color: var(--accent);
+}
+
+.nav-icon {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sr-only {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+  clip: rect(0, 0, 0, 0);
+}
