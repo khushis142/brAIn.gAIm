@@ -7,7 +7,7 @@ Docker Compose configurations for infrastructure services.
 ### 1. PostgreSQL (`postgres/`)
 - **Image**: `postgres:18.6-alpine3.24`
 - **Port**: `5432`
-- **Volume**: `postgres_data` -> `/var/lib/postgresql/data`
+- **Volume**: `postgres_data` -> `/var/lib/postgresql`
 - **Default Credentials**:
   - User: `postgres`
   - Password: `postgrespassword`
