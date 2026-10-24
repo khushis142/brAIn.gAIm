@@ -13,6 +13,7 @@
 }
 
 .card {
+  --like: #ff5fa2;
   background: #000;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -106,6 +107,57 @@
   white-space: nowrap;
 }
 
+/* Double-tap target over the video, leaving the native controls bar free */
+.tap-layer {
+  bottom: 56px;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+/* Big brain that pops where the video was double tapped */
+.burst {
+  animation: burst 800ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  color: #fff;
+  fill: var(--like);
+  filter: drop-shadow(0 0 18px var(--like));
+  height: 110px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 110px;
+}
+
+.like {
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  height: 40px;
+  place-items: center;
+  transition: color 200ms ease;
+  width: 40px;
+}
+
+.like svg {
+  fill: transparent;
+  transition: fill 200ms ease;
+}
+
+.like.liked {
+  color: var(--like);
+}
+
+.like.liked svg {
+  animation: like-pop 400ms cubic-bezier(0.3, 1.6, 0.5, 1);
+  fill: color-mix(in srgb, var(--like) 35%, transparent);
+  filter: drop-shadow(0 0 6px var(--like));
+}
+
 .next {
   animation: bob 1.6s ease-in-out infinite;
   border-radius: 50%;
@@ -190,10 +242,24 @@
   50% { transform: translateY(4px); }
 }
 
+@keyframes like-pop {
+  50% { transform: scale(1.35) rotate(-8deg); }
+}
+
+@keyframes burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(-15deg); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+  45% { transform: translate(-50%, -50%) scale(0.95) rotate(-4deg); }
+  65% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translate(-50%, -160%) scale(0.7); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card.leaving,
   .card.entering,
   .next,
+  .like.liked svg,
+  .burst,
   .warp.active::before,
   .warp.active::after {
     animation: none;

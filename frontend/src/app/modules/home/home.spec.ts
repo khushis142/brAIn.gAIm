@@ -48,4 +48,33 @@ describe('Home', () => {
     swipeUp();
     expect(next).toHaveBeenCalledTimes(1);
   });
+
+  it('likes a video on double tap and toggles with the button', () => {
+    const home = component as unknown as {
+      item: WritableSignal<FeedItem | null>;
+      liked(): boolean;
+      toggleLike(): void;
+      onTapStart(event: PointerEvent): void;
+      onTapEnd(event: PointerEvent): void;
+    };
+    const tap = (timeStamp: number) => {
+      const event = { clientX: 50, clientY: 50, offsetX: 50, offsetY: 50, timeStamp } as PointerEvent;
+      home.onTapStart(event);
+      home.onTapEnd(event);
+    };
+
+    home.item.set({ type: 'video', id: 'v', title: 'Clip', url: 'clip.mp4' });
+    tap(1000);
+    expect(home.liked()).toBe(false);
+    tap(1200);
+    expect(home.liked()).toBe(true);
+
+    // A second double tap keeps it liked
+    tap(2000);
+    tap(2100);
+    expect(home.liked()).toBe(true);
+
+    home.toggleLike();
+    expect(home.liked()).toBe(false);
+  });
 });
