@@ -34,3 +34,17 @@ Start service:
 ```bash
 docker compose -f rustfs/docker-compose.yml up -d
 ```
+
+### 3. Glances (`glances/`)
+- **Image**: `nicolargo/glances:latest-full`
+- **Port**:
+  - `61208`: Web UI
+- **Volume**:
+  - `/var/run/docker.sock` -> `/var/run/docker.sock:ro`
+- **PID**: `host`
+- **Web UI URL**: `http://localhost:61208`
+
+Start service:
+```bash
+docker compose -f glances/docker-compose.yml up -d
+```
