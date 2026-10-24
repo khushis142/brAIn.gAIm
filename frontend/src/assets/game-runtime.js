@@ -5,13 +5,13 @@
  * Expects a <canvas id="c"> in the document.
  *
  * Game contract (what the game passes to registerGame):
- *   init(api)            required   api = { width, height }
+ *   init(api)            required   api = { width, height, username, data, submitResult }
  *   update(dt, input)    required   dt in seconds, input = { keys }
  *   render(ctx)          required   2D canvas context
  *   resize(w, h)         optional   called after the host resized the canvas
  *   destroy()            optional   called once when the game is stopped
  *
- * Messages to the host:   { type: 'started' | 'heartbeat' | 'error', message? }
+ * Messages to the host:   { type: 'started' | 'heartbeat' | 'result' | 'error', ... }
  * Commands from the host: { type: 'pause' | 'resume' | 'stop' | 'resize', width?, height? }
  *
  * NOTE: This file is injected into the page as an inline script, so it must
@@ -69,11 +69,26 @@
   let lastFrame = last;
 
   const input = { keys: {} };
+  const gameInput = window.__GAME_INPUT__ || {
+    protocolVersion: 1,
+    username: '',
+    data: null,
+  };
+  delete window.__GAME_INPUT__;
 
   // Getters so width/height reflect later resizes.
   const api = Object.freeze({
     get width() { return canvas.width; },
     get height() { return canvas.height; },
+    username: typeof gameInput.username === 'string' ? gameInput.username : '',
+    data: gameInput.data,
+    submitResult(result) {
+      if (result === null || typeof result !== 'object' ||
+          typeof result.score !== 'number' || !Number.isFinite(result.score)) {
+        throw new Error('submitResult() expects an object with a finite score');
+      }
+      post({ type: 'result', result });
+    },
   });
 
   // ---------------------------------------------------------------- input

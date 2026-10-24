@@ -1,5 +1,10 @@
 import { signal } from '@angular/core';
-import { HostCommand, isSandboxEvent } from './gameProtocol';
+import {
+  GameResult,
+  GameStartInput,
+  HostCommand,
+  isSandboxEvent,
+} from './gameProtocol';
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
 
@@ -7,6 +12,11 @@ const HEARTBEAT_TIMEOUT_MS = 3000;
 const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
+
+export interface GameSessionOptions<CustomData = unknown> extends GameStartInput<CustomData> {
+  readonly width?: number;
+  readonly height?: number;
+}
 
 /**
  * One running game inside a sandboxed iframe.
@@ -19,9 +29,11 @@ export class GameSession {
 
   private readonly _status = signal<SessionStatus>('idle');
   private readonly _error = signal<string | null>(null);
+  private readonly _result = signal<GameResult | null>(null);
 
   readonly status = this._status.asReadonly();
   readonly error = this._error.asReadonly();
+  readonly result = this._result.asReadonly();
 
   constructor(
     private readonly doc: Document,
@@ -33,16 +45,38 @@ export class GameSession {
 
   // ------------------------------------------------------------ public API
 
-  start(gameCode: string, width = 800, height = 600): void {
+  start(gameCode: string, width?: number, height?: number): void;
+  start<CustomData>(gameCode: string, options: GameSessionOptions<CustomData>): void;
+  start<CustomData>(
+    gameCode: string,
+    optionsOrWidth?: GameSessionOptions<CustomData> | number,
+    legacyHeight = 600,
+  ): void {
     this.stop();
     this._error.set(null);
+    this._result.set(null);
     this._status.set('starting');
+
+    const options: GameSessionOptions<CustomData> =
+      typeof optionsOrWidth === 'number'
+        ? {
+            username: '',
+            data: undefined as CustomData,
+            width: optionsOrWidth,
+            height: legacyHeight,
+          }
+        : optionsOrWidth ?? {
+            username: '',
+            data: undefined as CustomData,
+          };
+    const width = options.width ?? 800;
+    const height = options.height ?? 600;
 
     const iframe = this.doc.createElement('iframe');
     // No allow-same-origin: the game gets an opaque origin and cannot touch the host.
     iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.style.cssText = `width:${width}px;height:${height}px;border:0;display:block`;
-    iframe.srcdoc = this.buildSrcdoc(gameCode, width, height);
+    iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => iframe.contentWindow?.focus());
 
@@ -98,6 +132,9 @@ export class GameSession {
       case 'heartbeat':
         this.lastBeat = Date.now();
         break;
+      case 'result':
+        this._result.set(e.data.result);
+        break;
       case 'error':
         this.fail(e.data.message.slice(0, MAX_ERROR_LENGTH));
         break;
@@ -132,7 +169,12 @@ export class GameSession {
     setTimeout(() => iframe.remove(), IFRAME_REMOVE_DELAY_MS);
   }
 
-  private buildSrcdoc(gameCode: string, width: number, height: number): string {
+  private buildSrcdoc<CustomData>(
+    gameCode: string,
+    width: number,
+    height: number,
+    options: GameSessionOptions<CustomData>,
+  ): string {
     const csp = [
       "default-src 'none'",
       "script-src 'unsafe-inline'",
@@ -145,6 +187,14 @@ export class GameSession {
     const safeCode = gameCode
       .replace(/<\/script/gi, '<\\/script')
       .replace(/<!--/g, '<\\!--');
+    const serializedInput = JSON.stringify({
+      protocolVersion: 1,
+      username: options.username,
+      data: options.data,
+    })
+      .replace(/</g, '\\u003c')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
 
     return `<!doctype html>
 <html>
@@ -155,6 +205,7 @@ export class GameSession {
 </head>
 <body>
 <canvas id="c" width="${width}" height="${height}"></canvas>
+<script>window.__GAME_INPUT__ = ${serializedInput};</script>
 <script>${this.runtimeSource}</script>
 <script>${safeCode}</script>
 </body>
