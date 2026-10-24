@@ -1,0 +1,281 @@
+openapi: 3.0.3
+info:
+  title: CDN Service API
+  description: >
+    Lean, high-performance CDN service for uploading, updating, delivering,
+    and deleting static mp4, js, and doc files (pdf, text, images) using
+    S3/RustFS object storage. Metadata is managed externally by the Backend.
+  version: 0.0.1
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Returns health status of S3/RustFS storage.
+      operationId: getHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: S3 storage operational
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Storage degraded or unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/files:
+    post:
+      summary: Upload file(s)
+      description: >
+        Uploads one or more files (mp4, js, pdf, text, images) to S3/RustFS.
+        Returns generated file ID(s) and static delivery link(s).
+      operationId: uploadFiles
+      tags:
+        - Files
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File payload (use 'file' for single file or 'files' for batch)
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Multiple files payload
+      responses:
+        '201':
+          description: File(s) uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResult'
+        '400':
+          description: Invalid file type or empty payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Storage error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/files/{id}:
+    put:
+      summary: Update / Replace file
+      description: Replaces the existing file content in S3 for the specified ID.
+      operationId: updateFile
+      tags:
+        - Files
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File UUID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Replacement file payload
+      responses:
+        '200':
+          description: File updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SingleFileUpload'
+        '400':
+          description: Invalid file or missing file field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Storage error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete file
+      description: Removes file and all objects associated with this ID from S3/RustFS.
+      operationId: deleteFile
+      tags:
+        - Files
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File UUID
+      responses:
+        '204':
+          description: File deleted successfully
+        '500':
+          description: Storage error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /files/{id}:
+    get:
+      summary: Deliver static file by ID
+      description: Stream file from S3 directly using file ID.
+      operationId: deliverFileByID
+      tags:
+        - CDN Delivery
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: header
+          name: Range
+          required: false
+          schema:
+            type: string
+            example: "bytes=0-1048575"
+        - in: header
+          name: If-None-Match
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full file content delivered
+        '206':
+          description: Partial byte-range delivered
+        '304':
+          description: Cached content fresh
+        '404':
+          description: File not found
+
+  /files/{id}/{filename}:
+    get:
+      summary: Deliver static file by ID and filename
+      description: Direct CDN delivery endpoint with filename in path.
+      operationId: deliverFileWithFilename
+      tags:
+        - CDN Delivery
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: Range
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: If-None-Match
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full file content delivered
+        '206':
+          description: Partial byte-range delivered
+        '304':
+          description: Cached content fresh
+        '404':
+          description: File not found
+
+components:
+  schemas:
+    SingleFileUpload:
+      type: object
+      required:
+        - id
+        - filename
+        - url
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "d0702b92-3252-4316-8faf-3b22966a1231"
+        filename:
+          type: string
+          example: "intro.mp4"
+        url:
+          type: string
+          format: uri
+          example: "http://localhost:8080/files/d0702b92-3252-4316-8faf-3b22966a1231/intro.mp4"
+
+    UploadResult:
+      oneOf:
+        - $ref: '#/components/schemas/SingleFileUpload'
+        - type: object
+          properties:
+            ids:
+              type: array
+              items:
+                type: string
+            files:
+              type: array
+              items:
+                $ref: '#/components/schemas/SingleFileUpload'
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - s3
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        s3:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "file not found"
