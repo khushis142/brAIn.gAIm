@@ -1,8 +1,11 @@
-// dodge3d/game.js: steer a cube through falling obstacles.
-let gl, api, program, positionBuffer, colorBuffer;
+// dodge3d/game.js: steer a cube through falling obstacles. Arrow keys to move; on touch
+// screens, hold the left or right half. The runtime only forwards keys, so the game listens
+// for pointer events on its own canvas.
+let gl, api, program, positionBuffer, colorBuffer, canvas;
 let playerX, obstacles, spawnTimer, score, gameOver, previousKeys;
 let username, difficulty, context;
 let best = 0;
+const touches = new Map(); // pointerId -> 'left' | 'right'
 
 const vertexSource = `
 attribute vec3 position;
@@ -39,7 +42,41 @@ function init(gameApi) {
       scoreLabel: api.data.scoreLabel,
     },
   });
+  canvas = document.getElementById('c');
+  if (canvas) {
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', onPointer);
+    canvas.addEventListener('pointermove', onPointer);
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+      canvas.addEventListener(type, onPointerEnd);
+    }
+  }
   reset();
+}
+
+function onPointer(event) {
+  if (event.type === 'pointermove' && !touches.has(event.pointerId)) return;
+  const rect = canvas.getBoundingClientRect();
+  touches.set(event.pointerId, event.clientX - rect.left < rect.width / 2 ? 'left' : 'right');
+  event.preventDefault();
+}
+
+function onPointerEnd(event) {
+  touches.delete(event.pointerId);
+}
+
+function touching(side) {
+  for (const value of touches.values()) if (value === side) return true;
+  return false;
+}
+
+function destroy() {
+  if (!canvas) return;
+  canvas.removeEventListener('pointerdown', onPointer);
+  canvas.removeEventListener('pointermove', onPointer);
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+    canvas.removeEventListener(type, onPointerEnd);
+  }
 }
 
 function reset() {
@@ -55,8 +92,8 @@ function update(dt, input) {
   previousKeys = { ...input.keys };
   if (gameOver) return;
 
-  if (input.keys.ArrowLeft) playerX -= 2.8 * dt;
-  if (input.keys.ArrowRight) playerX += 2.8 * dt;
+  if (input.keys.ArrowLeft || touching('left')) playerX -= 2.8 * dt;
+  if (input.keys.ArrowRight || touching('right')) playerX += 2.8 * dt;
   playerX = Math.max(-3, Math.min(3, playerX));
   score += dt;
   spawnTimer -= dt;
@@ -191,4 +228,4 @@ function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
 function normalize(v) { const l = Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; }
 
-registerGame({ renderer: 'webgl', init, update, render });
+registerGame({ renderer: 'webgl', init, update, render, destroy });
