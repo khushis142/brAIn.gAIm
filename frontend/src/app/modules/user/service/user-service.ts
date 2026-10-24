@@ -23,8 +23,16 @@ export class UserService {
     return this.api.register(details).pipe(switchMap(() => this.login(details.username, details.password)));
   }
 
+  loadUser(): Observable<UserRead> {
+    return this.api.getMe().pipe(
+      tap((user) => this.user.set(user)),
+    );
+  }
+
   updateInterest(interest: string): Observable<UserRead> {
-    return this.api.updateMe({ field: interest });
+    return this.api.updateMe({ field: interest }).pipe(
+      tap((user) => this.user.set(user)),
+    );
   }
 
   logout(): void {
