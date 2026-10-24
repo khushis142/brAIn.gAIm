@@ -8,6 +8,6 @@ from app.models.base import Base
 from app.models.content import Content
 from app.models.feed import Impression
 from app.models.games import Score
-from app.models.users import StudyField, User
+from app.models.users import User
 
-__all__ = ["Base", "Content", "Impression", "Score", "StudyField", "User"]
+__all__ = ["Base", "Content", "Impression", "Score", "User"]

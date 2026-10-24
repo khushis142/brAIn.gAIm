@@ -6,19 +6,16 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import update
+from sqlalchemy import text, update
 
 from app.db import SessionLocal, engine
 from app.feed import VIDEOS_PER_GAME
 from app.main import app
-from app.models import Base, StudyField, User
+from app.models import Base, User
 
 pytestmark = pytest.mark.skipif(
     "TEST_DATABASE_URL" not in os.environ, reason="TEST_DATABASE_URL not set"
 )
-
-CS = "computer-science"
-ENG = "engineering"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -26,15 +23,18 @@ async def schema() -> AsyncIterator[None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    async with SessionLocal() as session:  # migrations seed these in real databases
-        session.add_all(
-            [StudyField(slug=CS, name="Computer Science"), StudyField(slug=ENG, name="Engineering")]
-        )
-        await session.commit()
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+async def empty_tables(schema: None) -> None:
+    """Content is global, so every test starts from an empty catalog."""
+    tables = ", ".join(table.name for table in Base.metadata.sorted_tables)
+    async with engine.begin() as conn:
+        await conn.execute(text(f"TRUNCATE {tables} CASCADE"))
 
 
 @pytest.fixture(scope="session")
@@ -43,10 +43,10 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield c
 
 
-async def _auth(client: AsyncClient, username: str, field: str = CS) -> dict[str, str]:
-    body = {"username": username, "password": "password123", "field": field}
+async def _auth(client: AsyncClient, username: str) -> dict[str, str]:
+    body = {"username": username, "password": "password123"}
     assert (await client.post("/auth/register", json=body)).status_code == 201
-    res = await client.post("/auth/token", data={"username": username, "password": "password123"})
+    res = await client.post("/auth/token", data=body)
     assert res.status_code == 200
     return {"Authorization": f"Bearer {res.json()['access_token']}"}
 
@@ -59,23 +59,14 @@ async def _make_developer(username: str) -> None:
         await session.commit()
 
 
-async def _new_field(slug: str) -> str:
-    """A field of its own, so other tests' content cannot leak into assertions."""
-    async with SessionLocal() as session:
-        session.add(StudyField(slug=slug, name=slug))
-        await session.commit()
-    return slug
-
-
 async def _register(
-    client: AsyncClient, headers: dict[str, str], kind: str, field: str, **extra: object
+    client: AsyncClient, headers: dict[str, str], kind: str, **extra: object
 ) -> dict:
     body = {
         "id": str(uuid.uuid4()),
         "filename": "clip.mp4" if kind == "video" else "game.js",
         "kind": kind,
-        "title": f"{kind} {field}",
-        "field": field,
+        "title": f"a {kind}",
         **extra,
     }
     res = await client.post("/content", json=body, headers=headers)
@@ -83,27 +74,26 @@ async def _register(
     return res.json()
 
 
-async def test_fields(client: AsyncClient) -> None:
-    fields = (await client.get("/fields")).json()
-    assert {"slug": CS, "name": "Computer Science"} in fields
-
-
-async def test_register_login_and_me(client: AsyncClient) -> None:
+async def test_register_login_and_interests(client: AsyncClient) -> None:
     headers = await _auth(client, "alice")
     me = (await client.get("/users/me", headers=headers)).json()
     assert me["username"] == "alice"
-    assert me["field"] == CS
+    assert me["interests"] is None
     assert me["is_developer"] is False
 
-    patched = await client.patch("/users/me", json={"field": ENG}, headers=headers)
-    assert patched.json()["field"] == ENG
-    unknown = await client.patch("/users/me", json={"field": "astrology"}, headers=headers)
-    assert unknown.status_code == 422
+    set_ = await client.patch(
+        "/users/me", json={"interests": "  Rust and robotics "}, headers=headers
+    )
+    assert set_.json()["interests"] == "Rust and robotics"
+    unchanged = await client.patch("/users/me", json={}, headers=headers)
+    assert unchanged.json()["interests"] == "Rust and robotics"
+    cleared = await client.patch("/users/me", json={"interests": "   "}, headers=headers)
+    assert cleared.json()["interests"] is None
+    too_long = await client.patch("/users/me", json={"interests": "x" * 2001}, headers=headers)
+    assert too_long.status_code == 422
 
-    dup = {"username": "alice", "password": "password123", "field": CS}
+    dup = {"username": "alice", "password": "password123"}
     assert (await client.post("/auth/register", json=dup)).status_code == 409
-    bad = {"username": "bob", "password": "password123", "field": "astrology"}
-    assert (await client.post("/auth/register", json=bad)).status_code == 422
     wrong = {"username": "alice", "password": "nope-nope"}
     assert (await client.post("/auth/token", data=wrong)).status_code == 401
 
@@ -111,9 +101,8 @@ async def test_register_login_and_me(client: AsyncClient) -> None:
 async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     owner = await _auth(client, "uploader")
     other = await _auth(client, "stranger")
-    await _make_developer("uploader")
 
-    item = await _register(client, owner, "video", ENG, tags=[" Physics ", "physics", "Beams"])
+    item = await _register(client, owner, "video", tags=[" Physics ", "physics", "Beams"])
     assert item["owner"] == "uploader"
     assert item["tags"] == ["physics", "beams"]
     assert item["url"] == f"https://cdn.test/files/{item['id']}/clip.mp4"
@@ -122,16 +111,11 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     listed = (await client.get("/content", params={"tag": "PHYSICS", "owner": "uploader"})).json()
     assert [c["id"] for c in listed] == [item["id"]]
 
-    # Duplicate id, wrong file type, unknown field, path tricks, no auth.
-    dup = {**item, "filename": "clip.mp4"}
+    # Duplicate id, wrong file type, path tricks, no auth.
+    dup = {"id": item["id"], "filename": "clip.mp4", "kind": "video", "title": "t"}
     assert (await client.post("/content", json=dup, headers=owner)).status_code == 409
-    for body in [
-        {"kind": "video", "filename": "game.js", "field": ENG},
-        {"kind": "game", "filename": "clip.mp4", "field": ENG},
-        {"kind": "video", "filename": "clip.mp4", "field": "astrology"},
-        {"kind": "video", "filename": "../x.mp4", "field": ENG},
-    ]:
-        body |= {"id": str(uuid.uuid4()), "title": "t"}
+    for kind, filename in [("video", "game.js"), ("game", "clip.mp4"), ("video", "../x.mp4")]:
+        body = {"id": str(uuid.uuid4()), "filename": filename, "kind": kind, "title": "t"}
         assert (await client.post("/content", json=body, headers=owner)).status_code == 422
     assert (await client.post("/content", json=dup)).status_code == 401
 
@@ -147,10 +131,9 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
 
 async def test_only_developers_publish_games(client: AsyncClient) -> None:
     headers = await _auth(client, "regular")
-    game = {"id": str(uuid.uuid4()), "filename": "g.js", "kind": "game", "title": "t", "field": CS}
-    res = await client.post("/content", json=game, headers=headers)
-    assert res.status_code == 403
-    await _register(client, headers, "video", CS)  # videos stay open to everyone
+    game = {"id": str(uuid.uuid4()), "filename": "g.js", "kind": "game", "title": "t"}
+    assert (await client.post("/content", json=game, headers=headers)).status_code == 403
+    await _register(client, headers, "video")  # videos stay open to everyone
 
     await _make_developer("regular")
     assert (await client.get("/users/me", headers=headers)).json()["is_developer"] is True
@@ -164,14 +147,12 @@ async def test_feed_requires_auth(client: AsyncClient) -> None:
 
 
 async def test_feed_interleaves_games(client: AsyncClient) -> None:
-    field = await _new_field("feed-test")
     creator = await _auth(client, "creator")
     await _make_developer("creator")
-    videos = {(await _register(client, creator, "video", field))["id"] for _ in range(2)}
-    await _register(client, creator, "game", field)
-    await _register(client, creator, "video", ENG)  # other field, never served
+    videos = {(await _register(client, creator, "video"))["id"] for _ in range(2)}
+    await _register(client, creator, "game")
 
-    headers = await _auth(client, "carol", field=field)
+    headers = await _auth(client, "carol")
     items = [
         (await client.post("/feed/next", headers=headers)).json()
         for _ in range(VIDEOS_PER_GAME * 2 + 2)
@@ -182,8 +163,8 @@ async def test_feed_interleaves_games(client: AsyncClient) -> None:
     assert all(item["url"].startswith("https://cdn.test/files/") for item in items)
 
 
-async def test_feed_empty_field(client: AsyncClient) -> None:
-    headers = await _auth(client, "dave", field=await _new_field("empty"))
+async def test_feed_without_content(client: AsyncClient) -> None:
+    headers = await _auth(client, "dave")
     assert (await client.post("/feed/next", headers=headers)).status_code == 404
 
 
@@ -191,8 +172,8 @@ async def test_leaderboard_keeps_best_score_per_user(client: AsyncClient) -> Non
     erin = await _auth(client, "erin")
     frank = await _auth(client, "frank")
     await _make_developer("erin")
-    game = (await _register(client, erin, "game", CS))["id"]
-    video = (await _register(client, erin, "video", CS))["id"]
+    game = (await _register(client, erin, "game"))["id"]
+    video = (await _register(client, erin, "video"))["id"]
     for headers, score in [(erin, 10), (erin, 30), (frank, 20)]:
         res = await client.post(f"/games/{game}/scores", json={"score": score}, headers=headers)
         assert res.status_code == 204

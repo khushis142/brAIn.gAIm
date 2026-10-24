@@ -14,7 +14,6 @@ class Content(Base):
     __tablename__ = "content"
     __table_args__ = (
         CheckConstraint("kind IN ('video', 'game')", name="kind"),
-        Index("ix_content_field_kind", "field", "kind"),
         Index("ix_content_tags", "tags", postgresql_using="gin"),
     )
 
@@ -23,7 +22,6 @@ class Content(Base):
     kind: Mapped[str] = mapped_column(String(8))
     filename: Mapped[str] = mapped_column(String(255))
     title: Mapped[str] = mapped_column(String(200))
-    field: Mapped[str] = mapped_column(ForeignKey("study_fields.slug"))
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     owner_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True

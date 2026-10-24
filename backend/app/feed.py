@@ -24,13 +24,9 @@ def should_serve_game(videos_since_game: int) -> bool:
 
 async def _pick(session: AsyncSession, user: User, kind: str) -> Content | None:
     seen = select(Impression.content_id).where(Impression.user_id == user.id)
-    candidates = (
-        select(Content)
-        .where(Content.field == user.field, Content.kind == kind)
-        .order_by(func.random())
-        .limit(1)
-    )
-    # Prefer unseen items; once the field is exhausted, start repeating.
+    candidates = select(Content).where(Content.kind == kind).order_by(func.random()).limit(1)
+    # Prefer unseen items; once everything was seen, start repeating.
+    # Personalization (based on user.interests) is not implemented yet.
     return await session.scalar(candidates.where(Content.id.not_in(seen))) or await session.scalar(
         candidates
     )
@@ -40,7 +36,7 @@ async def next_item(session: AsyncSession, user: User) -> Content | None:
     """Pick the next feed item for `user`, record the impression, and commit.
 
     Falls back to the other kind when the preferred one has no content,
-    so a field with only videos (or only games) still yields a feed.
+    so a catalog with only videos (or only games) still yields a feed.
     """
     recent_kinds = (
         await session.scalars(

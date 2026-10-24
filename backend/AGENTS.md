@@ -12,7 +12,8 @@ TEST_DATABASE_URL=postgresql://braingain:braingain@localhost:5432/braingain_test
 fastapi dev app/main.py     # needs .env (copy .env.example) and a running Postgres
 ```
 
-Model change: edit `app/models.py`, then `alembic revision --autogenerate -m "..."`,
+Model change: edit the domain module in `app/models/` (re-export new models in
+`app/models/__init__.py`), then `alembic revision --autogenerate -m "..."`,
 review the generated file (add data conversion where needed), `alembic upgrade head`,
 `alembic check`.
 
@@ -23,7 +24,7 @@ review the generated file (add data conversion where needed), `alembic upgrade h
   and never handles file bytes or S3.
 - Delivery URLs are always built by `app/cdn.py` from `CDN_BASE_URL`; never store or
   return a client-supplied URL (games are JS that runs in the app).
-- Study fields are seeded by migrations; a new field is a new migration.
+- Users' free-text `interests` are the input for feed personalization (not built yet).
 - Only developers (`users.is_developer`, granted via SQL) may publish games; videos
   are open to every logged-in user.
 - Feed decisions live in `app/feed.py`; routers stay thin.

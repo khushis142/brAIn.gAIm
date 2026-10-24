@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.db import SessionDep
 from app.models import User
-from app.routers.fields import require_known_field
 from app.schemas import UserRead, UserUpdate
 from app.security import CurrentUser
 
@@ -16,7 +15,7 @@ async def read_me(user: CurrentUser) -> User:
 
 @router.patch("/me", response_model=UserRead)
 async def update_me(body: UserUpdate, user: CurrentUser, session: SessionDep) -> User:
-    await require_known_field(session, body.field)
-    user.field = body.field
+    if "interests" in body.model_fields_set:
+        user.interests = body.interests
     await session.commit()
     return user

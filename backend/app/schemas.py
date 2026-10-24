@@ -11,21 +11,18 @@ Kind = Literal["video", "game"]
 _EXTENSIONS: dict[str, set[str]] = {"video": {".mp4"}, "game": {".js", ".mjs"}}
 
 
-class StudyFieldRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    slug: str
-    name: str
-
-
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
     password: str = Field(min_length=8, max_length=128)
-    field: str
+
+
+def _blank_to_none(text: str | None) -> str | None:
+    return text.strip() or None if text is not None else None
 
 
 class UserUpdate(BaseModel):
-    field: str
+    # Omitted = unchanged, null or blank = cleared.
+    interests: Annotated[str | None, Field(max_length=2000), AfterValidator(_blank_to_none)] = None
 
 
 class UserRead(BaseModel):
@@ -33,7 +30,7 @@ class UserRead(BaseModel):
 
     id: uuid.UUID
     username: str
-    field: str
+    interests: str | None
     is_developer: bool
 
 
@@ -61,7 +58,6 @@ class ContentCreate(BaseModel):
     filename: str = Field(min_length=1, max_length=255, description="As returned by the CDN")
     kind: Kind
     title: str = Field(min_length=1, max_length=200)
-    field: str
     tags: Tags = []
 
     @model_validator(mode="after")
@@ -76,7 +72,6 @@ class ContentCreate(BaseModel):
 
 class ContentUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=200)
-    field: str | None = None
     tags: Tags | None = None
 
 
@@ -84,7 +79,6 @@ class ContentRead(BaseModel):
     id: uuid.UUID
     kind: Kind
     title: str
-    field: str
     tags: list[str]
     owner: str
     url: str

@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from app.cdn import file_url
 from app.db import SessionDep
 from app.models import Content, User
-from app.routers.fields import require_known_field
 from app.schemas import ContentCreate, ContentRead, ContentUpdate, Kind
 from app.security import CurrentUser
 
@@ -19,7 +18,6 @@ def _read(content: Content, owner: str) -> ContentRead:
         id=content.id,
         kind=content.kind,  # type: ignore[arg-type]  # guarded by a check constraint
         title=content.title,
-        field=content.field,
         tags=content.tags,
         owner=owner,
         url=file_url(content.id, content.filename),
@@ -42,7 +40,6 @@ async def register_content(
 ) -> ContentRead:
     if body.kind == "game" and not user.is_developer:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only developers can publish games")
-    await require_known_field(session, body.field)
     content = Content(**body.model_dump(), owner_id=user.id)
     session.add(content)
     try:
@@ -57,7 +54,6 @@ async def register_content(
 async def list_content(
     session: SessionDep,
     kind: Kind | None = None,
-    field: str | None = None,
     tag: str | None = None,
     owner: str | None = Query(None, description="Username"),
     limit: int = Query(20, ge=1, le=100),
@@ -66,8 +62,6 @@ async def list_content(
     query = select(Content, User.username).join(User, User.id == Content.owner_id)
     if kind is not None:
         query = query.where(Content.kind == kind)
-    if field is not None:
-        query = query.where(Content.field == field)
     if tag is not None:
         query = query.where(Content.tags.contains([tag.strip().lower()]))
     if owner is not None:
@@ -98,8 +92,6 @@ async def update_content(
 ) -> ContentRead:
     content = await _get_owned(session, content_id, user)
     changes = body.model_dump(exclude_none=True)
-    if "field" in changes:
-        await require_known_field(session, changes["field"])
     for name, value in changes.items():
         setattr(content, name, value)
     await session.commit()

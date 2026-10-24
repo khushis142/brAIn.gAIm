@@ -14,6 +14,6 @@ router = APIRouter(prefix="/feed", tags=["feed"])
 async def next_item(user: CurrentUser, session: SessionDep) -> VideoItem | GameItem:
     item = await feed.next_item(session, user)
     if item is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No content for this field yet")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No content yet")
     model = VideoItem if item.kind == "video" else GameItem
     return model(id=item.id, title=item.title, url=file_url(item.id, item.filename))

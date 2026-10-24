@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db import SessionDep
 from app.models import User
-from app.routers.fields import require_known_field
 from app.schemas import Token, UserCreate, UserRead
 from app.security import create_access_token, hash_password, verify_password
 
@@ -16,12 +15,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(body: UserCreate, session: SessionDep) -> User:
-    await require_known_field(session, body.field)
-    user = User(
-        username=body.username,
-        password_hash=hash_password(body.password),
-        field=body.field,
-    )
+    user = User(username=body.username, password_hash=hash_password(body.password))
     session.add(user)
     try:
         await session.commit()
