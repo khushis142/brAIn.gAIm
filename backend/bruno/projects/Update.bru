@@ -1,0 +1,17 @@
+meta {
+  name: Update
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{api}}/projects/{{projectId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "My project (renamed)"
+  }
+}

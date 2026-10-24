@@ -1,0 +1,12 @@
+meta {
+  name: Delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{api}}/content/{{fileId}}
+  body: none
+  auth: inherit
+}
+

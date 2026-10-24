@@ -1,0 +1,18 @@
+meta {
+  name: List
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{api}}/content?limit=20
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 20
+  ~kind: video
+  ~tag: learning
+  ~owner: {{process.env.BRUNO_USERNAME}}
+}

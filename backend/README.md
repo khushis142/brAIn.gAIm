@@ -64,6 +64,13 @@ is built from `CDN_BASE_URL` and the id; client-supplied URLs are never stored.
 Grant it directly in the database:
 `UPDATE users SET is_developer = true WHERE username = '<name>';`
 
+### Bruno collection
+
+`bruno/` is a [Bruno](https://www.usebruno.com/) collection for the API and CDN. Open the
+folder in Bruno, copy `bruno/.env.example` to `bruno/.env` with an existing user, pick the
+`prod` or `local` environment, and run **auth/Login** first; its token is inherited by all
+other requests. Uploads set `fileId`/`filename`, project creation sets `projectId`.
+
 ## Design
 
 - **Feed decision** (`app/feed.py`): every `VIDEOS_PER_GAME` (3) videos a game is

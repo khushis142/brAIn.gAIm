@@ -1,0 +1,17 @@
+meta {
+  name: Update interests
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{api}}/users/me
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "interests": "Learning science, spaced repetition"
+  }
+}

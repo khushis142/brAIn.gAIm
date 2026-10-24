@@ -1,0 +1,22 @@
+meta {
+  name: Create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{api}}/projects
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "My project",
+    "body": "# Notes\n\nMarkdown **works** here."
+  }
+}
+
+script:post-response {
+  bru.setVar("projectId", res.body.id);
+}

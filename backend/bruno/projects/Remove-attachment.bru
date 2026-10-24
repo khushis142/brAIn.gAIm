@@ -1,0 +1,12 @@
+meta {
+  name: Remove attachment
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{api}}/projects/{{projectId}}/attachments/{{fileId}}
+  body: none
+  auth: inherit
+}
+

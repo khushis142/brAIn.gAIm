@@ -1,0 +1,25 @@
+meta {
+  name: Upload file
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{cdn}}/api/v1/files
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  file: @file(fixtures/sample.png)
+}
+
+script:post-response {
+  bru.setVar("fileId", res.body.id);
+  bru.setVar("filename", res.body.filename);
+}
+
+docs {
+  Pick any file in the Body tab. Videos must be .mp4 to register as content;
+  attachments may be pdf, png, jpg, webp, gif, txt, md or csv.
+}
