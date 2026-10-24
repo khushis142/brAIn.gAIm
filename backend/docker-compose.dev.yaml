@@ -2,7 +2,7 @@
 # Deployment uses docker-compose.yaml.
 services:
   postgres:
-    image: postgres:17
+    image: postgres:18
     environment:
       POSTGRES_USER: braingain
       POSTGRES_PASSWORD: braingain
