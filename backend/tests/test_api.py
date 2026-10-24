@@ -364,6 +364,17 @@ async def test_leaderboard_keeps_best_score_per_user(client: AsyncClient) -> Non
     assert (await client.get(f"/games/{video}/leaderboard")).status_code == 404
     assert (await client.get(f"/games/{uuid.uuid4()}/leaderboard")).status_code == 404
 
+    # Listing games
+    games_res = await client.get("/games")
+    assert games_res.status_code == 200
+    listed_games = games_res.json()
+    assert any(g["id"] == game and g["kind"] == "game" for g in listed_games)
+
+    single_game_res = await client.get(f"/games/{game}")
+    assert single_game_res.status_code == 200
+    assert single_game_res.json()["id"] == game
+    assert (await client.get(f"/games/{video}")).status_code == 404
+
 
 async def test_projects_are_private_crud(client: AsyncClient) -> None:
     owner = await _auth(client, "maker")
