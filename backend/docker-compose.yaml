@@ -3,13 +3,14 @@
 services:
   backend:
     # Deployed version, updated by hand after CI has published it (see README).
-    image: ghcr.io/brain-gaim/backend:0.0.6
+    image: ghcr.io/brain-gaim/backend:0.0.7
     container_name: backend
     restart: unless-stopped
     ports: ["3000:8000"]
     environment:
       DATABASE_URL: ${DATABASE_URL:?postgresql://user:pass@host:5432/db}
       JWT_SECRET: ${JWT_SECRET:?at least 32 characters}
+      CDN_BASE_URL: ${CDN_BASE_URL:?public CDN URL, e.g. https://cdn.example.com}
 
 networks:
   default:
