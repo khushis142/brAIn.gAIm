@@ -26,9 +26,44 @@ services:
     image: ghcr.io/berriai/litellm:v1.106.3
     container_name: litellm
     restart: unless-stopped
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
-    volumes: ["./litellm/config.yaml:/app/config.yaml:ro"]
+    # The config lives in LITELLM_CONFIG below, not in a mounted file: Portainer GitOps keeps
+    # the repo inside its own container, so a relative bind mount would find no file on the
+    # host (Docker then mounts an empty directory).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - printf '%s\n' "$$LITELLM_CONFIG" > /tmp/config.yaml && exec litellm --config /tmp/config.yaml --port 4000
     environment:
+      LITELLM_CONFIG: |
+        # LiteLLM proxy (#44): the backend asks for an alias, the proxy picks the Anthropic model,
+        # tracks spend per key and stops at the budgets below. Secrets come from the environment.
+        model_list:
+          - model_name: smart # writes games and round inputs
+            litellm_params:
+              model: anthropic/claude-sonnet-5-5
+              api_key: os.environ/ANTHROPIC_API_KEY
+          - model_name: fast # cheaper fallback
+            litellm_params:
+              model: anthropic/claude-haiku-5-5
+              api_key: os.environ/ANTHROPIC_API_KEY
+
+        router_settings:
+          fallbacks: [{ "smart": ["fast"] }]
+          num_retries: 1
+
+        litellm_settings:
+          # Drop request parameters a model does not support instead of failing.
+          drop_params: true
+          # Prompts contain users' documents: keep spend and token counts, never message content.
+          turn_off_message_logging: true
+          # Hard cap for the whole proxy, on top of each key's own budget.
+          max_budget: 50 # USD
+          budget_duration: 30d
+
+        general_settings:
+          master_key: os.environ/LITELLM_MASTER_KEY
+          database_url: os.environ/DATABASE_URL
+          store_prompts_in_spend_logs: false
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Anthropic API key of the production workspace}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?admin key for the proxy, starts with sk-}
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?encrypts stored keys; never change it after first start}
