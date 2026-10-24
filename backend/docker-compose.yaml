@@ -40,7 +40,7 @@ services:
         model_list:
           - model_name: smart # writes games and round inputs
             litellm_params:
-              model: anthropic/claude-sonnet-5-5
+              model: anthropic/claude-haiku-5-5
               api_key: os.environ/ANTHROPIC_API_KEY
           - model_name: fast # cheaper fallback
             litellm_params:
