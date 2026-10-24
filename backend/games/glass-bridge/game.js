@@ -8,6 +8,7 @@ let state = 'ready';
 let selectedSide = 0;
 let previousSide = 0;
 let jumpProgress = 0;
+let jumpStartDepth = 0;
 let feedbackTimer = 0;
 let lastCorrect = false;
 let finished = false;
@@ -96,6 +97,9 @@ function update(dt, input) {
       state = 'feedback';
       feedbackTimer = 0.8;
     }
+  } else if (state === 'advance') {
+    jumpProgress = Math.min(1, jumpProgress + dt / 0.45);
+    if (jumpProgress >= 1) state = 'ready';
   } else if (state === 'feedback') {
     feedbackTimer -= dt;
     if (feedbackTimer <= 0) {
@@ -108,7 +112,9 @@ function update(dt, input) {
           finish(true);
         } else {
           previousSide = selectedSide;
-          state = 'ready';
+          jumpStartDepth = choiceDepth(current - 1);
+          state = 'advance';
+          jumpProgress = 0;
         }
       }
     }
@@ -150,13 +156,24 @@ function bridgeY(depth) {
   return H * (0.39 + 0.48 * depth);
 }
 
+function choiceRow(index) {
+  return 5 - Math.round((index * 4) / Math.max(1, questions.length - 1));
+}
+
+function choiceDepth(index) {
+  const near = 0.12 + choiceRow(index) * 0.125;
+  return near - 0.0475;
+}
+
+function laneX(side, depth) {
+  return W / 2 + (side ? 1 : -1) * bridgeWidth(depth) / 4;
+}
+
 function lanePoints(side, near, far, inset) {
   const nearWidth = bridgeWidth(near) / 2;
   const farWidth = bridgeWidth(far) / 2;
-  const gapNear = Math.max(3, nearWidth * 0.025);
-  const gapFar = Math.max(2, farWidth * 0.04);
-  const centerNear = W / 2 + (side ? 1 : -1) * nearWidth / 2;
-  const centerFar = W / 2 + (side ? 1 : -1) * farWidth / 2;
+  const gapNear = Math.max(7, nearWidth * 0.055);
+  const gapFar = Math.max(4, farWidth * 0.07);
   const innerNear = W / 2 + (side ? gapNear : -gapNear);
   const innerFar = W / 2 + (side ? gapFar : -gapFar);
   const outerNear = side ? W / 2 + nearWidth : W / 2 - nearWidth;
@@ -204,7 +221,12 @@ function wrapText(ctx, text, maxWidth) {
 function drawQuestion(ctx) {
   const pad = Math.max(16, W * 0.055);
   const boxY = H * 0.055;
-  const boxH = H * 0.28;
+  const question = questions[current] ? questions[current].question : 'Bridge cleared!';
+  const fontSize = Math.max(14, Math.min(25, W * 0.061, H * 0.045));
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  const lines = wrapText(ctx, question, W - pad * 3.4).slice(0, 3);
+  const lineHeight = fontSize * 1.25;
+  const boxH = Math.min(H * 0.32, Math.max(H * 0.13, 48 + lines.length * lineHeight + 20));
   ctx.fillStyle = 'rgba(11, 20, 38, 0.94)';
   roundedRect(ctx, pad, boxY, W - pad * 2, boxH, 16);
   ctx.fill();
@@ -223,15 +245,11 @@ function drawQuestion(ctx) {
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#f8fafc';
-  const question = questions[current] ? questions[current].question : 'Bridge cleared!';
-  const fontSize = Math.max(14, Math.min(25, W * 0.061, H * 0.045));
   ctx.font = `bold ${fontSize}px sans-serif`;
-  const maxLines = Math.max(1, Math.min(3, Math.floor((boxH - 58) / (fontSize * 1.25))));
-  const lines = wrapText(ctx, question, W - pad * 3.4).slice(0, maxLines);
   let y = boxY + 48;
   for (const line of lines) {
     ctx.fillText(line, pad * 1.7, y);
-    y += fontSize * 1.25;
+    y += lineHeight;
   }
 }
 
@@ -247,12 +265,13 @@ function drawBridge(ctx) {
     [W / 2 - bridgeWidth(1) / 2, bridgeY(1)],
   ], glow);
 
+  const activeRow = questions.length ? choiceRow(current) : -1;
   for (let row = 6; row >= 0; row -= 1) {
     const near = 0.12 + row * 0.125;
-    const far = near - 0.12;
+    const far = near - 0.095;
     for (let side = 0; side < 2; side += 1) {
-      const points = lanePoints(side, near, far, 2);
-      const isChoice = row === 4;
+      const points = lanePoints(side, near, far, 5);
+      const isChoice = row === activeRow;
       const chosen = isChoice && (state === 'feedback' || state === 'jump') && side === selectedSide;
       let fill = side === 0 ? 'rgba(27, 166, 153, 0.29)' : 'rgba(89, 126, 178, 0.32)';
       let stroke = side === 0 ? 'rgba(76, 235, 198, 0.75)' : 'rgba(147, 197, 253, 0.72)';
@@ -310,27 +329,33 @@ function drawAnswer(ctx, text, points, side) {
 }
 
 function drawRobot(ctx) {
-  const jump = state === 'jump' ? Math.sin(jumpProgress * Math.PI) * H * 0.13 : 0;
-  let side = state === 'ready' ? previousSide : selectedSide;
-  let x = W / 2 + (side ? 1 : -1) * bridgeWidth(0.58) / 4;
-  let y = bridgeY(0.58) - H * 0.02;
-  if (state === 'ready' && current === 0) {
+  let x;
+  let y;
+  let jumping = state === 'jump' || state === 'advance';
+  if (state === 'jump') {
+    const startDepth = current === 0 ? 0.91 : choiceDepth(current);
+    const startX = current === 0 ? W / 2 : laneX(previousSide, startDepth);
+    const targetDepth = choiceDepth(current);
+    x = startX + (laneX(selectedSide, targetDepth) - startX) * jumpProgress;
+    y = bridgeY(startDepth) + (bridgeY(targetDepth) - bridgeY(startDepth)) * jumpProgress;
+  } else if (state === 'advance') {
+    const targetDepth = choiceDepth(current);
+    x = laneX(previousSide, targetDepth);
+    y = bridgeY(jumpStartDepth) + (bridgeY(targetDepth) - bridgeY(jumpStartDepth)) * jumpProgress;
+  } else if (current === 0) {
     x = W / 2;
-    y = bridgeY(0.88);
-  } else if (state === 'jump') {
-    const startX =
-      current === 0 ? W / 2 : W / 2 + (previousSide ? 1 : -1) * bridgeWidth(0.58) / 4;
-    const targetX = W / 2 + (selectedSide ? 1 : -1) * bridgeWidth(0.58) / 4;
-    x = startX + (targetX - startX) * jumpProgress;
-    y = current === 0
-      ? bridgeY(0.88) + (bridgeY(0.58) - bridgeY(0.88)) * jumpProgress
-      : bridgeY(0.58);
+    y = bridgeY(0.91);
+  } else {
+    const depth = choiceDepth(current);
+    x = laneX(previousSide, depth);
+    y = bridgeY(depth);
   }
+  const jump = jumping ? Math.sin(jumpProgress * Math.PI) * H * 0.13 : 0;
   const scale = Math.max(0.65, Math.min(1, W / 390));
   const falling = state === 'feedback' && !lastCorrect;
   ctx.save();
   ctx.translate(x, y - jump + (falling ? feedbackTimer * H * 0.18 : 0));
-  if (state === 'jump') ctx.rotate((selectedSide ? 1 : -1) * Math.sin(jumpProgress * Math.PI) * 0.18);
+  if (jumping) ctx.rotate((selectedSide ? 1 : -1) * Math.sin(jumpProgress * Math.PI) * 0.18);
   if (falling) ctx.rotate(-0.35);
   ctx.scale(scale, scale);
 
