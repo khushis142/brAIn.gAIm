@@ -1,0 +1,44 @@
+:host {
+  display: inline-flex;
+}
+
+.health-badge {
+  align-items: center;
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 650;
+  gap: 6px;
+  padding: 7px 10px;
+}
+
+.material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.health-badge:not(.healthy):not(.unavailable) .material-symbols-outlined {
+  animation: server-pulse 1.4s ease-in-out infinite;
+}
+
+.health-badge.healthy .material-symbols-outlined {
+  color: #21a366;
+}
+
+.health-badge.unavailable .material-symbols-outlined {
+  color: #d14343;
+}
+
+@keyframes server-pulse {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .health-badge:not(.healthy):not(.unavailable) .material-symbols-outlined {
+    animation: none;
+  }
+}

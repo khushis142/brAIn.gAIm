@@ -4,16 +4,20 @@
       <span>{{ title() }}</span>
     </a>
 
-    <button
-      class="theme-toggle"
-      type="button"
-      (click)="toggleTheme()"
-      [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
-      [attr.aria-pressed]="isDarkMode()"
-    >
-      <span aria-hidden="true">{{ isDarkMode() ? 'sun' : 'moon' }}</span>
-      <span class="sr-only">{{ isDarkMode() ? 'Light mode' : 'Dark mode' }}</span>
-    </button>
+    <div class="header-actions">
+      <app-health-badge />
+
+      <button
+        class="theme-toggle"
+        type="button"
+        (click)="toggleTheme()"
+        [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+        [attr.aria-pressed]="isDarkMode()"
+      >
+        <span aria-hidden="true">{{ isDarkMode() ? 'sun' : 'moon' }}</span>
+        <span class="sr-only">{{ isDarkMode() ? 'Light mode' : 'Dark mode' }}</span>
+      </button>
+    </div>
   </header>
 
   <main class="page-content">
