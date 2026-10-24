@@ -2,7 +2,7 @@
 // Vertical platform climbing quiz game.
 // The player bounces safely on a middle platform, with two answer platforms above (left / right).
 // One platform is correct (springs player up to next question); the other breaks and ends run.
-// Faster completion awards higher points.
+// Faster completion awards higher points. Round cannot be restarted inside the game.
 
 let W, H, api, canvas;
 let questions = [];
@@ -16,6 +16,7 @@ let targetCameraY = 0;
 let gameState = 'PLAY'; // 'PLAY', 'FALLING', 'GAME_OVER', 'VICTORY'
 let elapsedTime = 0;
 let score = 0;
+let bestScore = 0;
 let submitted = false;
 let squishAnim = 0; // jump stretch effect
 let facing = 1; // 1 = right, -1 = left
@@ -29,8 +30,8 @@ const SUPER_BOUNCE_VELOCITY = -700;
 const HORIZ_ACCEL = 1600;
 const HORIZ_MAX_SPEED = 320;
 const HORIZ_FRICTION = 0.88;
-const LEVEL_GAP = 270;
-const PLATFORM_Y_OFFSET = 120; // Up from middle platform
+const LEVEL_GAP = 280;
+const PLATFORM_Y_OFFSET = 125; // Up from middle platform
 
 function init(gameApi) {
   api = gameApi;
@@ -79,10 +80,9 @@ function init(gameApi) {
 }
 
 function onPointerDown(event) {
-  if (gameState === 'GAME_OVER' || gameState === 'VICTORY') {
-    resetGame();
-    return;
-  }
+  // No restarting once game ends
+  if (gameState === 'GAME_OVER' || gameState === 'VICTORY') return;
+
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
   touches.set(event.pointerId, x < rect.width / 2 ? 'left' : 'right');
@@ -132,8 +132,9 @@ function resetGame() {
     const q = questions[i];
     const baseY = startY - i * LEVEL_GAP;
     const midW = 96;
-    const optW = Math.min(136, Math.max(90, W * 0.38));
-    const optH = 22;
+    // Wider and taller option platforms to fit long multi-line answers
+    const optW = Math.min(160, Math.max(120, W * 0.44));
+    const optH = 40;
 
     levels.push({
       qIndex: i,
@@ -150,7 +151,7 @@ function resetGame() {
         broken: false,
       },
       left: {
-        x: Math.max(12, W * 0.25 - optW / 2),
+        x: 10,
         y: baseY - PLATFORM_Y_OFFSET,
         w: optW,
         h: optH,
@@ -160,7 +161,7 @@ function resetGame() {
         broken: false,
       },
       right: {
-        x: Math.min(W - optW - 12, W * 0.75 - optW / 2),
+        x: W - optW - 10,
         y: baseY - PLATFORM_Y_OFFSET,
         w: optW,
         h: optH,
@@ -207,7 +208,6 @@ function spawnParticles(x, y, color, count) {
 
 function breakPlatform(plat) {
   plat.broken = true;
-  // Create two falling half-pieces
   brokenPieces.push({
     x: plat.x,
     y: plat.y,
@@ -235,6 +235,7 @@ function finishGame(finalScore, victory) {
   if (submitted) return;
   submitted = true;
   score = Math.max(0, Math.floor(finalScore));
+  bestScore = Math.max(bestScore, score);
   gameState = victory ? 'VICTORY' : 'GAME_OVER';
   api.submitResult({
     score,
@@ -246,13 +247,10 @@ function finishGame(finalScore, victory) {
 }
 
 function update(dt, input) {
-  // Cap dt to prevent physics tunneling
   dt = Math.min(dt, 0.05);
 
+  // Once game ends, no updates or restart
   if (gameState === 'GAME_OVER' || gameState === 'VICTORY') {
-    if (input.keys?.Space && !prevKeys.Space) {
-      resetGame();
-    }
     prevKeys = { ...input.keys };
     return;
   }
@@ -320,12 +318,10 @@ function update(dt, input) {
       const feetY = player.y + player.h;
       const prevFeetY = feetY - player.vy * dt;
 
-      // Check current level and adjacent level platforms
       const lvl = levels[currentQuestionIndex];
       if (lvl) {
         const platformsToCheck = [lvl.middle, lvl.left, lvl.right];
 
-        // Also check previous level's safe middle platform in case player drops back down
         if (currentQuestionIndex > 0) {
           platformsToCheck.push(levels[currentQuestionIndex - 1].middle);
         }
@@ -333,7 +329,6 @@ function update(dt, input) {
         for (const plat of platformsToCheck) {
           if (plat.broken) continue;
 
-          // Check feet crossing top edge of platform
           const withinX =
             player.x + player.w * 0.8 >= plat.x && player.x + player.w * 0.2 <= plat.x + plat.w;
           const crossedTop = prevFeetY <= plat.y + 4 && feetY >= plat.y - 2;
@@ -358,8 +353,7 @@ function update(dt, input) {
                 currentQuestionIndex++;
 
                 if (currentQuestionIndex >= levels.length) {
-                  // Reached summit!
-                  // Base: 1000 pts per question. Speed bonus: up to 3000 pts for fast runs (<60s)
+                  // Summit reached: 1000 pts per question + speed bonus
                   const baseScore = questions.length * 1000;
                   const speedBonus = Math.max(0, Math.round((60 - elapsedTime) * 50));
                   finishGame(baseScore + speedBonus, true);
@@ -385,7 +379,6 @@ function update(dt, input) {
       finishGame(partialScore, false);
     }
   } else if (gameState === 'FALLING') {
-    // Player falling after platform broke
     if (player.y - cameraY > H + 50) {
       const partialScore = currentQuestionIndex * 1000;
       finishGame(partialScore, false);
@@ -404,13 +397,12 @@ function drawPlayer(ctx, x, y, w, h, facingDir, squish) {
   ctx.save();
   ctx.translate(x + w / 2, y + h / 2);
 
-  // Squish/stretch effect on bounce
   const scaleX = 1 + squish * 0.3;
   const scaleY = 1 - squish * 0.3;
   ctx.scale(scaleX * facingDir, scaleY);
 
   // Body
-  ctx.fillStyle = '#84cc16'; // Lime green
+  ctx.fillStyle = '#84cc16';
   ctx.beginPath();
   ctx.ellipse(0, 0, 14, 16, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -446,12 +438,76 @@ function drawPlayer(ctx, x, y, w, h, facingDir, squish) {
   ctx.restore();
 }
 
+// Draws text wrapped cleanly inside platform bounds so long answers never truncate
+function drawWrappedPlatformText(ctx, text, cx, cy, maxW) {
+  text = String(text || '').trim();
+
+  // First try single line at 12px
+  ctx.font = 'bold 12px sans-serif';
+  if (ctx.measureText(text).width <= maxW) {
+    ctx.fillText(text, cx, cy);
+    return;
+  }
+
+  // Try 2 lines at 11px
+  ctx.font = 'bold 11px sans-serif';
+  let words = text.split(/\s+/);
+  let lines = [];
+  let cur = '';
+
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(test).width <= maxW) {
+      cur = test;
+    } else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+  }
+  if (cur) lines.push(cur);
+
+  // If still overflowing width, shrink to 10px
+  if (lines.length > 2 || lines.some((l) => ctx.measureText(l).width > maxW)) {
+    ctx.font = 'bold 10px sans-serif';
+    lines = [];
+    cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width <= maxW) {
+        cur = test;
+      } else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+  }
+
+  const lineH = 13;
+  if (lines.length === 1) {
+    ctx.fillText(lines[0], cx, cy);
+  } else {
+    const totalH = (Math.min(lines.length, 2) - 1) * lineH;
+    const startY = cy - totalH / 2;
+    for (let i = 0; i < Math.min(lines.length, 2); i++) {
+      let lineStr = lines[i];
+      if (i === 1 && lines.length > 2) {
+        while (lineStr.length > 3 && ctx.measureText(lineStr + '...').width > maxW) {
+          lineStr = lineStr.slice(0, -1);
+        }
+        lineStr += '...';
+      }
+      ctx.fillText(lineStr, cx, startY + i * lineH);
+    }
+  }
+}
+
 function render(ctx) {
   // Background: graph paper style
   ctx.fillStyle = '#faf8ef';
   ctx.fillRect(0, 0, W, H);
 
-  // Faint grid lines
+  // Grid lines
   ctx.strokeStyle = '#e2dfd2';
   ctx.lineWidth = 1;
   const gridSpacing = 28;
@@ -498,11 +554,11 @@ function render(ctx) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Grass pattern on top of safe platform
     ctx.fillStyle = '#16a34a';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('SAFE', mid.x + mid.w / 2, mid.y + 13);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SAFE', mid.x + mid.w / 2, mid.y + mid.h / 2);
 
     // 2. Left and Right Option Platforms
     for (const opt of [lvl.left, lvl.right]) {
@@ -512,29 +568,23 @@ function render(ctx) {
       const label = isLeft ? lvl.leftOption : lvl.rightOption;
 
       // Platform body
-      ctx.fillStyle = '#3b82f6'; // Clean blue
+      ctx.fillStyle = '#0284c7'; // Rich sky blue
       ctx.beginPath();
-      ctx.roundRect(opt.x, opt.y, opt.w, opt.h, 6);
+      ctx.roundRect(opt.x, opt.y, opt.w, opt.h, 8);
       ctx.fill();
-      ctx.strokeStyle = '#1d4ed8';
+      ctx.strokeStyle = '#0369a1';
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Platform text label
+      // Top step indicator line
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(opt.x + 4, opt.y + 2, opt.w - 8, 3);
+
+      // Platform text label with wrapping
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-
-      // Truncate if long
-      let displayLabel = String(label);
-      if (ctx.measureText(displayLabel).width > opt.w - 12) {
-        while (displayLabel.length > 3 && ctx.measureText(displayLabel + '...').width > opt.w - 12) {
-          displayLabel = displayLabel.slice(0, -1);
-        }
-        displayLabel += '...';
-      }
-      ctx.fillText(displayLabel, opt.x + opt.w / 2, opt.y + opt.h / 2);
+      drawWrappedPlatformText(ctx, label, opt.x + opt.w / 2, opt.y + opt.h / 2 + 1, opt.w - 12);
     }
   }
 
@@ -552,16 +602,16 @@ function render(ctx) {
   ctx.restore();
 
   // Top Sticky Banner HUD
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-  ctx.fillRect(0, 0, W, 88);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.fillRect(0, 0, W, 92);
   ctx.strokeStyle = '#cbd5e1';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, 88);
-  ctx.lineTo(W, 88);
+  ctx.moveTo(0, 92);
+  ctx.lineTo(W, 92);
   ctx.stroke();
 
-  // Question & Timer info
+  // Header info line
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#64748b';
@@ -571,45 +621,45 @@ function render(ctx) {
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#0f172a';
-  ctx.fillText(`Time: ${elapsedTime.toFixed(1)}s`, W - 14, 10);
+  const bestText = bestScore > 0 ? `Best: ${bestScore}  |  ` : '';
+  ctx.fillText(`${bestText}Time: ${elapsedTime.toFixed(1)}s`, W - 14, 10);
 
-  // Question text
+  // Question text with clean multi-line wrapping
   const currentQ = levels[Math.min(currentQuestionIndex, levels.length - 1)]?.question || '';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 14px sans-serif';
+  ctx.font = 'bold 13px sans-serif';
 
-  // Simple wrap for header question
   const maxQWidth = W - 28;
-  const words = currentQ.split(' ');
+  const words = currentQ.split(/\s+/);
   let line = '';
-  let lineY = 30;
+  let lineY = 28;
   for (const word of words) {
     const testLine = line ? `${line} ${word}` : word;
     if (ctx.measureText(testLine).width > maxQWidth && line) {
       ctx.fillText(line, 14, lineY);
       line = word;
       lineY += 18;
-      if (lineY > 66) break; // Keep within banner
+      if (lineY > 68) break;
     } else {
       line = testLine;
     }
   }
-  if (line && lineY <= 66) {
+  if (line && lineY <= 68) {
     ctx.fillText(line, 14, lineY);
   }
 
-  // Touch hint overlay at bottom when playing
+  // Touch controls guide when playing
   if (gameState === 'PLAY') {
     ctx.fillStyle = 'rgba(100, 116, 139, 0.4)';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Tap Left / Right half or use Arrow Keys to steer', W / 2, H - 18);
+    ctx.fillText('Tap Left / Right half or use Arrow Keys to steer', W / 2, H - 16);
   }
 
-  // Victory / Game Over Overlay
+  // Victory / Game Over Overlay - matching host leaderboard format
   if (gameState === 'GAME_OVER' || gameState === 'VICTORY') {
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     ctx.fillRect(0, 0, W, H);
 
     ctx.textAlign = 'center';
@@ -617,33 +667,33 @@ function render(ctx) {
 
     if (gameState === 'VICTORY') {
       ctx.fillStyle = '#22c55e';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.fillText('Summit Reached!', W / 2, H / 2 - 60);
+      ctx.font = 'bold 32px sans-serif';
+      ctx.fillText('Summit Reached!', W / 2, H / 2 - 50);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(`Score: ${score}`, W / 2, H / 2 - 10);
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(`Score: ${score}`, W / 2, H / 2);
 
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`Time: ${elapsedTime.toFixed(1)}s`, W / 2, H / 2 + 25);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(`Best: ${bestScore}`, W / 2, H / 2 + 35);
     } else {
       ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.fillText('Platform Broke!', W / 2, H / 2 - 60);
+      ctx.font = 'bold 32px sans-serif';
+      ctx.fillText('Run Complete', W / 2, H / 2 - 50);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 26px sans-serif';
-      ctx.fillText(`Score: ${score}`, W / 2, H / 2 - 10);
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(`Score: ${score}`, W / 2, H / 2);
 
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`Reached: ${currentQuestionIndex} / ${questions.length}`, W / 2, H / 2 + 25);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(`Best: ${bestScore}`, W / 2, H / 2 + 35);
     }
 
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText('Tap screen or press Space to retry', W / 2, H / 2 + 75);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('See your standing on the leaderboard below', W / 2, H / 2 + 75);
   }
 }
 
