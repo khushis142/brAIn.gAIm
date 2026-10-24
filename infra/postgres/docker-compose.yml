@@ -6,13 +6,13 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: postgresdb
+      POSTGRES_USER: braingain
+      POSTGRES_PASSWORD: braingain
+      POSTGRES_DB: braingain
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U braingain"]
       interval: 10s
       timeout: 5s
       retries: 5
