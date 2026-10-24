@@ -1,1 +1,28 @@
-<p>register works!</p>
+<main class="auth-page">
+  <div class="auth-card">
+    <p class="eyebrow">Start learning</p>
+    <h1>Create your account</h1>
+    <p class="muted">Build a learning habit that lasts.</p>
+
+    <form [formGroup]="registerForm" (ngSubmit)="submit()">
+      <label for="username">Username</label>
+      <input id="username" name="username" formControlName="username" autocomplete="username" />
+
+      <label for="field">Study field</label>
+      <input id="field" name="field" formControlName="field" placeholder="e.g. biology" />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" formControlName="password" minlength="8" type="password" autocomplete="new-password" />
+
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+
+      <button type="submit" [disabled]="registerForm.invalid || submitting()">
+        {{ submitting() ? 'Creating account...' : 'Register' }}
+      </button>
+    </form>
+
+    <p class="switch">Already have an account? <a routerLink="/login">Log in</a></p>
+  </div>
+</main>

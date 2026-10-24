@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {LucideDynamicIcon, LucideHouse, LucideSettings, LucideUpload, LucideSun, LucideMoon} from '@lucide/angular';
 import { HealthBadge } from './shared/health-badge/health-badge';
+import { UserService } from './modules/user/service/user-service';
 
 @Component({
   imports: [
@@ -19,7 +20,9 @@ import { HealthBadge } from './shared/health-badge/health-badge';
   templateUrl: './app.html',
 })
 export class App {
+  private readonly userService = inject(UserService);
   protected readonly title = signal('brAIn.gAIn');
+  protected readonly isAuthenticated = this.userService.isAuthenticated;
   protected readonly isDarkMode = signal(false);
 
   constructor() {

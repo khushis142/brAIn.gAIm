@@ -1,1 +1,25 @@
-<p>login works!</p>
+<main class="auth-page">
+  <div class="auth-card">
+    <p class="eyebrow">Welcome back</p>
+    <h1>Log in to braingain</h1>
+    <p class="muted">Keep learning and growing your mind.</p>
+
+    <form (ngSubmit)="submit()" [formGroup]="loginForm">
+      <label for="username">Username</label>
+      <input id="username" name="username" formControlName="username" autocomplete="username" />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" formControlName="password" required type="password" autocomplete="current-password" />
+
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+
+      <button type="submit" [disabled]="loginForm.invalid || submitting()">
+        {{ submitting() ? 'Logging in...' : 'Log in' }}
+      </button>
+    </form>
+
+    <p class="switch">New to braingain? <a routerLink="/register">Create an account</a></p>
+  </div>
+</main>
