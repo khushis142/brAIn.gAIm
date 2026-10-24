@@ -92,7 +92,8 @@ export class Home {
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    this.touchStartY = event.touches[0].clientY;
+    // Swipes during a game belong to the game; the ↓ button still moves on
+    this.touchStartY = this.item()?.type === 'game' ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
@@ -117,7 +118,7 @@ export class Home {
     this.session()?.stop();
     this.item.set(item);
 
-    if (gameCode !== null) {
+    if (gameCode !== null && item.type === 'game') {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
         username: this.username ?? '',

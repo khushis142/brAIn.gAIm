@@ -6,14 +6,14 @@
  *
  * Game contract (what the game passes to registerGame):
  *   init(api)            required   api = { width, height, username, data, submitResult, setUiDesign }
- *   update(dt, input)    required   dt in seconds, input = { keys }
+ *   update(dt, input)    required   dt in seconds, input = { keys } (touch gestures press keys too)
  *   renderer             optional   '2d' (default) or 'webgl'
  *   render(ctx)          required   CanvasRenderingContext2D or WebGLRenderingContext
  *   resize(w, h)         optional   called after the host resized the canvas
  *   destroy()            optional   called once when the game is stopped
  *
  * Messages to the host:   { type: 'started' | 'heartbeat' | 'result' | 'error', ... }
- * Commands from the host: { type: 'pause' | 'resume' | 'stop' | 'resize', width?, height? }
+ * Commands from the host: { type: 'pause' | 'resume' | 'stop' | 'resize' | 'touch', ... }
  *
  * NOTE: This file is injected into the page as an inline script, so it must
  * never contain a closing script tag sequence anywhere, not even in comments.
@@ -141,6 +141,91 @@
   });
   // Without this, a key held while focus is lost would stay "pressed" forever.
   addEventListener('blur', clearKeys);
+
+  // ---------------------------------------------------------------- touch
+  // Phones have no keyboard, so touch gestures press the same virtual keys.
+  // Games keep reading input.keys and work with both:
+  //   tap              Space, pressed briefly
+  //   swipe            arrow key in the swipe direction, pressed briefly
+  //   press and hold   ArrowLeft / ArrowRight held, by which half the finger is on
+  const TAP_MAX_MOVE_PX = 12;
+  const SWIPE_MIN_PX = 30;
+  const HOLD_MS = 200;
+  const BRIEF_PRESS_MS = 100;        // long enough for games that react to key edges
+
+  let touch = null;                  // the one finger we follow
+
+  const pressBriefly = (code) => {
+    input.keys[code] = true;
+    setTimeout(() => { input.keys[code] = false; }, BRIEF_PRESS_MS);
+  };
+
+  const sideKey = (x) => (x < innerWidth / 2 ? 'ArrowLeft' : 'ArrowRight');
+
+  const setHoldKey = (code) => {
+    if (touch.holdKey === code) return;
+    if (touch.holdKey) input.keys[touch.holdKey] = false;
+    touch.holdKey = code;
+    if (code) input.keys[code] = true;
+  };
+
+  // Touches arrive here directly, or from the host as 'touch' commands (see below)
+  // when the browser delivered them to the host page instead.
+  function touchStart(id, x, y) {
+    if (touch) return;
+    const current = { id, startX: x, startY: y, x, y, holdKey: null, holdTimer: 0 };
+    touch = current;
+    current.holdTimer = setTimeout(() => {
+      // A finger that stayed put is holding; one that moved away is swiping
+      const moved = Math.hypot(current.x - current.startX, current.y - current.startY);
+      if (touch === current && moved < SWIPE_MIN_PX) setHoldKey(sideKey(current.x));
+    }, HOLD_MS);
+  }
+
+  function touchMove(id, x, y) {
+    if (!touch || touch.id !== id) return;
+    touch.x = x;
+    touch.y = y;
+    if (touch.holdKey) setHoldKey(sideKey(x)); // dragging across switches direction
+  }
+
+  function touchEnd(id, x, y, cancelled) {
+    if (!touch || touch.id !== id) return;
+    clearTimeout(touch.holdTimer);
+    const dx = x - touch.startX;
+    const dy = y - touch.startY;
+    const wasHold = touch.holdKey !== null;
+    setHoldKey(null);
+    touch = null;
+    if (wasHold || cancelled) return;
+
+    if (Math.abs(dx) < TAP_MAX_MOVE_PX && Math.abs(dy) < TAP_MAX_MOVE_PX) {
+      pressBriefly('Space');
+    } else if (Math.max(Math.abs(dx), Math.abs(dy)) >= SWIPE_MIN_PX) {
+      if (Math.abs(dx) > Math.abs(dy)) pressBriefly(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
+      else pressBriefly(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+    }
+  }
+
+  addEventListener('touchstart', (e) => {
+    e.preventDefault(); // no scrolling, zooming or emulated mouse clicks
+    const t = e.changedTouches[0];
+    touchStart(t.identifier, t.clientX, t.clientY);
+  }, { passive: false });
+
+  addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) touchMove(t.identifier, t.clientX, t.clientY);
+  }, { passive: false });
+
+  const onTouchEnd = (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      touchEnd(t.identifier, t.clientX, t.clientY, e.type === 'touchcancel');
+    }
+  };
+  addEventListener('touchend', onTouchEnd, { passive: false });
+  addEventListener('touchcancel', onTouchEnd, { passive: false });
 
   // ---------------------------------------------------------------- loop
   const shouldRun = () =>
@@ -335,6 +420,15 @@
         } catch (err) {
           fail(err);
         }
+        break;
+      }
+
+      case 'touch': {
+        const { phase, id, x, y } = cmd;
+        if (![id, x, y].every(Number.isFinite)) return;
+        if (phase === 'start') touchStart(id, x, y);
+        else if (phase === 'move') touchMove(id, x, y);
+        else if (phase === 'end' || phase === 'cancel') touchEnd(id, x, y, phase === 'cancel');
         break;
       }
 

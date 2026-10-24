@@ -90,6 +90,28 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('forwards touches on the iframe element to the game', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
+    vi.spyOn(iframe, 'getBoundingClientRect').mockReturnValue({ left: 10, top: 20 } as DOMRect);
+
+    const touch = new Event('touchstart', { cancelable: true });
+    Object.defineProperty(touch, 'changedTouches', {
+      value: [{ identifier: 1, clientX: 60, clientY: 70 }],
+    });
+    iframe.dispatchEvent(touch);
+
+    expect(post).toHaveBeenCalledWith({ type: 'touch', phase: 'start', id: 1, x: 50, y: 50 }, '*');
+    expect(touch.defaultPrevented).toBe(true);
+
+    session.destroy();
+    container.remove();
+  });
+
   it('rejects oversized or unsafe game code before creating an iframe', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');

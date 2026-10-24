@@ -41,6 +41,8 @@ export interface GameItem {
   id: string;
   title: string;
   url: string;
+  round_id: string;
+  /** Generated input for this round; pass it to GameSession.start as `data` */
   data?: GameCustomData;
 }
 

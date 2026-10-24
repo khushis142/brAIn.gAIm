@@ -6,6 +6,7 @@ import {
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
+  TouchPhase,
 } from './gameProtocol';
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
@@ -15,6 +16,12 @@ const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
+const TOUCH_PHASES: Record<string, TouchPhase> = {
+  touchstart: 'start',
+  touchmove: 'move',
+  touchend: 'end',
+  touchcancel: 'cancel',
+};
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -73,6 +80,13 @@ export class GameSession {
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => iframe.contentWindow?.focus());
+    // Chrome's device emulation can deliver touches on the game to this page (targeting the
+    // iframe element) instead of the game's document, so pass those on to the game.
+    for (const type of Object.keys(TOUCH_PHASES)) {
+      iframe.addEventListener(type, (e) => this.forwardTouch(iframe, e as TouchEvent), {
+        passive: false,
+      });
+    }
 
     this.container.appendChild(iframe);
     this.iframe = iframe;
@@ -177,6 +191,21 @@ export class GameSession {
     this.iframe?.contentWindow?.postMessage(command, '*');
   }
 
+  private forwardTouch(iframe: HTMLIFrameElement, e: TouchEvent): void {
+    e.preventDefault(); // the page must not scroll, and the feed must not see a swipe
+    const rect = iframe.getBoundingClientRect();
+    for (const t of Array.from(e.changedTouches)) {
+      const command: HostCommand = {
+        type: 'touch',
+        phase: TOUCH_PHASES[e.type],
+        id: t.identifier,
+        x: t.clientX - rect.left,
+        y: t.clientY - rect.top,
+      };
+      iframe.contentWindow?.postMessage(command, '*');
+    }
+  }
+
   /** Asks the runtime to shut down (so game.destroy() runs), then removes the iframe. */
   private retire(iframe: HTMLIFrameElement): void {
     iframe.contentWindow?.postMessage({ type: 'stop' } satisfies HostCommand, '*');
@@ -215,7 +244,7 @@ export class GameSession {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
-<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<style>html,body{margin:0;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}canvas{display:block}</style>
 </head>
 <body>
 <canvas id="c" width="${width}" height="${height}"></canvas>

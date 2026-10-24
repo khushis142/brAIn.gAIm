@@ -32,7 +32,8 @@
 .game-host,
 .video,
 .placeholder,
-.error {
+.error,
+.result {
   inset: 0;
   position: absolute;
 }
@@ -44,7 +45,9 @@
 }
 
 .placeholder,
-.error {
+.error ,
+.result {
+  background: rgb(0 0 0 / 0.75);
   color: #fff;
   display: grid;
   gap: 12px;
@@ -54,6 +57,7 @@
 }
 
 .error button,
+.result button,
 .next {
   background: var(--accent);
   border: 0;
@@ -61,9 +65,17 @@
   cursor: pointer;
 }
 
-.error button {
+.error button,
+.result button {
   border-radius: 999px;
   padding: 8px 16px;
+}
+
+.result-score {
+  color: var(--accent);
+  font-size: 3rem;
+  font-weight: 800;
+  margin: 0;
 }
 
 .info {
