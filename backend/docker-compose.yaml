@@ -1,0 +1,5 @@
+services:
+  backend:
+    image: ghcr.io/brain-gaim/backend:latest
+    container_name: backend
+    restart: unless-stopped
