@@ -6,10 +6,17 @@ on:
       - main
     paths:
       - version.txt
+  workflow_run:
+    workflows: ['Bump Version Renovate']
+    types:
+      - completed
   workflow_dispatch:
 
 jobs:
   release-and-build:
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
       packages: write
