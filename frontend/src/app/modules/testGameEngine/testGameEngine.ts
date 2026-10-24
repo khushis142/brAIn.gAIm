@@ -175,8 +175,8 @@ export class GameViewComponent {
     this.loadError.set(null);
     this.isPaused.set(false);
     try {
-      const res = await fetch(`assets/games/${name}.js`);
-      if (!res.ok) throw new Error(`Could not load ${name}.js (${res.status})`);
+      const res = await fetch(`assets/games/${name}/game.js`);
+      if (!res.ok) throw new Error(`Could not load ${name}/game.js (${res.status})`);
       this.session()?.start(await res.text(), {
         username: 'demo-user',
         data: {

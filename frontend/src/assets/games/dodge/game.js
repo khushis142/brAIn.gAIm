@@ -1,6 +1,6 @@
-// dodge.js: dodge the falling blocks. Arrow keys to move.
+// dodge/game.js: dodge the falling blocks. Arrow keys to move.
 let W, H, gameApi, username, difficulty, context;
-let player, blocks, spawnTimer, score, gameOver;
+let player, blocks, spawnTimer, score, gameOver, previousKeys;
 let best = 0;
 
 function init(api) {
@@ -8,7 +8,7 @@ function init(api) {
   W = api.width;
   H = api.height;
   username = api.username;
-  difficulty = api.data?.difficulty || 'normal';
+  difficulty = api.data.difficulty;
   context = api.data.context;
   api.setUiDesign({
     theme: {
@@ -17,14 +17,14 @@ function init(api) {
       density: 'comfortable',
     },
     pauseMenu: {
-      title: api.data.pauseTitle || 'Dodge pause',
-      message: api.data.pauseMessage || `Context: ${context}`,
-      resumeLabel: api.data.resumeLabel || 'Keep playing',
+      title: api.data.pauseTitle,
+      message: api.data.pauseMessage,
+      resumeLabel: api.data.resumeLabel,
     },
     leaderboard: {
-      title: api.data.leaderboardTitle || 'Dodge leaderboard',
-      subtitle: api.data.leaderboardSubtitle || `Based on: ${context}`,
-      scoreLabel: api.data.scoreLabel || 'Survival score',
+      title: api.data.leaderboardTitle,
+      subtitle: api.data.leaderboardSubtitle,
+      scoreLabel: api.data.scoreLabel,
     },
   });
   reset();
@@ -36,19 +36,19 @@ function reset() {
   spawnTimer = 0;
   score = 0;
   gameOver = false;
+  previousKeys = {};
 }
 
 function update(dt, input) {
+  previousKeys = { ...input.keys };
   if (gameOver) return;
 
-  // Move player
-  const left = input.keys['ArrowLeft'];
-  const right = input.keys['ArrowRight'];
+  const left = input.keys.ArrowLeft;
+  const right = input.keys.ArrowRight;
   if (left) player.x -= player.speed * dt;
   if (right) player.x += player.speed * dt;
   player.x = Math.max(0, Math.min(W - player.w, player.x));
 
-  // Spawn blocks, faster as the score grows
   score += dt;
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
@@ -63,14 +63,13 @@ function update(dt, input) {
     spawnTimer = Math.max(0.15, 0.8 - score * 0.02);
   }
 
-  // Move blocks and check collisions
-  for (const b of blocks) {
-    b.y += b.vy * dt;
+  for (const block of blocks) {
+    block.y += block.vy * dt;
     const hit =
-      b.x < player.x + player.w &&
-      b.x + b.w > player.x &&
-      b.y < player.y + player.h &&
-      b.y + b.h > player.y;
+      block.x < player.x + player.w &&
+      block.x + block.w > player.x &&
+      block.y < player.y + player.h &&
+      block.y + block.h > player.y;
     if (hit) {
       gameOver = true;
       best = Math.max(best, score);
@@ -78,13 +77,14 @@ function update(dt, input) {
         score: Math.floor(score * 10),
         game: 'dodge',
         username,
+        context,
         difficulty,
         survivedSeconds: Number(score.toFixed(2)),
       });
       break;
     }
   }
-  blocks = blocks.filter(b => b.y < H);
+  blocks = blocks.filter((block) => block.y < H);
 }
 
 function difficultyOffset() {
@@ -94,19 +94,15 @@ function difficultyOffset() {
 }
 
 function render(ctx) {
-  // Background
   ctx.fillStyle = '#12141c';
   ctx.fillRect(0, 0, W, H);
 
-  // Blocks
   ctx.fillStyle = '#ff5c5c';
-  for (const b of blocks) ctx.fillRect(b.x, b.y, b.w, b.h);
+  for (const block of blocks) ctx.fillRect(block.x, block.y, block.w, block.h);
 
-  // Player
   ctx.fillStyle = gameOver ? '#777' : '#4fd1c5';
   ctx.fillRect(player.x, player.y, player.w, player.h);
 
-  // HUD
   ctx.fillStyle = '#fff';
   ctx.font = '20px sans-serif';
   ctx.textAlign = 'left';

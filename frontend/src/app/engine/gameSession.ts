@@ -14,6 +14,7 @@ const HEARTBEAT_TIMEOUT_MS = 3000;
 const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
+const MAX_GAME_CODE_BYTES = 200 * 1024;
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -54,6 +55,7 @@ export class GameSession {
     gameCode: string,
     options: GameSessionOptions<CustomData>,
   ): void {
+    this.validateGameCode(gameCode);
     this.stop();
     this._error.set(null);
     this._result.set(null);
@@ -116,6 +118,18 @@ export class GameSession {
   }
 
   // ------------------------------------------------------------ internals
+
+  private validateGameCode(gameCode: string): void {
+    if (typeof gameCode !== 'string') {
+      throw new Error('Game code must be a string');
+    }
+    if (new TextEncoder().encode(gameCode).byteLength > MAX_GAME_CODE_BYTES) {
+      throw new Error('Game code exceeds the 200 KB limit');
+    }
+    if (/<\/script/i.test(gameCode)) {
+      throw new Error('Game code must not contain a closing script tag');
+    }
+  }
 
   private readonly onMessage = (e: MessageEvent): void => {
     // Only accept messages from our own iframe, and only well-formed ones
