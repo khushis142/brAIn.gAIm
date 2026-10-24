@@ -39,6 +39,7 @@ flowchart TD
 | Category | Extensions | MIME Types |
 |---|---|---|
 | **Video** | `.mp4` | `video/mp4` |
+| **Audio** | `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.flac`, `.weba`, `.opus` | `audio/mpeg`, `audio/wav`, `audio/ogg`, `audio/mp4`, `audio/aac`, `audio/flac`, `audio/webm`, `audio/opus` |
 | **Code / Scripts** | `.js`, `.mjs`, `.cjs` | `application/javascript`, `text/javascript` |
 | **PDF** | `.pdf` | `application/pdf` |
 | **Text** | `.txt`, `.md`, `.csv`, `.json`, `.xml` | `text/plain`, `text/markdown`, `text/csv`, `application/json`, `application/xml` |

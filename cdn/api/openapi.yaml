@@ -3,7 +3,7 @@ info:
   title: CDN Service API
   description: >
     Lean, high-performance CDN service for uploading, updating, delivering,
-    and deleting static mp4, js, and doc files (pdf, text, images) using
+    and deleting static mp4, audio, js, and doc files (pdf, text, images) using
     S3/RustFS object storage. Metadata is managed externally by the Backend.
   version: 0.0.1
 servers:
@@ -35,7 +35,7 @@ paths:
     post:
       summary: Upload file(s)
       description: >
-        Uploads one or more files (mp4, js, pdf, text, images) to S3/RustFS.
+        Uploads one or more files (mp4, audio, js, pdf, text, images) to S3/RustFS.
         Returns generated file ID(s) and static delivery link(s).
       operationId: uploadFiles
       tags:

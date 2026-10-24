@@ -367,6 +367,23 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 	// Video
 	case ".mp4":
 		return "video/mp4", nil
+	// Audio
+	case ".mp3":
+		return "audio/mpeg", nil
+	case ".wav":
+		return "audio/wav", nil
+	case ".ogg", ".oga":
+		return "audio/ogg", nil
+	case ".m4a":
+		return "audio/mp4", nil
+	case ".aac":
+		return "audio/aac", nil
+	case ".flac":
+		return "audio/flac", nil
+	case ".weba":
+		return "audio/webm", nil
+	case ".opus":
+		return "audio/opus", nil
 	// Script
 	case ".js", ".mjs", ".cjs":
 		return "application/javascript", nil
@@ -406,6 +423,7 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 			hType = strings.TrimSpace(hType[:idx])
 		}
 		if hType == "video/mp4" ||
+			strings.HasPrefix(hType, "audio/") ||
 			hType == "application/javascript" || hType == "text/javascript" ||
 			hType == "application/pdf" ||
 			strings.HasPrefix(hType, "text/") ||
@@ -416,13 +434,13 @@ func validateAssetType(filename, headerContentType string) (string, error) {
 
 	if ext != "" {
 		if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-			if strings.HasPrefix(mimeType, "text/") || strings.HasPrefix(mimeType, "image/") {
+			if strings.HasPrefix(mimeType, "audio/") || strings.HasPrefix(mimeType, "text/") || strings.HasPrefix(mimeType, "image/") {
 				return mimeType, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("unsupported file type: only video (mp4), code (js), or docs (pdf, text, images) are permitted (got filename: %s, mime: %s)", filename, headerContentType)
+	return "", fmt.Errorf("unsupported file type: only video (mp4), audio, code (js), or docs (pdf, text, images) are permitted (got filename: %s, mime: %s)", filename, headerContentType)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
