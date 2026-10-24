@@ -168,6 +168,25 @@ describe('GameSession', () => {
     expect(session.lifecycle()).toBe('disposed');
   });
 
+  it('replays the requested lifecycle after the runtime starts', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const send = vi.spyOn(session as never, 'send');
+
+    session.setLifecycle('playing');
+    expect(send).not.toHaveBeenCalledWith({ type: 'resume' });
+
+    window.dispatchEvent(new MessageEvent('message', {
+      source: iframe.contentWindow,
+      data: { type: 'started' },
+    }));
+
+    expect(send).toHaveBeenCalledWith({ type: 'resume' });
+    session.destroy();
+  });
+
   it('forwards touches on the iframe element to the game', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

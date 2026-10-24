@@ -38,6 +38,8 @@ export class GameSession {
   private lastBeat = 0;
   private watchdog?: ReturnType<typeof setInterval>;
   private resultSubmissions = 0;
+  private runtimeReady = false;
+  private requestedLifecycle: Exclude<GameLifecycleState, 'disposed'> = 'preloading';
 
   private readonly _status = signal<SessionStatus>('idle');
   private readonly _error = signal<string | null>(null);
@@ -71,6 +73,8 @@ export class GameSession {
     this._result.set(null);
     this._uiDesign.set({});
     this.resultSubmissions = 0;
+    this.runtimeReady = false;
+    this.requestedLifecycle = 'preloading';
     this._lifecycle.set('preloading');
     this._status.set('starting');
 
@@ -111,7 +115,6 @@ export class GameSession {
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => {
       iframe.focus();
-      iframe.contentWindow?.focus();
     });
 
     this.container.appendChild(iframe);
@@ -140,14 +143,15 @@ export class GameSession {
       this.retire(this.iframe);
       this.iframe = undefined;
     }
+    this.runtimeReady = false;
     if (this._status() !== 'error') this._status.set('idle');
   }
 
   setLifecycle(state: Exclude<GameLifecycleState, 'disposed'>): void {
     if (this._lifecycle() === 'disposed') return;
+    this.requestedLifecycle = state;
     this._lifecycle.set(state);
-    if (state === 'playing') this.resume();
-    else this.pause();
+    if (this.runtimeReady) this.applyRequestedLifecycle();
   }
 
   pause(): void {
@@ -160,7 +164,6 @@ export class GameSession {
 
   focus(): void {
     this.iframe?.focus();
-    this.iframe?.contentWindow?.focus();
   }
 
   resize(width: number, height: number): void {
@@ -179,6 +182,7 @@ export class GameSession {
 
   destroy(): void {
     this.stop();
+    this.runtimeReady = false;
     this._lifecycle.set('disposed');
     this.doc.defaultView?.removeEventListener('message', this.onMessage);
   }
@@ -220,7 +224,9 @@ export class GameSession {
 
     switch (e.data.type) {
       case 'started':
+        this.runtimeReady = true;
         this._status.set('running');
+        this.applyRequestedLifecycle();
         break;
       case 'heartbeat':
         this.lastBeat = Date.now();
@@ -258,6 +264,11 @@ export class GameSession {
     this._error.set(message);
     this._status.set('error');
     this.stop();
+  }
+
+  private applyRequestedLifecycle(): void {
+    if (this.requestedLifecycle === 'playing') this.resume();
+    else this.pause();
   }
 
   private send(command: HostCommand): void {

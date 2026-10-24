@@ -98,7 +98,6 @@ export class Home {
   private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
   private intersectionObserver?: IntersectionObserver;
   private visibleRatio = 1;
-  private windowFocused = true;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -115,23 +114,10 @@ export class Home {
       if (result && current?.type === 'game') untracked(() => this.submitScore(current, result.score));
     });
     const destroyRef = inject(DestroyRef);
-    const view = document.defaultView;
     const onVisibilityChange = () => this.syncGameLifecycle();
-    const onFocus = () => {
-      this.windowFocused = true;
-      this.syncGameLifecycle();
-    };
-    const onBlur = () => {
-      this.windowFocused = false;
-      this.syncGameLifecycle();
-    };
     document.addEventListener('visibilitychange', onVisibilityChange);
-    view?.addEventListener('focus', onFocus);
-    view?.addEventListener('blur', onBlur);
     destroyRef.onDestroy(() => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      view?.removeEventListener('focus', onFocus);
-      view?.removeEventListener('blur', onBlur);
       this.intersectionObserver?.disconnect();
       this.session()?.destroy();
       this.clearTimers();
@@ -159,7 +145,7 @@ export class Home {
       game.setLifecycle('completed');
       return;
     }
-    if (document.visibilityState === 'hidden' || !this.windowFocused || this.visibleRatio === 0) {
+    if (document.visibilityState === 'hidden' || this.visibleRatio === 0) {
       game.setLifecycle('paused');
       return;
     }
@@ -208,6 +194,7 @@ export class Home {
       this.loadError.set(describeError(err));
     } finally {
       this.phase.set('idle');
+      this.syncGameLifecycle();
       this.busy = false;
     }
   }

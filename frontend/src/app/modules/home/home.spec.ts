@@ -52,6 +52,28 @@ describe('Home', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('resumes a game automatically after the feed transition finishes', async () => {
+    const home = component as unknown as {
+      item: WritableSignal<FeedItem | null>;
+      phase: WritableSignal<'idle' | 'leaving' | 'entering'>;
+      session: WritableSignal<{
+        result(): unknown;
+        focus(): void;
+        setLifecycle(state: string): void;
+        destroy(): void;
+      } | null>;
+      syncGameLifecycle(): void;
+    };
+    home.item.set({ type: 'game', id: 'g', title: 'Quiz', url: 'quiz.js', round_id: 'r', data: { context: 'Quiz' } });
+    home.phase.set('idle');
+    const setLifecycle = vi.fn();
+    home.session.set({ result: () => null, focus: vi.fn(), setLifecycle, destroy: vi.fn() });
+
+    home.syncGameLifecycle();
+
+    expect(setLifecycle).toHaveBeenCalledWith('playing');
+  });
+
   it('likes a video on double tap and toggles with the button', () => {
     const home = component as unknown as {
       item: WritableSignal<FeedItem | null>;

@@ -193,7 +193,7 @@ The host owns these states:
 | --- | --- |
 | `preloading` | Code and startup resources are being prepared. |
 | `visible` | Fully visible, but transitioning or not yet eligible to run. |
-| `playing` | Fully visible, focused, and allowed to run. |
+| `playing` | Fully visible, iframe focused by the host, and allowed to run. |
 | `partially visible` | Part of the card is visible; gameplay is paused. |
 | `paused` | Hidden, unfocused, tab hidden, or another feed item is active. |
 | `completed` | A result was submitted; gameplay remains paused. |
@@ -202,8 +202,10 @@ The host owns these states:
 The host pauses games when the card leaves the viewport, the user swipes to
 another item, the browser tab is hidden, or a video becomes active. It also
 pauses partially visible cards. A game resumes only when its card is fully
-visible, the tab is visible, the window is focused, and the feed transition has
-finished. Returning to the card resumes the existing game; it does not reload it.
+visible, the tab is visible, and the feed transition has finished. The host
+focuses the iframe itself before resuming; parent-window focus events are not
+used as a gameplay gate because focusing a sandboxed iframe can blur the parent
+window. Returning to the card resumes the existing game; it does not reload it.
 
 A valid result moves the game to `completed`. Treat that as the end of the
 attempt. `destroy()` is for permanent teardown and is the only transition to
