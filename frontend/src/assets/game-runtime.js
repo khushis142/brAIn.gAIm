@@ -7,7 +7,8 @@
  * Game contract (what the game passes to registerGame):
  *   init(api)            required   api = { width, height, username, data, submitResult, setUiDesign }
  *   update(dt, input)    required   dt in seconds, input = { keys }
- *   render(ctx)          required   2D canvas context
+ *   renderer             optional   '2d' (default) or 'webgl'
+ *   render(ctx)          required   CanvasRenderingContext2D or WebGLRenderingContext
  *   resize(w, h)         optional   called after the host resized the canvas
  *   destroy()            optional   called once when the game is stopped
  *
@@ -52,14 +53,10 @@
     post({ type: 'error', message: 'Runtime: canvas #c not found' });
     return;
   }
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    post({ type: 'error', message: 'Runtime: 2D context not available' });
-    return;
-  }
-
   // ---------------------------------------------------------------- state
   let game = null;
+  let ctx = null;
+  let renderer = '2d';
   let registered = false;
   let failed = false;
   let stopped = false;
@@ -67,6 +64,8 @@
   let rafId = 0;
   let last = performance.now();
   let lastFrame = last;
+  let registerTimer;
+  let heartbeatTimer;
 
   const input = { keys: {} };
   const gameInput = window.__GAME_INPUT__;
@@ -87,6 +86,7 @@
     get height() { return canvas.height; },
     username: typeof gameInput.username === 'string' ? gameInput.username : '',
     data: gameInput.data,
+    get renderer() { return renderer; },
     submitResult(result) {
       if (result === null || typeof result !== 'object' ||
           typeof result.score !== 'number' || !Number.isFinite(result.score)) {
@@ -117,6 +117,13 @@
       post({ type: 'ui-design', design });
     },
   });
+
+  function createContext(selectedRenderer) {
+    if (selectedRenderer === 'webgl') {
+      return canvas.getContext('webgl2') || canvas.getContext('webgl');
+    }
+    return canvas.getContext('2d');
+  }
 
   // ---------------------------------------------------------------- input
   // Mutate in place so a game holding a reference to input.keys stays valid.
@@ -151,13 +158,19 @@
     try {
       game.update(dt, input);
 
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      try {
+      if (renderer === '2d') {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        try {
+          game.render(ctx);
+        } finally {
+          ctx.restore(); // a game cannot leak transforms/styles into the next frame
+        }
+      } else {
+        ctx.viewport(0, 0, canvas.width, canvas.height);
+        ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT);
         game.render(ctx);
-      } finally {
-        ctx.restore(); // a game cannot leak transforms/styles into the next frame
       }
     } catch (err) {
       fail(err);
@@ -217,6 +230,10 @@
       fail(new Error('registerGame() expects an object'));
       return;
     }
+    if (candidate.renderer !== undefined && candidate.renderer !== '2d' && candidate.renderer !== 'webgl') {
+      fail(new Error('Game renderer must be "2d" or "webgl"'));
+      return;
+    }
     const missing = REQUIRED_HOOKS.filter((n) => typeof candidate[n] !== 'function');
     if (missing.length > 0) {
       fail(new Error('Game is missing required function(s): ' + missing.join(', ')));
@@ -227,6 +244,19 @@
         fail(new Error('Game hook "' + name + '" must be a function'));
         return;
       }
+    }
+
+    renderer = candidate.renderer || '2d';
+    ctx = createContext(renderer);
+    if (!ctx) {
+      fail(new Error('Runtime: ' + renderer + ' context not available'));
+      return;
+    }
+    if (renderer === 'webgl') {
+      canvas.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault();
+        fail(new Error('WebGL context was lost'));
+      });
     }
 
     game = candidate;
@@ -253,7 +283,7 @@
   addEventListener('error', (e) => fail(e.error || e.message));
   addEventListener('unhandledrejection', (e) => fail(e.reason));
 
-  const registerTimer = setTimeout(() => {
+  registerTimer = setTimeout(() => {
     if (!registered) {
       fail(new Error('Game did not call registerGame() within ' +
         REGISTER_TIMEOUT_MS / 1000 + 's'));
@@ -264,7 +294,7 @@
   // Only sent while things are healthy. If the loop should be running but no
   // frame has been drawn for STALL_MS, we stay silent and the host's watchdog
   // takes over. A paused or hidden game is healthy, so it keeps beating.
-  const heartbeatTimer = setInterval(() => {
+  heartbeatTimer = setInterval(() => {
     if (failed || stopped) return;
     const loopHealthy =
       !shouldRun() || performance.now() - lastFrame < STALL_MS;

@@ -90,6 +90,7 @@ Every game must register exactly once:
 
 ```js
 registerGame({
+  renderer: '2d',
   init(api) {},
   update(dt, input) {},
   render(ctx) {},
@@ -101,9 +102,40 @@ The required hooks are:
 - `init(api)`: called once before the game loop starts.
 - `update(dt, input)`: called once per animation frame. `dt` is elapsed time in
   seconds and is clamped by the runtime.
-- `render(ctx)`: draws one frame using the 2D canvas context.
+- `render(ctx)`: draws one frame using the selected rendering context.
 
 Optional hooks are `resize(width, height)` and `destroy()`.
+
+## Rendering modes and 3D support
+
+Games use the 2D renderer by default. A game that needs GPU rendering can opt
+into WebGL by declaring:
+
+```js
+registerGame({
+  renderer: 'webgl',
+  init(api) {},
+  update(dt, input) {},
+  render(gl) {},
+});
+```
+
+For `renderer: 'webgl'`, the runtime requests WebGL2 first and falls back to
+WebGL. The selected mode is available as `api.renderer`, and `render(gl)`
+receives the WebGL rendering context. The runtime clears the color and depth
+buffers and updates the viewport before each frame. A game owns shaders,
+buffers, matrices, camera logic, and all other 3D rendering code.
+
+For the default `renderer: '2d'`, `render(ctx)` receives a
+`CanvasRenderingContext2D`; the runtime resets and restores its drawing state
+around each frame. Do not use 2D methods with a WebGL context or WebGL methods
+with a 2D context.
+
+WebGL context loss ends the session with an error. Games should release GPU
+resources in `destroy()` and be prepared for the session to be recreated. The
+iframe remains sandboxed and the Content Security Policy still prevents normal
+network access, so WebGL libraries and assets must be bundled or supplied by a
+future approved asset system. The existing 200 KB source limit still applies.
 
 ## Inputs
 

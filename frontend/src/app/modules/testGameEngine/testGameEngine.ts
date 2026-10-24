@@ -22,6 +22,11 @@ import { GameSession } from '../../engine/gameSession';
           Play Dodge
         </button>
         <button
+          class="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-sky-400"
+          (click)="loadGame('dodge3d')">
+          Play 3D Dodge
+        </button>
+        <button
           class="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
           (click)="session()?.stop()">
           Stop

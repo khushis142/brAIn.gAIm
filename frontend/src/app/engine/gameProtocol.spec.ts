@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { isGameUiDesign, isSandboxEvent } from './gameProtocol';
+import type { GameApi, GameModule } from './gameProtocol';
 
 describe('game protocol validation', () => {
+  it('supports both renderer declarations in the game contract', () => {
+    const webglGame: GameModule = {
+      renderer: 'webgl',
+      init(api: GameApi) {
+        expect(api.renderer).toBe('webgl');
+      },
+      update() {},
+      render() {},
+    };
+    const twoDGame: GameModule = {
+      init(api: GameApi) {
+        expect(api.renderer).toBe('2d');
+      },
+      update() {},
+      render() {},
+    };
+
+    expect(webglGame.renderer).toBe('webgl');
+    expect(twoDGame.renderer).toBeUndefined();
+  });
+
   it('accepts a complete UI design with allowlisted theme tokens', () => {
     expect(
       isGameUiDesign({
