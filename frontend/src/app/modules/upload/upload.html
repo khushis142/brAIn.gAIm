@@ -1,48 +1,85 @@
 <section class="upload">
-  <h2>Knowledge</h2>
-
   @if (error(); as message) {
     <p class="error" role="alert">{{ message }}</p>
   }
 
-  <div class="projects" role="list" aria-label="Projekte">
-    <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
-    @for (project of projects(); track project.id) {
-      <app-project-folder
-        [name]="project.name"
-        [color]="project.color"
-        [count]="project.files.length"
-        [selected]="project.id === selectedId()"
-        (pressed)="switchProject(project.id)"
-        (colorChange)="setColor(project.id, $event)"
-        (rename)="openRenameProject(project)"
-        (remove)="removeProject(project.id)"
-      />
-    }
-  </div>
-
-  <hr />
-
-  <div class="files">
-    @if (selected(); as project) {
-      @for (file of project.files; track file.id) {
-        <app-file-item [file]="file" (remove)="removeFile(file)" />
-      } @empty {
-        <p class="hint">Noch keine Dateien in diesem Projekt.</p>
-      }
-    } @else {
-      <p class="hint">Wähle oder erstelle ein Projekt.</p>
-    }
-  </div>
-
-  @if (selected()) {
-    <div class="dropzone-bar">
-      <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
-      <button class="process-button" type="button" [disabled]="busy()" (click)="processKnowledge()">
-        <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
-        <span>Wissen verarbeiten</span>
+  @if (knowledgeViewOpen()) {
+    <div class="knowledge-subview">
+      <button class="back-button" type="button" (click)="closeKnowledgeView()">
+        <span aria-hidden="true">←</span>
+        Zurück
       </button>
+      <h2>Extrahiertes Wissen</h2>
+      @if (flashcardsLoading()) {
+        <p class="hint">Wissen wird geladen…</p>
+      }
+      @for (flashcard of flashcards(); track flashcard.id) {
+        <article class="flashcard">
+          <h3>{{ flashcard.title }}</h3>
+          <p>{{ flashcard.body }}</p>
+        </article>
+      } @empty {
+        @if (!flashcardsLoading()) {
+          <p class="hint">Noch kein Wissen extrahiert.</p>
+        }
+      }
     </div>
+  } @else {
+    <h2>Knowledge</h2>
+
+    <div class="projects" role="list" aria-label="Projekte">
+      <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
+      @for (project of projects(); track project.id) {
+        <app-project-folder
+          [name]="project.name"
+          [color]="project.color"
+          [count]="project.files.length"
+          [selected]="project.id === selectedId()"
+          (pressed)="switchProject(project.id)"
+          (colorChange)="setColor(project.id, $event)"
+          (rename)="openRenameProject(project)"
+          (remove)="removeProject(project.id)"
+        />
+      }
+    </div>
+
+    <hr />
+
+    @if (selected()) {
+      <button class="knowledge-link" type="button" (click)="openKnowledgeView()">
+        <span>Extrahiertes Wissen</span>
+        <span class="knowledge-count">{{ flashcards().length }}</span>
+      </button>
+    }
+
+    <div class="files">
+      @if (selected(); as project) {
+        @for (file of project.files; track file.id) {
+          <app-file-item [file]="file" (remove)="removeFile(file)" />
+        } @empty {
+          <p class="hint">Noch keine Dateien in diesem Projekt.</p>
+        }
+      } @else {
+        <p class="hint">Wähle oder erstelle ein Projekt.</p>
+      }
+    </div>
+
+    @if (selected()) {
+      <div class="dropzone-bar">
+        <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
+        <button
+          class="process-button"
+          type="button"
+          [disabled]="busy() || flashcardsRequested()"
+          [class.processing]="processingFlashcards()"
+          [class.requested]="flashcardsRequested()"
+          (click)="processKnowledge()"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
+          <span>Wissen extrahieren</span>
+        </button>
+      </div>
+    }
   }
 
   @if (nameDialog(); as dialog) {

@@ -87,7 +87,51 @@ describe('ApiService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
     expect(request.request.body).toBeNull();
-    request.flush(null);
+    request.flush([
+      {
+        id: 'card-1',
+        title: 'Was ist Wissen?',
+        body: 'Lernen.',
+        created_at: '2026-10-24T22:16:27.214712Z',
+      },
+    ]);
+  });
+
+  it('loads flashcards for a project', () => {
+    authenticate();
+    api.getProjectFlashcards('project/id').subscribe();
+
+    const request = httpTesting.expectOne(
+      `${environment.apiBaseUrl}/projects/project%2Fid/flashcards`,
+    );
+    expect(request.request.method).toBe('GET');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    request.flush([
+      {
+        id: 'card-1',
+        title: 'Was ist Wissen?',
+        body: 'Lernen.',
+        created_at: '2026-10-24T22:16:27.214712Z',
+      },
+    ]);
+  });
+
+  it('updates a project folder color', () => {
+    authenticate();
+    api.updateProject('project/id', { color: '#42a5f5' }).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/projects/project%2Fid`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ color: '#42a5f5' });
+    request.flush({
+      id: 'project-id',
+      name: 'Mathe',
+      color: '#42a5f5',
+      body: '',
+      attachments: [],
+      created_at: '',
+      updated_at: '',
+    });
   });
 
   it('lists study fields', () => {

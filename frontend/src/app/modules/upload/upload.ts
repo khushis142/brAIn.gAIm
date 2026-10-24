@@ -1,6 +1,11 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom, forkJoin } from 'rxjs';
-import { ApiService, AttachmentRead, ProjectRead } from '../../core/api.service';
+import {
+  ApiService,
+  AttachmentRead,
+  ProjectFlashcardRead,
+  ProjectRead,
+} from '../../core/api.service';
 import { FileItem, FileKind, UploadedFile } from '../../shared/file-item/file-item';
 import { DEFAULT_FOLDER_COLOR, ProjectFolder } from '../../shared/project-folder/project-folder';
 import { UploadDropzone } from '../../shared/upload-dropzone/upload-dropzone';
@@ -16,7 +21,6 @@ interface Project {
 type ProjectNameDialog =
   { mode: 'create'; name: string } | { mode: 'rename'; projectId: string; name: string };
 
-const COLORS_KEY = 'braingain-folder-colors';
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'];
 
 function kindOf(filename: string): FileKind {
@@ -50,6 +54,11 @@ export class Upload implements OnInit {
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly selectedId = signal<string | null>(null);
+  protected readonly flashcards = signal<ProjectFlashcardRead[]>([]);
+  protected readonly flashcardsLoading = signal(false);
+  protected readonly flashcardsRequested = signal(false);
+  protected readonly processingFlashcards = signal(false);
+  protected readonly knowledgeViewOpen = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly nameDialog = signal<ProjectNameDialog | null>(null);
@@ -64,13 +73,18 @@ export class Upload implements OnInit {
       projects: this.api.listProjects(),
     }).subscribe({
       next: ({ user, projects }) => {
-        const colors = this.loadColors();
-        this.projects.set(projects.map((project) => this.toProject(project, colors)));
+        this.projects.set(projects.map((project) => this.toProject(project)));
         this.selectedId.set(
           projects.some((project) => project.id === user.active_project_id)
             ? (user.active_project_id ?? null)
             : null,
         );
+        if (
+          user.active_project_id &&
+          projects.some((project) => project.id === user.active_project_id)
+        ) {
+          this.loadFlashcards(user.active_project_id);
+        }
       },
       error: () => this.error.set('Knowledge konnte nicht geladen werden.'),
     });
@@ -103,7 +117,7 @@ export class Upload implements OnInit {
       await this.run('Projekt konnte nicht erstellt werden.', async () => {
         const created = await firstValueFrom(this.api.createProject(name));
         createdId = created.id;
-        this.projects.update((projects) => [...projects, this.toProject(created, {})]);
+        this.projects.update((projects) => [...projects, this.toProject(created)]);
         this.nameDialog.set(null);
       });
       if (createdId) {
@@ -123,11 +137,14 @@ export class Upload implements OnInit {
     });
   }
 
-  protected setColor(id: string, color: string): void {
-    this.patchProject(id, { color });
-    const colors = this.loadColors();
-    colors[id] = color;
-    localStorage.setItem(COLORS_KEY, JSON.stringify(colors));
+  protected async setColor(id: string, color: string): Promise<void> {
+    if (this.busy()) {
+      return;
+    }
+    await this.run('Ordnerfarbe konnte nicht gespeichert werden.', async () => {
+      const updated = await firstValueFrom(this.api.updateProject(id, { color }));
+      this.patchProject(id, { color: updated.color ?? color });
+    });
   }
 
   protected async switchProject(id: string): Promise<void> {
@@ -137,6 +154,7 @@ export class Upload implements OnInit {
     await this.run('Projekt konnte nicht gewechselt werden.', async () => {
       await firstValueFrom(this.userService.setActiveProject(id));
       this.selectedId.set(id);
+      this.loadFlashcards(id);
     });
   }
 
@@ -147,9 +165,6 @@ export class Upload implements OnInit {
       if (this.selectedId() === id) {
         this.selectedId.set(null);
       }
-      const colors = this.loadColors();
-      delete colors[id];
-      localStorage.setItem(COLORS_KEY, JSON.stringify(colors));
     });
   }
 
@@ -171,11 +186,42 @@ export class Upload implements OnInit {
 
   protected async processKnowledge(): Promise<void> {
     const projectId = this.selectedId();
-    if (!projectId) {
+    if (!projectId || this.flashcardsRequested() || this.busy()) {
       return;
     }
+    this.flashcardsRequested.set(true);
+    this.processingFlashcards.set(true);
     await this.run('Wissen konnte nicht verarbeitet werden.', async () => {
-      await firstValueFrom(this.api.processProjectFlashcards(projectId));
+      this.flashcards.set(await firstValueFrom(this.api.processProjectFlashcards(projectId)));
+      this.flashcardsLoading.set(false);
+    });
+    this.processingFlashcards.set(false);
+  }
+
+  protected openKnowledgeView(): void {
+    this.knowledgeViewOpen.set(true);
+  }
+
+  protected closeKnowledgeView(): void {
+    this.knowledgeViewOpen.set(false);
+  }
+
+  private loadFlashcards(projectId: string): void {
+    this.flashcards.set([]);
+    this.flashcardsLoading.set(true);
+    this.api.getProjectFlashcards(projectId).subscribe({
+      next: (flashcards) => {
+        if (this.selectedId() === projectId) {
+          this.flashcards.set(flashcards);
+          this.flashcardsLoading.set(false);
+        }
+      },
+      error: () => {
+        if (this.selectedId() === projectId) {
+          this.flashcardsLoading.set(false);
+          this.error.set('Extrahiertes Wissen konnte nicht geladen werden.');
+        }
+      },
     });
   }
 
@@ -205,11 +251,11 @@ export class Upload implements OnInit {
     }
   }
 
-  private toProject(project: ProjectRead, colors: Record<string, string>): Project {
+  private toProject(project: ProjectRead): Project {
     return {
       id: project.id,
       name: project.name,
-      color: colors[project.id] ?? DEFAULT_FOLDER_COLOR,
+      color: project.color ?? DEFAULT_FOLDER_COLOR,
       files: project.attachments.map(toFile),
     };
   }
@@ -224,11 +270,4 @@ export class Upload implements OnInit {
     );
   }
 
-  private loadColors(): Record<string, string> {
-    try {
-      return JSON.parse(localStorage.getItem(COLORS_KEY) ?? '{}');
-    } catch {
-      return {};
-    }
-  }
 }

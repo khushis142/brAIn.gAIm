@@ -86,15 +86,24 @@ export interface AttachmentRead {
 export interface ProjectRead {
   id: string;
   name: string;
+  color?: string;
   body: string;
   attachments: AttachmentRead[];
   created_at: string;
   updated_at: string;
 }
 
+export interface ProjectFlashcardRead {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
 export interface ProjectUpdate {
   name?: string;
   body?: string;
+  color?: string;
 }
 
 export interface CdnFile {
@@ -207,10 +216,17 @@ export class ApiService {
     );
   }
 
-  processProjectFlashcards(projectId: string): Observable<void> {
-    return this.http.post<void>(
+  processProjectFlashcards(projectId: string): Observable<ProjectFlashcardRead[]> {
+    return this.http.post<ProjectFlashcardRead[]>(
       this.url(`projects/${encodeURIComponent(projectId)}/flashcards`),
       null,
+      this.authOptions(),
+    );
+  }
+
+  getProjectFlashcards(projectId: string): Observable<ProjectFlashcardRead[]> {
+    return this.http.get<ProjectFlashcardRead[]>(
+      this.url(`projects/${encodeURIComponent(projectId)}/flashcards`),
       this.authOptions(),
     );
   }

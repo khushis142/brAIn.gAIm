@@ -7,6 +7,7 @@ import { Upload } from './upload';
 const project: ProjectRead = {
   id: 'p1',
   name: 'Mathe',
+  color: '#ffc800',
   body: '',
   attachments: [
     { id: 'a1', filename: 'bild.png', url: 'http://cdn/files/a1/bild.png', created_at: '' },
@@ -27,11 +28,35 @@ describe('Upload', () => {
     api = {
       listProjects: vi.fn(() => of([project])),
       createProject: vi.fn((name: string) => of({ ...project, id: 'p2', name, attachments: [] })),
-      updateProject: vi.fn((id: string, update: { name: string }) =>
-        of({ ...project, id, name: update.name }),
+      updateProject: vi.fn((id: string, update: { name?: string; color?: string }) =>
+        of({
+          ...project,
+          id,
+          name: update.name ?? project.name,
+          color: update.color ?? project.color,
+        }),
       ),
       deleteProject: vi.fn(() => of(undefined)),
-      processProjectFlashcards: vi.fn(() => of(undefined)),
+      processProjectFlashcards: vi.fn(() =>
+        of([
+          {
+            id: 'card-1',
+            title: 'Was ist Wissen?',
+            body: 'Lernen.',
+            created_at: '2026-10-24T22:16:27.214712Z',
+          },
+        ]),
+      ),
+      getProjectFlashcards: vi.fn(() =>
+        of([
+          {
+            id: 'card-1',
+            title: 'Was ist Wissen?',
+            body: 'Lernen.',
+            created_at: '2026-10-24T22:16:27.214712Z',
+          },
+        ]),
+      ),
       uploadToCdn: vi.fn((file: File) =>
         of({ id: 'a3', filename: file.name, url: 'http://cdn/files/a3/' + file.name }),
       ),
@@ -68,7 +93,26 @@ describe('Upload', () => {
   it('loads projects and selects the active project from the user profile', () => {
     expect(folders().length).toBe(2);
     expect(folders()[1].querySelector('.folder')?.classList.contains('selected')).toBe(true);
+    expect(api['getProjectFlashcards']).toHaveBeenCalledWith('p1');
+    expect(el.textContent).toContain('Extrahiertes Wissen');
+    expect(el.textContent).not.toContain('Was ist Wissen?');
     expect(el.querySelector('app-upload-dropzone')).not.toBeNull();
+  });
+
+  it('opens the extracted knowledge subview and renders returned flashcards', async () => {
+    (el.querySelector('.knowledge-link') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.knowledge-subview h2')?.textContent).toContain(
+      'Extrahiertes Wissen',
+    );
+    expect(el.textContent).toContain('Was ist Wissen?');
+    expect(el.textContent).toContain('Lernen.');
+    expect(el.querySelector('app-project-folder')).toBeNull();
+
+    (el.querySelector('.back-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-project-folder')).not.toBeNull();
   });
 
   it('shows attachments of the selected project with an image preview', async () => {
@@ -160,7 +204,7 @@ describe('Upload', () => {
     expect(folders().length).toBe(1);
   });
 
-  it('persists the folder color locally', async () => {
+  it('persists the folder color through the project API', async () => {
     vi.useFakeTimers();
     (folders()[1].querySelector('.folder') as HTMLElement).dispatchEvent(new Event('pointerdown'));
     vi.advanceTimersByTime(600);
@@ -169,8 +213,22 @@ describe('Upload', () => {
 
     (el.querySelectorAll('.swatch')[4] as HTMLButtonElement).click();
     await fixture.whenStable();
-    expect(JSON.parse(localStorage.getItem('braingain-folder-colors') ?? '{}')['p1']).toBe(
-      '#42a5f5',
+    expect(api['updateProject']).toHaveBeenCalledWith('p1', { color: '#42a5f5' });
+    expect((folders()[1].querySelector('.icon') as HTMLElement).style.color).toBe(
+      'rgb(66, 165, 245)',
     );
+  });
+
+  it('locks the flashcard button after processing for the current page visit', async () => {
+    const button = el.querySelector('.process-button') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBe(true);
+    expect(button.classList.contains('processing')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    expect(button.disabled).toBe(true);
+    expect(button.classList.contains('processing')).toBe(false);
+    expect(button.classList.contains('requested')).toBe(true);
   });
 });
