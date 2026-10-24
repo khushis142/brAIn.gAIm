@@ -69,7 +69,7 @@ docker compose -f piper/docker-compose.yml up -d --build
 ### 5. llama.cpp (`llama/`)
 - **Image**: `ghcr.io/ggml-org/llama.cpp:server-b11515` (CPU)
 - **Port**:
-  - `8080`: OpenAI-compatible HTTP API
+  - `8082`: OpenAI-compatible HTTP API (container port `8080`; host `8080` is the frontend)
 - **Model**: `unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M` (~2.5 GB, downloaded on first start)
 - **Volume**: `llama_models` -> `/models`
 - **Limits**: 3 threads, 5 GB memory, 8192-token context, 1 request at a time
@@ -77,7 +77,7 @@ docker compose -f piper/docker-compose.yml up -d --build
 
 Chat completion with JSON-schema-constrained output:
 ```bash
-curl http://localhost:8080/v1/chat/completions -H 'Content-Type: application/json' -d '{
+curl http://localhost:8082/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "messages": [{"role": "user", "content": "One quiz question about photosynthesis."}],
   "max_tokens": 300,
   "response_format": {"type": "json_schema", "json_schema": {"name": "quiz", "schema": {

@@ -4,7 +4,7 @@ services:
     container_name: llama
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8082:8080"
     environment:
       # Downloaded into the volume on first start, then reused.
       LLAMA_ARG_HF_REPO: unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M
