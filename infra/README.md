@@ -70,7 +70,7 @@ docker compose -f piper/docker-compose.yml up -d --build
 - **Image**: `ghcr.io/ggml-org/llama.cpp:server-b11515` (CPU)
 - **Port**:
   - `8082`: OpenAI-compatible HTTP API (container port `8080`; host `8080` is the frontend)
-- **Model**: `unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M` (~2.5 GB, downloaded on first start)
+- **Model**: `unsloth/Qwen3-1.7B-GGUF:Q4_K_M` (~1.1 GB, downloaded on first start)
 - **Volume**: `llama_models` -> `/models`
 - **Limits**: 3 threads, 5 GB memory, 8192-token context, 1 request at a time
 - **Internal URL**: `http://llama:8080/v1`
