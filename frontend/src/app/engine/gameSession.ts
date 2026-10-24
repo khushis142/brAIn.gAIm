@@ -6,7 +6,6 @@ import {
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
-  TouchPhase,
 } from './gameProtocol';
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
@@ -16,12 +15,6 @@ const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
-const TOUCH_PHASES: Record<string, TouchPhase> = {
-  touchstart: 'start',
-  touchmove: 'move',
-  touchend: 'end',
-  touchcancel: 'cancel',
-};
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -35,6 +28,7 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
  */
 export class GameSession {
   private iframe?: HTMLIFrameElement;
+  private resizeObserver?: ResizeObserver;
   private lastBeat = 0;
   private watchdog?: ReturnType<typeof setInterval>;
 
@@ -77,19 +71,45 @@ export class GameSession {
     iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.tabIndex = 0;
     iframe.style.cssText = `width:${width}px;height:${height}px;border:0;display:block`;
+    const forwardTouches = (event: TouchEvent): void => {
+      event.preventDefault();
+      const rect = iframe.getBoundingClientRect();
+      const phase = event.type === 'touchstart'
+        ? 'start'
+        : event.type === 'touchmove'
+          ? 'move'
+          : event.type === 'touchcancel'
+            ? 'cancel'
+            : 'end';
+      for (const touch of Array.from(event.changedTouches)) {
+        iframe.contentWindow?.postMessage({
+          type: 'touch',
+          phase,
+          id: touch.identifier,
+          x: touch.clientX - rect.left,
+          y: touch.clientY - rect.top,
+        }, '*');
+      }
+    };
+    iframe.addEventListener('touchstart', forwardTouches, { passive: false });
+    iframe.addEventListener('touchmove', forwardTouches, { passive: false });
+    iframe.addEventListener('touchend', forwardTouches, { passive: false });
+    iframe.addEventListener('touchcancel', forwardTouches, { passive: false });
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
     iframe.addEventListener('load', () => iframe.contentWindow?.focus());
-    // Chrome's device emulation can deliver touches on the game to this page (targeting the
-    // iframe element) instead of the game's document, so pass those on to the game.
-    for (const type of Object.keys(TOUCH_PHASES)) {
-      iframe.addEventListener(type, (e) => this.forwardTouch(iframe, e as TouchEvent), {
-        passive: false,
-      });
-    }
 
     this.container.appendChild(iframe);
     this.iframe = iframe;
+    const ResizeObserverConstructor = this.doc.defaultView?.ResizeObserver;
+    if (ResizeObserverConstructor) {
+      this.resizeObserver = new ResizeObserverConstructor(() => {
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+        if (width > 0 && height > 0) this.resize(width, height);
+      });
+      this.resizeObserver.observe(this.container);
+    }
 
     this.lastBeat = Date.now();
     this.watchdog = setInterval(() => this.checkHeartbeat(), WATCHDOG_INTERVAL_MS);
@@ -98,6 +118,8 @@ export class GameSession {
   stop(): void {
     clearInterval(this.watchdog);
     this.watchdog = undefined;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
 
     if (this.iframe) {
       this.retire(this.iframe);
@@ -120,7 +142,9 @@ export class GameSession {
   }
 
   resize(width: number, height: number): void {
-    if (!this.iframe) return;
+    if (!this.iframe || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
     this.iframe.style.width = `${width}px`;
     this.iframe.style.height = `${height}px`;
     this.send({ type: 'resize', width, height });
@@ -191,21 +215,6 @@ export class GameSession {
     this.iframe?.contentWindow?.postMessage(command, '*');
   }
 
-  private forwardTouch(iframe: HTMLIFrameElement, e: TouchEvent): void {
-    e.preventDefault(); // the page must not scroll, and the feed must not see a swipe
-    const rect = iframe.getBoundingClientRect();
-    for (const t of Array.from(e.changedTouches)) {
-      const command: HostCommand = {
-        type: 'touch',
-        phase: TOUCH_PHASES[e.type],
-        id: t.identifier,
-        x: t.clientX - rect.left,
-        y: t.clientY - rect.top,
-      };
-      iframe.contentWindow?.postMessage(command, '*');
-    }
-  }
-
   /** Asks the runtime to shut down (so game.destroy() runs), then removes the iframe. */
   private retire(iframe: HTMLIFrameElement): void {
     iframe.contentWindow?.postMessage({ type: 'stop' } satisfies HostCommand, '*');
@@ -244,7 +253,7 @@ export class GameSession {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
-<style>html,body{margin:0;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}canvas{display:block}</style>
+<style>html,body{margin:0;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}canvas{display:block;touch-action:none}</style>
 </head>
 <body>
 <canvas id="c" width="${width}" height="${height}"></canvas>

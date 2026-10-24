@@ -3,6 +3,27 @@ export const GAME_PROTOCOL_VERSION = 2;
 
 export type GameRenderer = '2d' | 'webgl';
 
+export type GameOrientation = 'portrait' | 'landscape';
+
+export interface GameSafeAreaInsets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+export interface GameViewport {
+  /** Logical dimensions in CSS pixels used by game rendering. */
+  readonly width: number;
+  readonly height: number;
+  /** Physical canvas backing-store dimensions after device-pixel-ratio scaling. */
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly devicePixelRatio: number;
+  readonly orientation: GameOrientation;
+  readonly safeArea: GameSafeAreaInsets;
+}
+
 /** Contract shared between the host app and the sandboxed runtime. */
 
 export interface GameCustomData {
@@ -55,6 +76,7 @@ export interface GameApi<CustomData extends GameCustomData = GameCustomData> {
   readonly username: string;
   readonly data: CustomData;
   readonly renderer: GameRenderer;
+  readonly viewport: GameViewport;
   submitResult(result: GameResult): void;
   setUiDesign(design: GameUiDesign): void;
 }
@@ -103,6 +125,21 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
 export interface InputState {
   /** Current held state. Games should detect one-shot actions as key transitions. */
   keys: Record<string, boolean>;
+  readonly pointer: PointerInput;
+}
+
+export interface PointerInput {
+  /** Position in logical canvas pixels. */
+  readonly x: number;
+  readonly y: number;
+  /** Position normalized to the range 0..1. */
+  readonly normalizedX: number;
+  readonly normalizedY: number;
+  readonly down: boolean;
+  readonly justPressed: boolean;
+  readonly justReleased: boolean;
+  readonly deltaX: number;
+  readonly deltaY: number;
 }
 
 /** What a game has to provide (hooks marked with ? are optional). */
@@ -111,7 +148,7 @@ export interface GameModule<CustomData extends GameCustomData = GameCustomData> 
   init(api: GameApi<CustomData>): void;
   update(dt: number, input: InputState): void;
   render(ctx: CanvasRenderingContext2D | WebGLRenderingContext): void;
-  resize?(width: number, height: number): void;
+  resize?(width: number, height: number, viewport: GameViewport): void;
   destroy?(): void;
 }
 

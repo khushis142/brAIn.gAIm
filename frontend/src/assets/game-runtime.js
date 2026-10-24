@@ -6,10 +6,11 @@
  *
  * Game contract (what the game passes to registerGame):
  *   init(api)            required   api = { width, height, username, data, submitResult, setUiDesign }
- *   update(dt, input)    required   dt in seconds, input = { keys } (touch gestures press keys too)
+ *   update(dt, input)    required   dt in seconds, input = { keys, pointer }
+ *                         touch gestures also press virtual keys
  *   renderer             optional   '2d' (default) or 'webgl'
  *   render(ctx)          required   CanvasRenderingContext2D or WebGLRenderingContext
- *   resize(w, h)         optional   called after the host resized the canvas
+ *   resize(w, h, viewport) optional called after the host resized the canvas
  *   destroy()            optional   called once when the game is stopped
  *
  * Messages to the host:   { type: 'started' | 'heartbeat' | 'result' | 'error', ... }
@@ -67,7 +68,19 @@
   let registerTimer;
   let heartbeatTimer;
 
-  const input = { keys: {} };
+  const pointer = {
+    x: 0,
+    y: 0,
+    normalizedX: 0,
+    normalizedY: 0,
+    down: false,
+    justPressed: false,
+    justReleased: false,
+    deltaX: 0,
+    deltaY: 0,
+  };
+  let viewport = null;
+  const input = { keys: {}, pointer };
   const gameInput = window.__GAME_INPUT__;
   delete window.__GAME_INPUT__;
 
@@ -80,10 +93,65 @@
     return;
   }
 
-  // Getters so width/height reflect later resizes.
+  function readSafeArea() {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
+      'padding:env(safe-area-inset-top) env(safe-area-inset-right) ' +
+      'env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    document.body.appendChild(probe);
+    const style = getComputedStyle(probe);
+    const inset = {
+      top: Number.parseFloat(style.paddingTop) || 0,
+      right: Number.parseFloat(style.paddingRight) || 0,
+      bottom: Number.parseFloat(style.paddingBottom) || 0,
+      left: Number.parseFloat(style.paddingLeft) || 0,
+    };
+    probe.remove();
+    return inset;
+  }
+
+  function createViewport(width, height) {
+    const devicePixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 4);
+    const pixelWidth = Math.max(1, Math.min(MAX_CANVAS_SIZE,
+      Math.round(width * devicePixelRatio)));
+    const pixelHeight = Math.max(1, Math.min(MAX_CANVAS_SIZE,
+      Math.round(height * devicePixelRatio)));
+    return Object.freeze({
+      width,
+      height,
+      pixelWidth,
+      pixelHeight,
+      devicePixelRatio,
+      orientation: width >= height ? 'landscape' : 'portrait',
+      safeArea: Object.freeze(readSafeArea()),
+    });
+  }
+
+  function applyViewport(width, height, notifyGame) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) return;
+    const next = createViewport(Math.floor(width), Math.floor(height));
+    if (viewport && next.width === viewport.width && next.height === viewport.height &&
+        next.pixelWidth === viewport.pixelWidth && next.pixelHeight === viewport.pixelHeight &&
+        JSON.stringify(next.safeArea) === JSON.stringify(viewport.safeArea)) return;
+    viewport = next;
+    canvas.style.width = `${next.width}px`;
+    canvas.style.height = `${next.height}px`;
+    canvas.width = next.pixelWidth;
+    canvas.height = next.pixelHeight;
+    if (notifyGame && game && typeof game.resize === 'function') {
+      try {
+        game.resize(next.width, next.height, next);
+      } catch (err) {
+        fail(err);
+      }
+    }
+  }
+
+  // Getters so dimensions and viewport reflect later resizes.
   const api = Object.freeze({
-    get width() { return canvas.width; },
-    get height() { return canvas.height; },
+    get width() { return viewport.width; },
+    get height() { return viewport.height; },
+    get viewport() { return viewport; },
     username: typeof gameInput.username === 'string' ? gameInput.username : '',
     data: gameInput.data,
     get renderer() { return renderer; },
@@ -131,6 +199,41 @@
     for (const code of Object.keys(input.keys)) delete input.keys[code];
   };
 
+  const updatePointer = (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (!viewport || rect.width <= 0 || rect.height <= 0) return;
+    const x = Math.max(0, Math.min(viewport.width,
+      (event.clientX - rect.left) * viewport.width / rect.width));
+    const y = Math.max(0, Math.min(viewport.height,
+      (event.clientY - rect.top) * viewport.height / rect.height));
+    pointer.deltaX += x - pointer.x;
+    pointer.deltaY += y - pointer.y;
+    pointer.x = x;
+    pointer.y = y;
+    pointer.normalizedX = viewport.width ? x / viewport.width : 0;
+    pointer.normalizedY = viewport.height ? y / viewport.height : 0;
+  };
+
+  canvas.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    updatePointer(event);
+    pointer.down = true;
+    pointer.justPressed = true;
+    canvas.setPointerCapture?.(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (pointer.down) event.preventDefault();
+    updatePointer(event);
+  });
+  const releasePointer = (event) => {
+    event.preventDefault();
+    updatePointer(event);
+    pointer.down = false;
+    pointer.justReleased = true;
+  };
+  canvas.addEventListener('pointerup', releasePointer);
+  canvas.addEventListener('pointercancel', releasePointer);
+
   addEventListener('keydown', (e) => {
     if (GAME_KEYS.has(e.code)) e.preventDefault(); // no page scrolling
     input.keys[e.code] = true;
@@ -140,7 +243,11 @@
     input.keys[e.code] = false;
   });
   // Without this, a key held while focus is lost would stay "pressed" forever.
-  addEventListener('blur', clearKeys);
+  addEventListener('blur', () => {
+    clearKeys();
+    if (pointer.down) pointer.justReleased = true;
+    pointer.down = false;
+  });
 
   // ---------------------------------------------------------------- touch
   // Phones have no keyboard, so touch gestures press the same virtual keys.
@@ -243,9 +350,14 @@
     try {
       game.update(dt, input);
 
+      pointer.justPressed = false;
+      pointer.justReleased = false;
+      pointer.deltaX = 0;
+      pointer.deltaY = 0;
+
       if (renderer === '2d') {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(viewport.devicePixelRatio, 0, 0, viewport.devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, viewport.width, viewport.height);
         ctx.save();
         try {
           game.render(ctx);
@@ -280,6 +392,17 @@
     clearKeys();
     syncLoop();
   });
+
+  const syncViewport = () => {
+    if (!viewport) return;
+    applyViewport(canvas.clientWidth || viewport.width, canvas.clientHeight || viewport.height, true);
+  };
+  addEventListener('resize', syncViewport);
+  addEventListener('orientationchange', syncViewport);
+  window.visualViewport?.addEventListener('resize', syncViewport);
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(syncViewport).observe(canvas);
+  }
 
   // ---------------------------------------------------------------- lifecycle
   function shutdown() {
@@ -332,6 +455,7 @@
     }
 
     renderer = candidate.renderer || '2d';
+    applyViewport(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, false);
     ctx = createContext(renderer);
     if (!ctx) {
       fail(new Error('Runtime: ' + renderer + ' context not available'));
@@ -413,13 +537,7 @@
         const h = Math.floor(cmd.height);
         const valid = (n) => Number.isFinite(n) && n >= 1 && n <= MAX_CANVAS_SIZE;
         if (!valid(w) || !valid(h)) return;
-        canvas.width = w;   // note: resizing a canvas clears it
-        canvas.height = h;
-        try {
-          if (game && typeof game.resize === 'function') game.resize(w, h);
-        } catch (err) {
-          fail(err);
-        }
+        applyViewport(w, h, true);
         break;
       }
 

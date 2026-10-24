@@ -104,7 +104,30 @@ The required hooks are:
   seconds and is clamped by the runtime.
 - `render(ctx)`: draws one frame using the selected rendering context.
 
-Optional hooks are `resize(width, height)` and `destroy()`.
+Optional hooks are `resize(width, height, viewport)` and `destroy()`.
+
+The runtime keeps `width` and `height` in logical CSS pixels. The canvas backing
+store is scaled for the device-pixel ratio, so games should draw using the
+logical dimensions and must not use `canvas.width` or `canvas.height` directly.
+The current viewport is also available as `api.viewport`:
+
+```js
+{
+  width: 800,
+  height: 600,
+  pixelWidth: 1600,
+  pixelHeight: 1200,
+  devicePixelRatio: 2,
+  orientation: 'landscape',
+  safeArea: { top: 0, right: 0, bottom: 24, left: 0 }
+}
+```
+
+`resize` is called when the logical dimensions, device-pixel ratio, orientation,
+or safe-area insets change. Use `safeArea` when placing controls near screen
+edges, and use `orientation` to select a layout. The runtime measures the
+safe-area environment provided by the device and automatically tracks browser
+resize, orientation, and visual-viewport changes.
 
 ## Rendering modes and 3D support
 
@@ -223,6 +246,7 @@ function init(gameApi) {
   api = gameApi;
   width = api.width;
   height = api.height;
+  console.log(api.viewport.orientation); // 'portrait' or 'landscape'
   console.log(api.data.context); // context supplied to the AI
   api.setUiDesign({
     pauseMenu: {
@@ -262,7 +286,7 @@ function render(ctx) {
   ctx.fillText('Press Space to finish', 20, 30);
 }
 
-function resize(newWidth, newHeight) {
+function resize(newWidth, newHeight, viewport) {
   width = newWidth;
   height = newHeight;
 }
@@ -382,10 +406,36 @@ duplicates, or when a required gameplay relationship is invalid. Do not throw:
 an uncaught game error ends the session.
 
 `input.keys` is the current held state for `ArrowUp`, `ArrowDown`, `ArrowLeft`,
-`ArrowRight`, and `Space`. For one-shot actions, detect a transition from
-`false` to `true` by comparing the current state with a previous snapshot. For
-continuous movement, use the held state directly. The runtime clears keys when
-focus or page visibility changes.
+`ArrowRight`, and `Space`. For one-shot keyboard actions, detect a transition
+from `false` to `true` by comparing the current state with a previous snapshot.
+For continuous movement, use the held state directly. The runtime clears keys
+when focus or page visibility changes.
+
+Mobile and pointer input is available through `input.pointer`:
+
+```js
+function update(dt, input) {
+  if (input.pointer.justPressed) {
+    // Start or select something once, on touch or mouse press.
+  }
+  if (input.pointer.down) {
+    player.x = input.pointer.normalizedX * api.width;
+  }
+}
+```
+
+Pointer Events cover touch, pen, and mouse input. The pointer coordinates are
+provided in logical canvas pixels (`x`, `y`) and normalized coordinates from
+`0` to `1` (`normalizedX`, `normalizedY`). `down` remains true while a pointer
+is held. `justPressed` and `justReleased` are true only during the frame where
+the transition occurs. `deltaX` and `deltaY` contain movement since the last
+game frame. The runtime applies `touch-action: none` to the canvas so vertical
+swipes do not scroll the iframe while a game is being played.
+
+Use pointer input for mobile controls and keep keyboard input as a desktop
+fallback. Avoid relying on hover, right-click, or precise multi-button mouse
+controls on a phone. The runtime tracks one active pointer; games needing
+multi-touch should be added through a future multi-pointer contract.
 
 Keep a round between 20 and 60 seconds because games appear between videos in
 a swipe feed. Submit a result with `api.submitResult({ score, ... })` when the
