@@ -1,6 +1,6 @@
 # Infra
 
-Docker Compose configurations for infrastructure services.
+Docker Compose configurations for infrastructure services. All stacks attach to the shared `braingain` bridge network so application containers (`backend`, `litellm`, `cdn`, `frontend`) can reach them by container name.
 
 ## Services
 
@@ -29,6 +29,8 @@ docker compose -f postgres/docker-compose.yml up -d
   - Access Key: `braingain`
   - Secret Key: `braingain-secret`
 - **Bucket**: `braingain` (auto-created on startup via `s3-init`)
+- **Internal URL**: `http://rustfs:9000`
+- **Web Console URL**: `http://localhost:9001`
 
 Start service:
 ```bash

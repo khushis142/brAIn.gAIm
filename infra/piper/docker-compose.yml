@@ -4,8 +4,8 @@ services:
     build:
       context: .
       args:
-        VOICE: en_US-hfc_female-medium
-    image: braingain/piper:1.8.0-en_US-hfc_female-medium
+        VOICE: ${VOICE:-en_US-hfc_female-medium}
+    image: braingain/piper:1.8.0-${VOICE:-en_US-hfc_female-medium}
     container_name: piper
     restart: unless-stopped
     ports:
