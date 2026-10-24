@@ -54,6 +54,33 @@ export interface LeaderboardEntry {
   score: number;
 }
 
+export interface AttachmentRead {
+  id: string;
+  filename: string;
+  url: string;
+  created_at: string;
+}
+
+export interface ProjectRead {
+  id: string;
+  name: string;
+  body: string;
+  attachments: AttachmentRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectUpdate {
+  name?: string;
+  body?: string;
+}
+
+export interface CdnFile {
+  id: string;
+  filename: string;
+  url: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -114,8 +141,64 @@ export class ApiService {
     );
   }
 
+  listProjects(): Observable<ProjectRead[]> {
+    return this.http.get<ProjectRead[]>(this.url('projects'), this.authOptions());
+  }
+
+  createProject(name: string): Observable<ProjectRead> {
+    return this.http.post<ProjectRead>(this.url('projects'), { name }, this.authOptions());
+  }
+
+  updateProject(id: string, project: ProjectUpdate): Observable<ProjectRead> {
+    return this.http.patch<ProjectRead>(
+      this.url(`projects/${encodeURIComponent(id)}`),
+      project,
+      this.authOptions(),
+    );
+  }
+
+  deleteProject(id: string): Observable<void> {
+    return this.http.delete<void>(
+      this.url(`projects/${encodeURIComponent(id)}`),
+      this.authOptions(),
+    );
+  }
+
+  addAttachment(projectId: string, file: CdnFile): Observable<AttachmentRead> {
+    return this.http.post<AttachmentRead>(
+      this.url(`projects/${encodeURIComponent(projectId)}/attachments`),
+      { id: file.id, filename: file.filename },
+      this.authOptions(),
+    );
+  }
+
+  deleteAttachment(projectId: string, attachmentId: string): Observable<void> {
+    return this.http.delete<void>(
+      this.url(
+        `projects/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      ),
+      this.authOptions(),
+    );
+  }
+
+  uploadToCdn(file: File): Observable<CdnFile> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<CdnFile>(`${environment.cdnBaseUrl}/api/v1/files`, body);
+  }
+
+  deleteFromCdn(id: string): Observable<void> {
+    return this.http.delete<void>(
+      `${environment.cdnBaseUrl}/api/v1/files/${encodeURIComponent(id)}`,
+    );
+  }
+
   health(): Observable<Record<string, string>> {
     return this.get<Record<string, string>>('health');
+  }
+
+  cdnHealth(): Observable<Record<string, unknown>> {
+    return this.http.get<Record<string, unknown>>(`${environment.cdnBaseUrl}/healthz`);
   }
 
   private url(endpoint: string): string {

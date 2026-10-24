@@ -4,7 +4,18 @@
   [class.unavailable]="status() === 'Unavailable'"
   aria-live="polite"
   role="status"
-  [attr.aria-label]="'Backend: ' + status()"
+  [attr.aria-label]="service() + ': ' + status()"
+  (pointerdown)="startHold()"
+  (pointerup)="cancelHold()"
+  (pointerleave)="cancelHold()"
+  (pointercancel)="cancelHold()"
+  (click)="onClick()"
+  (contextmenu)="preventContextMenu($event)"
 >
-  <span class="material-symbols-outlined" aria-hidden="true">dns</span>
+  <span class="material-symbols-outlined" aria-hidden="true">{{ icon() }}</span>
+  @if (showStatusPopup()) {
+    <span class="status-popup" [class.fading]="fadingStatusPopup()" role="status">
+      {{ service() === 'CDN' ? 'Content Delivery Network' : 'Backend' }}: {{ status() }}
+    </span>
+  }
 </div>

@@ -1,0 +1,53 @@
+<button
+  class="folder"
+  type="button"
+  [class.new]="isNew()"
+  [class.selected]="selected()"
+  [attr.aria-pressed]="isNew() ? null : selected()"
+  [attr.aria-label]="isNew() ? 'Neues Projekt' : name()"
+  (click)="onClick()"
+  (pointerdown)="startPress()"
+  (pointerup)="cancelPress()"
+  (pointerleave)="cancelPress()"
+  (pointercancel)="cancelPress()"
+  (contextmenu)="suppressNativeMenu($event)"
+>
+  <span
+    class="material-symbols-outlined icon"
+    aria-hidden="true"
+    [style.color]="isNew() ? null : color()"
+  >
+    {{ isNew() ? 'create_new_folder' : 'folder' }}
+  </span>
+  @if (!isNew()) {
+    <span class="label">{{ name() }}</span>
+    <span class="count" aria-label="{{ count() }} Dokumente">{{ count() }}</span>
+  }
+</button>
+
+@if (menuOpen()) {
+  <div class="backdrop" (click)="menuOpen.set(false)"></div>
+  <div class="menu" role="dialog" [attr.aria-label]="'Ordner ' + name()">
+    <p class="menu-title">{{ name() }}</p>
+    <div class="colors">
+      @for (c of colors; track c) {
+        <button
+          type="button"
+          class="swatch"
+          [class.active]="c === color()"
+          [style.background]="c"
+          [attr.aria-label]="'Farbe ' + c"
+          (click)="pickColor(c)"
+        ></button>
+      }
+    </div>
+    <button type="button" class="action" (click)="startRename()">
+      <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+      Umbenennen
+    </button>
+    <button type="button" class="action delete" (click)="delete()">
+      <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      Ordner löschen
+    </button>
+  </div>
+}

@@ -1,0 +1,134 @@
+:host {
+  flex: none;
+}
+
+.folder {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  position: relative;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-touch-callout: none;
+  width: 88px;
+}
+
+.icon {
+  color: #ffc800;
+  font-size: 56px;
+  font-variation-settings: 'FILL' 1;
+}
+
+.new .icon {
+  color: var(--muted);
+  font-variation-settings: 'FILL' 0;
+}
+
+.label {
+  font-size: 0.8rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  align-items: center;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  color: var(--surface);
+  display: inline-flex;
+  font-size: 0.65rem;
+  font-weight: 700;
+  height: 22px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 5px;
+  position: absolute;
+  right: 4px;
+  top: 4px;
+}
+
+.folder.selected {
+  background: var(--control);
+  border-color: var(--accent);
+}
+
+.folder:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.backdrop {
+  background: rgb(0 0 0 / 0.4);
+  inset: 0;
+  position: fixed;
+  z-index: 50;
+}
+
+.menu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  left: 0;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  position: fixed;
+  right: 0;
+  z-index: 51;
+}
+
+.menu-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.swatch {
+  border: 3px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 44px;
+  width: 44px;
+}
+
+.swatch.active {
+  border-color: var(--text);
+}
+
+.action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px;
+}
+
+.action.delete {
+  color: #ef5350;
+}
+
+.action:hover {
+  background: var(--control);
+}
