@@ -1,47 +1,31 @@
 <div class="app-shell">
-  <header class="app-header">
-    <a class="brand" routerLink="/" aria-label="Go to braingain home">
-      <span>{{ title() }}</span>
-    </a>
+  <app-header />
+  @if (isAuthenticated()) {
 
-    <div class="header-actions">
-      <app-health-badge />
-      <app-health-badge service="CDN" icon="video_file" />
+    <main class="page-content">
+      <router-outlet></router-outlet>
+    </main>
 
-      <button
-        class="theme-toggle"
-        type="button"
-        (click)="toggleTheme()"
-        [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
-        [attr.aria-pressed]="isDarkMode()"
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <a
+        class="nav-item"
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
       >
-        <svg [lucideIcon]="icon()"></svg>
-        <span class="sr-only">{{ isDarkMode() ? 'Light mode' : 'Dark mode' }}</span>
-      </button>
-    </div>
-  </header>
-
-  <main class="page-content">
+        <svg lucideHome></svg>
+        <span>Home</span>
+      </a>
+      <a class="nav-item" routerLink="/upload" routerLinkActive="active">
+        <svg lucideUpload></svg>
+        <span>Upload</span>
+      </a>
+      <a class="nav-item" routerLink="/settings" routerLinkActive="active">
+        <svg lucideSettings></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+  } @else {
     <router-outlet></router-outlet>
-  </main>
-
-  <nav class="bottom-nav" aria-label="Primary navigation">
-    <a
-      class="nav-item"
-      routerLink="/"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-    >
-      <svg lucideHome></svg>
-      <span>Home</span>
-    </a>
-    <a class="nav-item" routerLink="/upload" routerLinkActive="active">
-      <svg lucideUpload></svg>
-      <span>MyFiles</span>
-    </a>
-    <a class="nav-item" routerLink="/settings" routerLinkActive="active">
-      <svg lucideSettings></svg>
-      <span>Settings</span>
-    </a>
-  </nav>
+  }
 </div>

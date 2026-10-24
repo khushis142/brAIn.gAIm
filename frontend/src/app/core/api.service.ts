@@ -6,7 +6,6 @@ import { environment } from '../../environments/environment';
 export interface UserCreate {
   username: string;
   password: string;
-  field: string;
 }
 
 export interface UserRead {
@@ -84,7 +83,8 @@ export interface CdnFile {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private accessToken: string | null = null;
+  private accessToken: string | null =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('braingain-token') : null;
 
   get<T>(endpoint: string): Observable<T> {
     return this.http.get<T>(this.url(endpoint));
@@ -105,8 +105,18 @@ export class ApiService {
     return this.http.post<Token>(this.url('auth/token'), body).pipe(
       tap(({ access_token }) => {
         this.accessToken = access_token;
+        localStorage.setItem('braingain-token', access_token);
       }),
     );
+  }
+
+  logout(): void {
+    this.accessToken = null;
+    localStorage.removeItem('braingain-token');
+  }
+
+  isAuthenticated(): boolean {
+    return this.accessToken !== null;
   }
 
   getMe(): Observable<UserRead> {
