@@ -374,14 +374,22 @@ async def test_projects_are_private_crud(client: AsyncClient) -> None:
     )
     assert res.status_code == 201
     project = res.json()
+    assert project["color"] == "#ffc800"
     assert project["body"] == "# Notes\n\n*FSRS* basics"
     assert project["attachments"] == []
     path = f"/projects/{project['id']}"
 
-    patched = (await client.patch(path, json={"name": "Thesis v2"}, headers=owner)).json()
+    patched_response = await client.patch(
+        path, json={"name": "Thesis v2", "color": "#42a5f5"}, headers=owner
+    )
+    assert patched_response.status_code == 200
+    patched = patched_response.json()
     assert patched["name"] == "Thesis v2"
+    assert patched["color"] == "#42a5f5"
     assert patched["body"] == project["body"]
     assert patched["updated_at"] >= project["updated_at"]
+    assert (await client.get(path, headers=owner)).json()["color"] == "#42a5f5"
+    assert (await client.patch(path, json={"color": "blue"}, headers=owner)).status_code == 422
 
     assert [p["id"] for p in (await client.get("/projects", headers=owner)).json()] == [
         project["id"]
@@ -484,7 +492,9 @@ async def test_active_project_feeds_the_games(
     # Setting the same project again or other fields keeps the prepared round.
     await client.patch("/users/me", json={"active_project_id": second["id"]}, headers=owner)
     await client.patch("/users/me", json={"interests": "x"}, headers=owner)
+    await client.patch(f"/projects/{second['id']}", json={"color": "#42a5f5"}, headers=owner)
     assert len(materials) == 3
+    assert await ready_rounds() == 1
 
     # Others' projects can't be activated, and look the same as missing ones.
     for project_id in [foreign["id"], str(uuid.uuid4())]:

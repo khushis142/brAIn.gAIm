@@ -106,6 +106,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     body: str | None = Field(None, max_length=100_000, description="Markdown")
+    color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class AttachmentCreate(BaseModel):
@@ -130,6 +131,7 @@ class AttachmentRead(BaseModel):
 class ProjectRead(BaseModel):
     id: uuid.UUID
     name: str
+    color: str
     body: str
     attachments: list[AttachmentRead]
     created_at: datetime

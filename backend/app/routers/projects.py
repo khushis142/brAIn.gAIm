@@ -39,6 +39,7 @@ def _read(project: Project) -> ProjectRead:
     return ProjectRead(
         id=project.id,
         name=project.name,
+        color=project.color,
         body=project.body,
         attachments=[_attachment(a) for a in project.attachments],
         created_at=project.created_at,
@@ -89,11 +90,16 @@ async def update_project(
     background: BackgroundTasks,
 ) -> ProjectRead:
     project = await _get_own(session, project_id, user)
-    for name, value in body.model_dump(exclude_none=True).items():
-        setattr(project, name, value)
-    if user.active_project_id == project_id:
+    updates = body.model_dump(exclude_none=True)
+    changed_material = any(
+        name in {"name", "body"} and getattr(project, name) != value
+        for name, value in updates.items()
+    )
+    if changed_material and user.active_project_id == project_id:
         await feed.discard_ready_rounds(session, user.id)
         background.add_task(feed.top_up, user.id)
+    for name, value in updates.items():
+        setattr(project, name, value)
     await session.commit()
     await session.refresh(project)  # updated_at is set by the database
     return _read(project)

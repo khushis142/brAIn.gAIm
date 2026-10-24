@@ -17,6 +17,7 @@ class Project(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(200))
+    color: Mapped[str] = mapped_column(String(7), default="#ffc800", server_default="#ffc800")
     body: Mapped[str] = mapped_column(Text, default="", server_default="")  # Markdown
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
