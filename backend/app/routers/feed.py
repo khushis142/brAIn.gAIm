@@ -19,5 +19,5 @@ async def next_item(user: CurrentUser, session: SessionDep) -> VideoItem | GameI
     if served.round is None:
         return VideoItem(id=item.id, title=item.title, url=url)
     return GameItem(
-        id=item.id, title=item.title, url=url, round_id=served.round.id, input=served.round.input
+        id=item.id, title=item.title, url=url, round_id=served.round.id, data=served.round.input
     )

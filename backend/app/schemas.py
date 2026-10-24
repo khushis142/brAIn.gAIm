@@ -143,7 +143,9 @@ class GameItem(BaseModel):
     title: str
     url: str = Field(description="The game's JS file")
     round_id: uuid.UUID
-    input: dict[str, Any] = Field(description="Generated input matching the game's schema")
+    data: dict[str, Any] = Field(
+        description="Generated game input; pass it as `data` to the game runtime's session.start"
+    )
 
 
 FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]

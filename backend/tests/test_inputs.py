@@ -39,6 +39,23 @@ def test_config_rejects_invalid_schema() -> None:
         GameConfig(input_schema={"type": "nonsense"}, context="x")
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"q": {"type": "string"}}},
+        {"type": "object", "properties": {"context": {"type": "string", "minLength": 1}}},
+        {
+            "type": "object",
+            "required": ["context"],
+            "properties": {"context": {"type": "string"}},
+        },
+    ],
+)
+def test_config_requires_the_runtimes_context_field(schema: dict) -> None:
+    with pytest.raises(ValidationError, match="non-empty string `context`"):
+        GameConfig(input_schema=schema, context="x")
+
+
 async def test_fake_llm_fills_the_example_game() -> None:
     game_input = await generate_input(FakeLLM(), EXAMPLE, ["# Biology\n\nCells divide."])
     validate(game_input, EXAMPLE.input_schema)

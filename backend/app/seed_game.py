@@ -2,7 +2,8 @@
 
 Usage: python -m app.seed_game <dir> --title "Quiz" --owner <username>
 
-<dir> holds `game.js` and `config.json` ({"input_schema": <JSON Schema>, "context": "..."}).
+<dir> holds `game.js` and `config.json` ({"input_schema": <JSON Schema>, "context": "..."});
+see games/README.md.
 This is the only way games enter the system besides the generator: the API never accepts them.
 """
 
@@ -24,6 +25,17 @@ from app.models import Content, User
 MAX_GAME_BYTES = 200_000
 
 
+def _check_game_code(path: Path) -> None:
+    """The frontend runtime's hard requirements (Frontend `docs/game-authoring.md`)."""
+    if path.stat().st_size > MAX_GAME_BYTES:
+        raise SystemExit(f"{path} is larger than {MAX_GAME_BYTES} bytes")
+    code = path.read_text()
+    if "registerGame(" not in code:
+        raise SystemExit(f"{path} never calls registerGame(...)")
+    if "</script" in code.lower():
+        raise SystemExit(f"{path} contains '</script', which breaks the inline embedding")
+
+
 async def upload_to_cdn(path: Path) -> tuple[uuid.UUID, str]:
     url = f"{get_settings().cdn_base_url.rstrip('/')}/api/v1/files"
     async with httpx.AsyncClient(timeout=60) as client:
@@ -37,8 +49,7 @@ async def upload_to_cdn(path: Path) -> tuple[uuid.UUID, str]:
 async def seed_game(session: AsyncSession, directory: Path, title: str, owner: str) -> Content:
     config = GameConfig.model_validate_json((directory / "config.json").read_text())
     game_js = directory / "game.js"
-    if game_js.stat().st_size > MAX_GAME_BYTES:
-        raise SystemExit(f"{game_js} is larger than {MAX_GAME_BYTES} bytes")
+    _check_game_code(game_js)
     owner_id = await session.scalar(select(User.id).where(User.username == owner))
     if owner_id is None:
         raise SystemExit(f"unknown user: {owner}")

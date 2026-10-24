@@ -1,10 +1,11 @@
 {
-  "context": "A multiple-choice quiz with 3 to 5 questions. Each question tests understanding of the study material, not trivia. `answer` is the zero-based index of the correct option; exactly one option is correct.",
+  "context": "A multiple-choice quiz with 3 to 5 questions. Each question tests understanding of the study material, not trivia. `context` is one short sentence naming the topic the questions cover; it is shown to the player. `answer` is the zero-based index of the correct option; exactly one option is correct. Keep questions under 90 characters and options under 40 characters so they fit on a phone screen.",
   "input_schema": {
     "type": "object",
-    "required": ["questions"],
+    "required": ["context", "questions"],
     "additionalProperties": false,
     "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 },
       "questions": {
         "type": "array",
         "minItems": 3,
@@ -14,12 +15,12 @@
           "required": ["question", "options", "answer"],
           "additionalProperties": false,
           "properties": {
-            "question": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "question": { "type": "string", "minLength": 1, "maxLength": 90 },
             "options": {
               "type": "array",
               "minItems": 3,
               "maxItems": 4,
-              "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+              "items": { "type": "string", "minLength": 1, "maxLength": 40 }
             },
             "answer": { "type": "integer", "minimum": 0, "maximum": 3 }
           }

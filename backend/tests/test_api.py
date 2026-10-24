@@ -169,10 +169,10 @@ async def test_feed_interleaves_games(client: AsyncClient) -> None:
     # Every game comes with a freshly generated, schema-valid input stored as a round.
     games = [item for item in items if item["type"] == "game"]
     for game in games:
-        validate(game["input"], EXAMPLE_GAME.input_schema)
+        validate(game["data"], EXAMPLE_GAME.input_schema)
     async with SessionLocal() as session:
         rounds = (await session.scalars(select(GameRound))).all()
-    assert {str(r.id): r.input for r in rounds} == {g["round_id"]: g["input"] for g in games}
+    assert {str(r.id): r.input for r in rounds} == {g["round_id"]: g["data"] for g in games}
 
 
 async def test_feed_skips_games_whose_input_fails(
@@ -212,6 +212,23 @@ async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -
             await seed_game(session, EXAMPLE_DIR, "Example quiz", "publisher")
         with pytest.raises(SystemExit, match="unknown user"):
             await seed_game(session, EXAMPLE_DIR, "Other", "nobody")
+
+
+@pytest.mark.parametrize(
+    ("code", "error"),
+    [
+        ("console.log('no registration');", "never calls registerGame"),
+        ("registerGame({}); const s = '</SCRIPT>';", "</script"),
+    ],
+)
+async def test_seed_game_rejects_code_the_runtime_cannot_run(
+    tmp_path: Path, code: str, error: str
+) -> None:
+    (tmp_path / "config.json").write_text((EXAMPLE_DIR / "config.json").read_text())
+    (tmp_path / "game.js").write_text(code)
+    async with SessionLocal() as session:
+        with pytest.raises(SystemExit, match=error):
+            await seed_game(session, tmp_path, "Broken", "nobody")
 
 
 async def test_feed_without_content(client: AsyncClient) -> None:

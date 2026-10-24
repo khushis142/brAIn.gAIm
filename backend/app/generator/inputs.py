@@ -1,8 +1,9 @@
 """Generates the input for one round of a game.
 
-Games are fixed, reviewed JS templates. Each declares in its config which input it expects
-(a JSON Schema) and what it is about (context); the LLM fills that input from the user's
-projects. Its reply is data, never code, and is validated against the schema before use.
+Games are fixed, reviewed JS templates (contract: Frontend `docs/game-authoring.md`). Each
+declares in its config which input it expects (a JSON Schema) and what it is about; the LLM
+fills that input from the user's projects. Its reply is data, never code, and is validated
+against the schema before the frontend hands it to the game as `api.data`.
 """
 
 import json
@@ -33,6 +34,17 @@ class GameConfig(BaseModel):
             Draft202012Validator.check_schema(schema)
         except SchemaError as error:
             raise ValueError(f"input_schema is not a valid JSON Schema: {error.message}") from None
+        # The frontend game runtime requires a non-empty `data.context` string (protocol v2).
+        context = schema.get("properties", {}).get("context", {})
+        if (
+            schema.get("type") != "object"
+            or "context" not in schema.get("required", [])
+            or context.get("type") != "string"
+            or context.get("minLength", 0) < 1
+        ):
+            raise ValueError(
+                "input_schema must be an object that requires a non-empty string `context`"
+            )
         return schema
 
 
