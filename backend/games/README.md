@@ -77,3 +77,13 @@ python -m app.seed_game my-game --title "My game" --owner <username>
 This checks the config and the code (schema valid and requiring `context`, `registerGame(`
 present, no `</script`, size), uploads `game.js` to the CDN and registers the game. Titles
 must be unique.
+
+To publish a new version of a game, run the same command with `--update` instead of
+`--owner`:
+
+```sh
+python -m app.seed_game my-game --title "My game" --update
+```
+
+The CDN id is the game's id, so the new `game.js` gets a new id. The game keeps its title
+and owner, and its scores, rounds and impressions move to the new id.
