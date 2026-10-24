@@ -65,7 +65,7 @@ tags it `:<version>` and `:latest` whenever `version.txt` changes on `main`.
 **To deploy, bump `version.txt`.**
 
 The container runs `alembic upgrade head` on start, then serves on port 8000,
-published on host port 8080
+published on host port 3000
 (healthcheck: `/health`).
 
 Portainer setup (once):
