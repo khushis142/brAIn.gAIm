@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { Header } from './header';
 
@@ -9,7 +11,10 @@ describe('Header', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [Header],
-      providers: [{ provide: ApiService, useValue: { get: () => ({ subscribe: () => undefined }) } }],
+      providers: [
+        provideRouter([]),
+        { provide: ApiService, useValue: { health: () => of({}), cdnHealth: () => of({}) } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Header);

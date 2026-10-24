@@ -1,0 +1,193 @@
+:host {
+  display: block;
+  /* Fill the space between the header (60px), bottom nav (76px) and page padding (2 × 28px) */
+  height: calc(100dvh - 192px);
+  min-height: 360px;
+}
+
+.feed {
+  height: 100%;
+  perspective: 1200px;
+  position: relative;
+  touch-action: none; /* vertical swipes are handled in home.ts */
+}
+
+.card {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 18px 50px -20px color-mix(in srgb, var(--accent) 45%, transparent);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.game-host,
+.video,
+.placeholder,
+.error {
+  inset: 0;
+  position: absolute;
+}
+
+.video {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.placeholder,
+.error {
+  color: #fff;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  place-content: center;
+  text-align: center;
+}
+
+.error button,
+.next {
+  background: var(--accent);
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.error button {
+  border-radius: 999px;
+  padding: 8px 16px;
+}
+
+.info {
+  align-items: center;
+  background: var(--control);
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.badge {
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
+.title {
+  flex: 1;
+  font-size: 0.95rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next {
+  animation: bob 1.6s ease-in-out infinite;
+  border-radius: 50%;
+  display: grid;
+  height: 40px;
+  margin-left: auto;
+  place-items: center;
+  width: 40px;
+}
+
+/* Transition: the card flies up and away, the next one rises in */
+.card.leaving {
+  animation: card-leave 450ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+
+.card.entering {
+  animation: card-enter 450ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* "Neural pulse" overlay shown while switching */
+.warp {
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 40%, transparent), transparent 65%);
+  border-radius: 20px;
+  inset: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 250ms ease;
+}
+
+.warp.active {
+  opacity: 1;
+}
+
+.warp.active::before,
+.warp.active::after {
+  content: '';
+  position: absolute;
+}
+
+/* Light band sweeping upwards */
+.warp.active::before {
+  animation: sweep 700ms ease-in forwards;
+  background: linear-gradient(to top, transparent, color-mix(in srgb, var(--accent) 70%, white), transparent);
+  height: 35%;
+  left: 0;
+  right: 0;
+  top: 100%;
+}
+
+/* Rings pulsing out from the centre, repeating until the next item has loaded */
+.warp.active::after {
+  animation: pulse 900ms ease-out infinite;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 24px var(--accent);
+  height: 80px;
+  left: calc(50% - 40px);
+  top: calc(50% - 40px);
+  width: 80px;
+}
+
+@keyframes card-leave {
+  to { filter: blur(8px); opacity: 0; transform: translateY(-35%) scale(0.85) rotateX(20deg); }
+}
+
+@keyframes card-enter {
+  from { filter: blur(8px); opacity: 0; transform: translateY(35%) scale(0.9) rotateX(-12deg); }
+}
+
+@keyframes sweep {
+  to { transform: translateY(-400%); }
+}
+
+@keyframes pulse {
+  from { opacity: 1; transform: scale(0.2); }
+  to { opacity: 0; transform: scale(5); }
+}
+
+@keyframes bob {
+  50% { transform: translateY(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.leaving,
+  .card.entering,
+  .next,
+  .warp.active::before,
+  .warp.active::after {
+    animation: none;
+  }
+
+  .card.leaving {
+    opacity: 0;
+  }
+}
