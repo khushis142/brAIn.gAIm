@@ -448,13 +448,6 @@
         return;
       }
       post({ type: 'ui-design', design });
-        let next;
-        try {
-          next = createViewport(Math.floor(width), Math.floor(height));
-        } catch (err) {
-          fail(err);
-          return;
-        }
     },
   });
 

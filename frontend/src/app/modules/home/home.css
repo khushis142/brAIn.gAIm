@@ -296,7 +296,6 @@
 
 /* "Neural pulse" overlay shown while switching */
 .warp {
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 40%, transparent), transparent 65%);
   border-radius: 20px;
   inset: 0;
   opacity: 0;
@@ -310,8 +309,7 @@
   opacity: 1;
 }
 
-.warp.active::before,
-.warp.active::after {
+.warp.active::before {
   content: '';
   position: absolute;
 }
@@ -326,17 +324,6 @@
   top: 100%;
 }
 
-/* Rings pulsing out from the centre, repeating until the next item has loaded */
-.warp.active::after {
-  animation: pulse 900ms ease-out infinite;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 24px var(--accent);
-  height: 80px;
-  left: calc(50% - 40px);
-  top: calc(50% - 40px);
-  width: 80px;
-}
 
 @keyframes card-leave {
   to { filter: blur(8px); opacity: 0; transform: translateY(-35%) scale(0.85) rotateX(20deg); }
@@ -350,10 +337,6 @@
   to { transform: translateY(-400%); }
 }
 
-@keyframes pulse {
-  from { opacity: 1; transform: scale(0.2); }
-  to { opacity: 0; transform: scale(5); }
-}
 
 @keyframes bob {
   50% { transform: translateY(4px); }
@@ -377,8 +360,7 @@
   .next,
   .like.liked svg,
   .burst,
-  .warp.active::before,
-  .warp.active::after {
+  .warp.active::before {
     animation: none;
   }
 
