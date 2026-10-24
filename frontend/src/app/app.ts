@@ -1,6 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LucideBrain, LucideHouse, LucideSettings, LucideVideo } from '@lucide/angular';
+import {
+  LucideBrain,
+  LucideHouse,
+  LucideSettings,
+  LucideSkull,
+  LucideVideo,
+} from '@lucide/angular';
 import { UserService } from './modules/user/service/user-service';
 import { Header } from './shared/header/header';
 
@@ -12,6 +18,7 @@ import { Header } from './shared/header/header';
     LucideHouse,
     LucideBrain,
     LucideVideo,
+    LucideSkull,
     LucideSettings,
     Header,
   ],

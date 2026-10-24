@@ -69,6 +69,37 @@ export interface ContentCreate {
 
 export interface ScoreCreate {
   score: number;
+  /** Feed round this score belongs to; resubmitting the same round is a no-op */
+  round_id?: string;
+}
+
+export interface ScoreRead {
+  newly_unlocked: string[];
+  games_completed: number;
+}
+
+export type ZombieSlot = 'head' | 'eyes' | 'neck' | 'feet';
+
+export interface AccessoryRead {
+  id: string;
+  name: string;
+  slot: ZombieSlot;
+  unlock_description: string;
+}
+
+export type ZombieEquipped = Record<ZombieSlot, string | null>;
+
+export interface ZombieProgress {
+  id: string;
+  current: number;
+  target: number;
+}
+
+export interface ZombieRead {
+  unlocked: string[];
+  equipped: ZombieEquipped;
+  games_completed: number;
+  progress: ZombieProgress[];
 }
 
 export interface LeaderboardEntry {
@@ -177,8 +208,8 @@ export class ApiService {
     return this.http.post<FeedItem>(this.url('feed/next'), null, this.authOptions());
   }
 
-  submitScore(gameId: string, score: ScoreCreate): Observable<void> {
-    return this.http.post<void>(
+  submitScore(gameId: string, score: ScoreCreate): Observable<ScoreRead> {
+    return this.http.post<ScoreRead>(
       this.url(`games/${encodeURIComponent(gameId)}/scores`),
       score,
       this.authOptions(),
@@ -190,6 +221,23 @@ export class ApiService {
     return this.http.get<LeaderboardEntry[]>(
       this.url(`games/${encodeURIComponent(gameId)}/leaderboard`),
       { params },
+    );
+  }
+
+  listAccessories(): Observable<AccessoryRead[]> {
+    return this.http.get<AccessoryRead[]>(this.url('zombie/accessories'), this.authOptions());
+  }
+
+  getMyZombie(): Observable<ZombieRead> {
+    return this.http.get<ZombieRead>(this.url('users/me/zombie'), this.authOptions());
+  }
+
+  /** Omitted slots stay as they are; null takes the item off */
+  updateEquipped(equipped: Partial<ZombieEquipped>): Observable<ZombieRead> {
+    return this.http.put<ZombieRead>(
+      this.url('users/me/zombie/equipped'),
+      equipped,
+      this.authOptions(),
     );
   }
 

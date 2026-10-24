@@ -13,7 +13,10 @@ describe('Home', () => {
     await TestBed.configureTestingModule({
       imports: [Home],
       providers: [
-        { provide: ApiService, useValue: { nextItem: () => NEVER } },
+        {
+          provide: ApiService,
+          useValue: { nextItem: () => NEVER, getMyZombie: () => NEVER, listAccessories: () => NEVER },
+        },
         { provide: GAME_RUNTIME_SOURCE, useValue: '' },
       ],
     }).compileComponents();
