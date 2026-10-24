@@ -30,7 +30,7 @@ export class UserService {
   }
 
   updateInterest(interest: string): Observable<UserRead> {
-    return this.api.updateMe({ field: interest }).pipe(
+    return this.api.updateMe({ interests: interest }).pipe(
       tap((user) => this.user.set(user)),
     );
   }

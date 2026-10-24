@@ -1,10 +1,10 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { LucideSettings } from '@lucide/angular';
+import { LucideLogOut, LucidePlus, LucideSettings } from '@lucide/angular';
 import { InterestsDialog } from '../user/interestsDialog/interests-dialog';
 import { UserService } from '../user/service/user-service';
 
 @Component({
-  imports: [InterestsDialog, LucideSettings],
+  imports: [InterestsDialog, LucideLogOut, LucidePlus, LucideSettings],
   selector: 'app-settings',
   styleUrl: './settings.css',
   templateUrl: './settings.html',

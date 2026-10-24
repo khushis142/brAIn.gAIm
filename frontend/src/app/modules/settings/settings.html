@@ -5,7 +5,7 @@
   </div>
 
   <div class="card">
-    <h3>User Settings</h3>
+    <h3>User</h3>
     <div class="user-information" aria-label="User information">
       <div>
         <span class="information-label">Username</span>
@@ -13,12 +13,25 @@
       </div>
       <div>
         <span class="information-label">Interests</span>
-        <strong>{{ userService.user()?.field ?? 'No interests added' }}</strong>
+        <strong>{{ userService.user()?.interests ?? 'No interests added' }}</strong>
       </div>
     </div>
-    <button class="settings-button" type="button" (click)="openInterestDialog()">Interests</button>
+    <button class="settings-button interest-button" type="button" (click)="openInterestDialog()">
+      <span class="button-icon" aria-hidden="true"><svg lucidePlus></svg></span>
+      <span class="button-copy">
+        <strong>Add Interests</strong>
+        <small>Personalize your learning feed</small>
+      </span>
+      <span class="button-arrow" aria-hidden="true">→</span>
+    </button>
     <div class="logout-button-container">
-      <button class="settings-button logout-button" type="button" (click)="logout()">Logout</button>
+      <button class="settings-button logout-button" type="button" (click)="logout()">
+        <span class="button-icon" aria-hidden="true"><svg lucideLogOut></svg></span>
+        <span class="button-copy">
+          <strong>Logout</strong>
+          <small>Sign out of this account</small>
+        </span>
+      </button>
     </div>
   </div>
 </section>
