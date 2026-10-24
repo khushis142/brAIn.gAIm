@@ -14,18 +14,22 @@ Lightweight, high-performance static asset CDN written in Go. Delivers video (`.
 ## Architecture
 
 ```mermaid
-flowchart LR
-    Client["Client / Frontend"]
-    Backend["Backend Service"]
-    CDN["CDN Service (Go)"]
-    RustFS["RustFS (S3)"]
+flowchart TD
+    subgraph Ingestion["Asset Ingestion Flow"]
+        ClientIn["Client / Frontend"] -->|"1. Upload file + metadata"| Backend["Backend Service"]
+        Backend -->|"2. Forward file upload"| CDN["CDN Service (Go)"]
+        CDN -->|"3. Put object"| RustFS["RustFS (S3)"]
+        CDN -->|"4. Return {id, url}"| Backend
+        Backend -->|"5. Save metadata + CDN URL in DB"| BackendDB[("Backend Postgres")]
+        Backend -->|"6. Return response"| ClientIn
+    end
 
-    Client -->|"1. Upload file"| CDN
-    CDN -->|"2. Store object"| RustFS
-    CDN -->|"3. Return {id, url}"| Client
-    Client -->|"4. Save ID + metadata"| Backend
-    Client -->|"5. Stream /files/:id"| CDN
-    CDN -->|"6. Range request"| RustFS
+    subgraph Delivery["Static Delivery Flow"]
+        ClientOut["Client / Frontend / Browser"] -->|"7. Fetch /files/:id/:filename"| CDNDeliv["CDN Service (Go)"]
+        CDNDeliv -->|"8. Range / ETag stream"| RustFS
+        RustFS -->|"9. Byte stream"| CDNDeliv
+        CDNDeliv -->|"10. Cached response"| ClientOut
+    end
 ```
 
 ---
