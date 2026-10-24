@@ -53,7 +53,7 @@ docker compose -f glances/docker-compose.yml up -d
 - **Image**: `braingain/piper:1.8.0` (built locally from `piper/Dockerfile`, `piper-tts[http]==1.8.0`)
 - **Port**:
   - `5000`: HTTP API
-- **Voice**: `en_US-lessac-medium` (baked into the image; change via the `VOICE` build arg)
+- **Voice**: `en_US-hfc_female-medium` (baked into the image; change via the `VOICE` build arg)
 - **Internal URL**: `http://piper:5000`
 
 Synthesize speech (returns WAV):
