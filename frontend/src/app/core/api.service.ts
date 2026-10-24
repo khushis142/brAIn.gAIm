@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { GameCustomData } from '../engine/gameProtocol';
 
 export interface UserCreate {
   username: string;
@@ -40,6 +41,7 @@ export interface GameItem {
   id: string;
   title: string;
   url: string;
+  data?: GameCustomData;
 }
 
 export type FeedItem = VideoItem | GameItem;

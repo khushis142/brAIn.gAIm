@@ -30,6 +30,38 @@ type Phase = 'idle' | 'leaving' | 'entering';
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
+const USE_MOCK_FEED = false;
+
+const MOCK_FEED: FeedItem[] = [
+  {
+    type: 'video',
+    id: 'mock-video-1',
+    title: 'Study focus: getting started',
+    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+  },
+  {
+    type: 'video',
+    id: 'mock-video-2',
+    title: 'Study focus: keep going',
+    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+  },
+  {
+    type: 'game',
+    id: 'dodge-demo',
+    title: 'Focus Dodge',
+    url: 'assets/games/dodge/game.js',
+    data: {
+      context: 'A short reaction game for a learning feed.',
+      difficulty: 'normal',
+      pauseTitle: 'Ready for a focus break?',
+      pauseMessage: 'Pause safely. Your current run will be waiting.',
+      resumeLabel: 'Continue Dodge',
+      leaderboardTitle: 'Focus break results',
+      leaderboardSubtitle: 'Your survival time from this learning feed.',
+      scoreLabel: 'Focus score',
+    },
+  },
+];
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -58,6 +90,7 @@ export class Home {
   );
 
   private busy = false;
+  private mockFeedIndex = 0;
   private touchStartY: number | null = null;
 
   constructor() {
@@ -80,7 +113,9 @@ export class Home {
     try {
       // Fetch the next item while the leave animation plays
       const [nextItem] = await Promise.all([
-        firstValueFrom(this.api.nextItem()),
+        USE_MOCK_FEED
+          ? Promise.resolve(this.nextMockItem())
+          : firstValueFrom(this.api.nextItem()),
         wait(hasItem ? LEAVE_MS : 0),
       ]);
       await this.show(nextItem);
@@ -119,7 +154,8 @@ export class Home {
 
   private async show(item: FeedItem): Promise<void> {
     // Download game code before swapping, so a failed download keeps the current item
-    const gameCode = item.type === 'game' ? await loadGameCode(item.url) : null;
+    const gameItem = item.type === 'game' ? item : null;
+    const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
 
     this.session()?.stop();
     this.item.set(item);
@@ -128,11 +164,19 @@ export class Home {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
         username: 'guest', // TODO: use the logged-in user once there is a login page
-        data: { context: `"${item.title}", a short game in a learning feed.` },
+        data: gameItem?.data ?? {
+          context: `"${item.title}", a short game in a learning feed.`,
+        },
         width: host.clientWidth,
         height: host.clientHeight,
       });
     }
+  }
+
+  private nextMockItem(): FeedItem {
+    const item = MOCK_FEED[this.mockFeedIndex % MOCK_FEED.length];
+    this.mockFeedIndex += 1;
+    return item;
   }
 }
 
