@@ -1,13 +1,3 @@
-// import { Component } from '@angular/core';
-
-// @Component({
-//   imports: [],
-//   selector: 'app-home',
-//   styleUrl: './home.css',
-//   templateUrl: './home.html',
-// })
-// export class Home {}
-
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   afterNextRender,
@@ -30,40 +20,6 @@ type Phase = 'idle' | 'leaving' | 'entering';
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
 const SWIPE_MIN_PX = 60;
-const USE_MOCK_FEED = true;
-// Games live in the backend (games/ there); the mock feed plays this published one.
-const MOCK_GAME_TITLE = 'Dodge 3D';
-
-const MOCK_FEED: FeedItem[] = [
-  {
-    type: 'video',
-    id: 'mock-video-1',
-    title: 'Study focus: getting started',
-    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  },
-  {
-    type: 'video',
-    id: 'mock-video-2',
-    title: 'Study focus: keep going',
-    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-  },
-  {
-    type: 'game',
-    id: 'dodge3d-demo',
-    title: 'Focus Dodge',
-    url: '', // filled in from the published game, see nextMockItem()
-    data: {
-      context: 'A short reaction game for a learning feed.',
-      difficulty: 'normal',
-      pauseTitle: 'Ready for a focus break?',
-      pauseMessage: 'Pause safely. Your current run will be waiting.',
-      resumeLabel: 'Continue Dodge',
-      leaderboardTitle: 'Focus break results',
-      leaderboardSubtitle: 'Your survival time from this learning feed.',
-      scoreLabel: 'Focus score',
-    },
-  },
-];
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -92,7 +48,7 @@ export class Home {
   );
 
   private busy = false;
-  private mockFeedIndex = 0;
+  private username: string | null = null;
   private touchStartY: number | null = null;
 
   constructor() {
@@ -115,9 +71,7 @@ export class Home {
     try {
       // Fetch the next item while the leave animation plays
       const [nextItem] = await Promise.all([
-        USE_MOCK_FEED
-          ? this.nextMockItem()
-          : firstValueFrom(this.api.nextItem()),
+        firstValueFrom(this.api.nextItem()),
         wait(hasItem ? LEAVE_MS : 0),
       ]);
       await this.show(nextItem);
@@ -158,6 +112,7 @@ export class Home {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
     const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
+    if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
 
     this.session()?.stop();
     this.item.set(item);
@@ -165,7 +120,7 @@ export class Home {
     if (gameCode !== null) {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
-        username: 'guest', // TODO: use the logged-in user once there is a login page
+        username: this.username ?? '',
         data: gameItem?.data ?? {
           context: `"${item.title}", a short game in a learning feed.`,
         },
@@ -173,16 +128,6 @@ export class Home {
         height: host.clientHeight,
       });
     }
-  }
-
-  private async nextMockItem(): Promise<FeedItem> {
-    const item = MOCK_FEED[this.mockFeedIndex % MOCK_FEED.length];
-    this.mockFeedIndex += 1;
-    if (item.type !== 'game') return item;
-    const games = await firstValueFrom(this.api.listContent('game'));
-    const game = games.find((g) => g.title === MOCK_GAME_TITLE);
-    if (!game) throw new Error(`The game "${MOCK_GAME_TITLE}" is not published.`);
-    return { ...item, id: game.id, url: game.url };
   }
 }
 
@@ -200,4 +145,3 @@ function describeError(err: unknown): string {
   }
   return err instanceof Error ? err.message : String(err);
 }
-
