@@ -1,3 +1,43 @@
-<section>
-  <h2>Upload</h2>
+<section class="upload">
+  <h2>Meine Dokumente</h2>
+
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+
+  <div class="projects" role="list" aria-label="Projekte">
+    <app-project-folder [isNew]="true" (pressed)="addProject()" />
+    @for (project of projects(); track project.id) {
+      <app-project-folder
+        [name]="project.name"
+        [color]="project.color"
+        [count]="project.files.length"
+        [selected]="project.id === selectedId()"
+        (pressed)="selectedId.set(project.id)"
+        (colorChange)="setColor(project.id, $event)"
+        (rename)="renameProject(project)"
+        (remove)="removeProject(project.id)"
+      />
+    }
+  </div>
+
+  <hr />
+
+  <div class="files">
+    @if (selected(); as project) {
+      @for (file of project.files; track file.id) {
+        <app-file-item [file]="file" (remove)="removeFile(file)" />
+      } @empty {
+        <p class="hint">Noch keine Dateien in diesem Projekt.</p>
+      }
+    } @else {
+      <p class="hint">Wähle oder erstelle ein Projekt.</p>
+    }
+  </div>
+
+  @if (selected()) {
+    <div class="dropzone-bar">
+      <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
+    </div>
+  }
 </section>

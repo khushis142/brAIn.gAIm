@@ -1,11 +1,14 @@
-// dodge.js: dodge the falling blocks. Arrow keys or A/D to move, Space to restart.
-let W, H;
+// dodge.js: dodge the falling blocks. Arrow keys to move.
+let W, H, gameApi, username, difficulty;
 let player, blocks, spawnTimer, score, gameOver;
 let best = 0;
 
 function init(api) {
+  gameApi = api;
   W = api.width;
   H = api.height;
+  username = api.username;
+  difficulty = api.data?.difficulty || 'normal';
   reset();
 }
 
@@ -18,14 +21,11 @@ function reset() {
 }
 
 function update(dt, input) {
-  if (gameOver) {
-    if (input.keys['Space']) reset();
-    return;
-  }
+  if (gameOver) return;
 
   // Move player
-  const left = input.keys['ArrowLeft'] || input.keys['KeyA'];
-  const right = input.keys['ArrowRight'] || input.keys['KeyD'];
+  const left = input.keys['ArrowLeft'];
+  const right = input.keys['ArrowRight'];
   if (left) player.x -= player.speed * dt;
   if (right) player.x += player.speed * dt;
   player.x = Math.max(0, Math.min(W - player.w, player.x));
@@ -40,7 +40,7 @@ function update(dt, input) {
       y: -size,
       w: size,
       h: size,
-      vy: 150 + Math.random() * 150 + score * 8,
+      vy: 150 + Math.random() * 150 + score * 8 + difficultyOffset(),
     });
     spawnTimer = Math.max(0.15, 0.8 - score * 0.02);
   }
@@ -56,9 +56,23 @@ function update(dt, input) {
     if (hit) {
       gameOver = true;
       best = Math.max(best, score);
+      gameApi.submitResult({
+        score: Math.floor(score * 10),
+        game: 'dodge',
+        username,
+        difficulty,
+        survivedSeconds: Number(score.toFixed(2)),
+      });
+      break;
     }
   }
   blocks = blocks.filter(b => b.y < H);
+}
+
+function difficultyOffset() {
+  if (difficulty === 'easy') return -40;
+  if (difficulty === 'hard') return 80;
+  return 0;
 }
 
 function render(ctx) {
@@ -85,9 +99,9 @@ function render(ctx) {
   if (gameOver) {
     ctx.textAlign = 'center';
     ctx.font = '48px sans-serif';
-    ctx.fillText('Game Over', W / 2, H / 2 - 10);
+    ctx.fillText('Run Complete', W / 2, H / 2 - 10);
     ctx.font = '22px sans-serif';
-    ctx.fillText('Press Space to restart', W / 2, H / 2 + 30);
+    ctx.fillText('See your score below', W / 2, H / 2 + 30);
   }
 }
 

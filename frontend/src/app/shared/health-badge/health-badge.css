@@ -13,6 +13,31 @@
   font-weight: 650;
   gap: 6px;
   padding: 7px 10px;
+  position: relative;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.status-popup {
+  animation: popup-fade-in 180ms ease-out both;
+  background: var(--text);
+  border-radius: 8px;
+  color: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 500;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: normal;
+  z-index: 20;
+}
+
+.status-popup.fading {
+  animation: popup-fade-out 200ms ease-in both;
 }
 
 .material-symbols-outlined {
@@ -37,8 +62,35 @@
   }
 }
 
+@keyframes popup-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 6px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes popup-fade-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 6px));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .health-badge:not(.healthy):not(.unavailable) .material-symbols-outlined {
+    animation: none;
+  }
+
+  .status-popup,
+  .status-popup.fading {
     animation: none;
   }
 }

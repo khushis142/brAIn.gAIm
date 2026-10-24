@@ -1,0 +1,49 @@
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100dvh - 60px - 76px - 56px);
+}
+
+.dropzone-bar {
+  background: var(--surface);
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  padding: 8px 0;
+  position: sticky;
+  z-index: 10;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.projects {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  width: 100%;
+}
+
+.files {
+  flex: 1;
+  min-height: 160px;
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.error {
+  background: var(--control);
+  border-radius: 8px;
+  color: #ef5350;
+  margin: 0;
+  padding: 8px 12px;
+}

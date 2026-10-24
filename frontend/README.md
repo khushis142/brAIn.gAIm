@@ -1,3 +1,13 @@
+## Writing a game
+
+Games for the sandboxed engine must call `registerGame()` and implement `init`,
+`update`, and `render`. The host supplies the username and game-specific input
+data during startup, and the game reports a numeric score through
+`api.submitResult({ score })`.
+
+See [docs/game-authoring.md](docs/game-authoring.md) for the complete contract,
+an example, and lifecycle guidance.
+
 # Braingain
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.4.

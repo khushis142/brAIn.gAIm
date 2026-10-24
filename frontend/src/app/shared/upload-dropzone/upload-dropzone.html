@@ -1,0 +1,12 @@
+<label
+  class="dropzone"
+  [class.dragging]="dragging()"
+  [class.disabled]="disabled()"
+  (dragover)="onDragOver($event)"
+  (dragleave)="dragging.set(false)"
+  (drop)="onDrop($event)"
+>
+  <span class="material-symbols-outlined" aria-hidden="true">upload</span>
+  <span>{{ disabled() ? 'Lädt hoch…' : 'Upload' }}</span>
+  <input type="file" multiple [disabled]="disabled()" (change)="onInput($event)" />
+</label>

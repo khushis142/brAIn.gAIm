@@ -1,0 +1,26 @@
+<div class="file-item">
+  @if (file().previewUrl; as url) {
+    <img class="preview" [src]="url" alt="" />
+  } @else {
+    <span
+      class="material-symbols-outlined type-icon"
+      aria-hidden="true"
+      [style.color]="icon().color"
+    >
+      {{ icon().name }}
+    </span>
+  }
+
+  <div class="info">
+    <span class="name">{{ file().name }}</span>
+    @if (file().description) {
+      <span class="description">{{ file().description }}</span>
+    }
+  </div>
+
+  <div class="actions">
+    <button type="button" aria-label="Datei löschen" (click)="remove.emit(file())">
+      <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+    </button>
+  </div>
+</div>

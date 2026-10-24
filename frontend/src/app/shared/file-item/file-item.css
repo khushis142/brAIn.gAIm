@@ -1,0 +1,65 @@
+.file-item {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.type-icon {
+  flex: none;
+  font-size: 40px;
+}
+
+.preview {
+  border-radius: 8px;
+  flex: none;
+  height: 40px;
+  object-fit: cover;
+  width: 40px;
+}
+
+.info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--accent);
+  cursor: pointer;
+  display: grid;
+  padding: 6px;
+  place-items: center;
+}
+
+button:hover {
+  background: var(--control);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+}
