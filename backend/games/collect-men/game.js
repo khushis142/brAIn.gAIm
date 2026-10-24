@@ -581,6 +581,8 @@ function contextLost() {
 
 function contextRestored(restoredApi) {
   api = restoredApi;
+}
+
 function updateGame(dt, input) {
   update(dt, input);
 }
