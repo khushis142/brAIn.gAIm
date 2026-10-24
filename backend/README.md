@@ -129,8 +129,8 @@ Portainer setup (once):
    file* and replace every value.
 
 LLM proxy (once): the stack runs a [LiteLLM](https://docs.litellm.ai/) proxy that routes the
-aliases in `litellm/config.yaml` (`smart`, `fast`) to Anthropic, tracks spend and stops at
-the proxy-wide budget there. Prompts are not logged. To switch the backend to it:
+aliases in its config (`LITELLM_CONFIG` of the `litellm` service in `docker-compose.yaml`:
+`smart`, `fast`) to Anthropic, tracks spend and stops at the proxy-wide budget there. Prompts are not logged. To switch the backend to it:
 
 1. Create the proxy's database: `createdb litellm` on the external Postgres.
 2. Deploy, then create a key for the backend with its own budget (USD):
