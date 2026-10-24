@@ -1,16 +1,12 @@
 # Production stack for Portainer (GitOps). Configure the variables below as
-# stack environment variables; Postgres and S3 are provided externally.
+# stack environment variables; Postgres is provided externally.
 services:
   backend:
     # Deployed version, updated by hand after CI has published it (see README).
-    image: ghcr.io/brain-gaim/backend:0.0.4
+    image: ghcr.io/brain-gaim/backend:0.0.6
     container_name: backend
     restart: unless-stopped
     ports: ["3000:8000"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:?postgresql+asyncpg://user:pass@host:5432/db}
-      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:?}
-      S3_BUCKET: ${S3_BUCKET:?}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?}
+      DATABASE_URL: ${DATABASE_URL:?postgresql://user:pass@host:5432/db}
       JWT_SECRET: ${JWT_SECRET:?at least 32 characters}
