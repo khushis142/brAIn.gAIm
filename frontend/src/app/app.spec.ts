@@ -13,7 +13,7 @@ describe('App', () => {
         provideRouter(routes),
         {
           provide: ApiService,
-          useValue: { get: () => of(null), isAuthenticated: () => true },
+          useValue: { health: () => of({}), cdnHealth: () => of({}), isAuthenticated: () => true },
         },
       ],
     })
