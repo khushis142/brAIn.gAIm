@@ -11,5 +11,6 @@ post {
 }
 
 docs {
-  One LLM call from the project's current text; unchanged text returns the existing cards.
+  One LLM call from the project's body and text/PDF attachments; an unchanged project
+  returns the existing cards. 422 if there is no text at all.
 }

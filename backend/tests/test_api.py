@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 from jsonschema import validate
@@ -19,6 +20,7 @@ from app.generator.llm import FakeLLM, LLMError
 from app.main import app
 from app.models import Base, Content, GameRound, Impression, Score, User, UserAccessory
 from app.seed_game import seed_game, update_game
+from tests.test_attachments import text_pdf
 
 EXAMPLE_DIR = Path(__file__).parents[1] / "games/example-quiz"
 EXAMPLE_GAME = GameConfig.model_validate_json((EXAMPLE_DIR / "config.json").read_text())
@@ -553,8 +555,10 @@ async def test_flashcards_are_generated_on_request(
 
     second = await generate()
     assert len(second) == 10 and not set(second) & set(first)
+    # Nothing to make cards from: an error, and the old cards stay.
     await client.patch(path, json={"body": ""}, headers=owner)
-    assert await generate() == []
+    assert (await client.post(cards_path, headers=owner)).status_code == 422
+    assert await card_ids() == second
 
     # Rounds use a few random cards of the active project.
     await client.patch(path, json={"body": "v3"}, headers=owner)
@@ -761,3 +765,77 @@ async def test_equip_accessories(client: AsyncClient) -> None:
     # Failed updates change nothing.
     zombie = (await client.get("/users/me/zombie", headers=headers)).json()
     assert zombie["equipped"] == expected
+
+
+async def test_flashcards_read_text_and_pdf_attachments(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.generator import flashcards
+
+    owner = await _auth(client, "reader")
+    project = (await client.post("/projects", json={"name": "Bio"}, headers=owner)).json()
+    path = f"/projects/{project['id']}"
+    files = {
+        "notes.txt": b"Mitochondria make ATP.",
+        "paper.pdf": text_pdf("Ribosomes build proteins"),
+        "diagram.png": b"\x89PNG never read",
+        "gone.md": None,  # missing on the CDN
+    }
+    downloads: list[str] = []
+    materials: list[str] = []
+
+    async def fake_download(file_id: uuid.UUID, filename: str, max_bytes: int) -> bytes:
+        downloads.append(filename)
+        if files[filename] is None:
+            request = httpx.Request("GET", cdn.file_url(file_id, filename))
+            raise httpx.HTTPStatusError("404", request=request, response=httpx.Response(404))
+        return files[filename]
+
+    real_generate = flashcards.generate_flashcards
+
+    async def recording_generate(llm, material):  # type: ignore[no-untyped-def]
+        materials.append(material)
+        return await real_generate(llm, material)
+
+    monkeypatch.setattr(cdn, "download", fake_download)
+    monkeypatch.setattr(flashcards, "generate_flashcards", recording_generate)
+
+    async def attach(filename: str) -> None:
+        body = {"id": str(uuid.uuid4()), "filename": filename}
+        assert (
+            await client.post(f"{path}/attachments", json=body, headers=owner)
+        ).status_code == 201
+
+    # An image alone is no material, and isn't even downloaded.
+    await attach("diagram.png")
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 422
+    assert downloads == []
+
+    for filename in ["notes.txt", "paper.pdf", "gone.md"]:
+        await attach(filename)
+    res = await client.post(f"{path}/flashcards", headers=owner)
+    assert res.status_code == 200 and len(res.json()) == 10
+    assert sorted(downloads) == ["gone.md", "notes.txt", "paper.pdf"]
+    assert materials == [
+        "# Bio\n\n## notes.txt\n\nMitochondria make ATP."
+        "\n\n## paper.pdf\n\nRibosomes build proteins"
+    ]
+
+    # Unchanged project: no downloads, no LLM call. A new attachment counts as a change.
+    downloads.clear()
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 200
+    assert downloads == [] and len(materials) == 1
+    files["more.txt"] = b"Cells divide."
+    await attach("more.txt")
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 200
+    assert len(materials) == 2 and "Cells divide." in materials[1]
+
+    # An unreachable CDN fails the request instead of making cards from part of the project.
+    files["late.txt"] = b"x"
+    await attach("late.txt")
+
+    async def unreachable(*args: object) -> bytes:
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(cdn, "download", unreachable)
+    assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 502
