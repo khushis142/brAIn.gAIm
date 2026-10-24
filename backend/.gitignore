@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.env
+.direnv/
+result
+.pytest_cache/
+.ruff_cache/
+# Local seed content (only the example manifest is tracked)
+seed/*
+!seed/manifest.example.json
