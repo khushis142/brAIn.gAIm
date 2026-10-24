@@ -61,6 +61,22 @@ const MOCK_FEED: FeedItem[] = [
       scoreLabel: 'Focus score',
     },
   },
+  {
+    type: 'game',
+    id: 'collect-men-demo',
+    title: 'Collect Men',
+    url: 'assets/games/collect-men/game.js',
+    data: {
+      context: 'Collect friendly 3D figures while staying focused.',
+      difficulty: 'normal',
+      pauseTitle: 'Keep collecting?',
+      pauseMessage: 'Take a breath and return when you are ready.',
+      resumeLabel: 'Continue collecting',
+      leaderboardTitle: 'Collection results',
+      leaderboardSubtitle: 'How many figures can you collect?',
+      scoreLabel: 'Collection score',
+    },
+  },
 ];
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -194,4 +210,3 @@ function describeError(err: unknown): string {
   }
   return err instanceof Error ? err.message : String(err);
 }
-

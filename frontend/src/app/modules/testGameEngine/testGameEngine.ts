@@ -27,6 +27,11 @@ import { GameSession } from '../../engine/gameSession';
           Play 3D Dodge
         </button>
         <button
+          class="rounded-md bg-violet-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-400"
+          (click)="loadGame('collect-men')">
+          Play Collect Men
+        </button>
+        <button
           class="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
           (click)="session()?.stop()">
           Stop
@@ -183,16 +188,60 @@ export class GameViewComponent {
       const res = await fetch(`assets/games/${name}/game.js`);
       if (!res.ok) throw new Error(`Could not load ${name}/game.js (${res.status})`);
       this.session()?.start(await res.text(), {
-        username: 'demo-user',
+        username: 'collect-men-mock-user',
         data: {
-          context: 'A short reaction game for a learning feed.',
+          context: 'A short science quiz about the solar system.',
           difficulty: 'normal',
           pauseTitle: 'Ready for a focus break?',
-          pauseMessage: 'Pause safely. Your current run will be waiting.',
-          resumeLabel: 'Continue Dodge',
-          leaderboardTitle: 'Focus break results',
-          leaderboardSubtitle: 'Your survival time from this learning feed.',
-          scoreLabel: 'Focus score',
+          pauseMessage: 'Pause safely. Your current question will be waiting.',
+          resumeLabel: 'Continue quiz',
+          leaderboardTitle: 'Quiz results',
+          leaderboardSubtitle: 'Your score from the collect-men quiz.',
+          scoreLabel: 'Quiz score',
+          questions: [
+            {
+              question: 'Which planet is known as the Red Planet?',
+              answer_correct: 'Mars',
+              answer_incorrect: 'Venus',
+              answer_incorrect2: 'Neptune',
+            },
+            {
+              question: 'How many moons does Earth have?',
+              answer_correct: 'One',
+              answer_incorrect: 'Two',
+              answer_incorrect2: 'Four',
+            },
+            {
+              question: 'What does the Sun provide Earth?',
+              answer_correct: 'Light',
+              answer_incorrect: 'Salt',
+              answer_incorrect2: 'Ice',
+            },
+            {
+              question: 'Which gas do plants absorb?',
+              answer_correct: 'Carbon dioxide',
+              answer_incorrect: 'Oxygen',
+              answer_incorrect2: 'Hydrogen',
+            },
+            {
+              question: 'What is water made of?',
+              answer_correct: 'Hydrogen and oxygen',
+              answer_incorrect: 'Salt and iron',
+              answer_incorrect2: 'Carbon and helium',
+            },
+            {
+              question: 'Which force pulls objects down?',
+              answer_correct: 'Gravity',
+              answer_incorrect: 'Magnetism',
+              answer_incorrect2: 'Friction',
+            },
+            {
+              question: 'What is the closest star to Earth?',
+              answer_correct: 'The Sun',
+              answer_incorrect: 'Sirius',
+              answer_incorrect2: 'Polaris',
+            },
+          ],
         },
       });
     } catch (err) {
