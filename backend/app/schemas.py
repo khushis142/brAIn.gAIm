@@ -5,6 +5,8 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
+from app.zombie import ACCESSORIES, Slot
+
 Kind = Literal["video", "game"]
 
 # Videos the frontend can play (the CDN accepts more).
@@ -170,8 +172,61 @@ FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]
 
 class ScoreCreate(BaseModel):
     score: int = Field(ge=0)
+    round_id: uuid.UUID | None = Field(
+        None, description="The feed item's round_id; a round is scored once, repeats are ignored"
+    )
+
+
+class ScoreResult(BaseModel):
+    newly_unlocked: list[str] = Field(description="Accessory ids this score unlocked")
+    games_completed: int
 
 
 class LeaderboardEntry(BaseModel):
     username: str
     score: int
+
+
+class AccessoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    slot: Slot
+    unlock_description: str
+
+
+class Equipped(BaseModel):
+    # In updates: omitted = unchanged, null = unequipped.
+    model_config = ConfigDict(extra="forbid")
+
+    head: str | None = None
+    eyes: str | None = None
+    neck: str | None = None
+    feet: str | None = None
+
+    @model_validator(mode="after")
+    def _check_slots(self) -> Self:
+        for slot in self.model_fields_set:
+            accessory_id = getattr(self, slot)
+            if accessory_id is None:
+                continue
+            accessory = ACCESSORIES.get(accessory_id)
+            if accessory is None:
+                raise ValueError(f"unknown accessory {accessory_id!r}")
+            if accessory.slot != slot:
+                raise ValueError(f"{accessory_id!r} is worn on {accessory.slot}, not {slot}")
+        return self
+
+
+class AccessoryProgress(BaseModel):
+    id: str
+    current: int
+    target: int
+
+
+class ZombieRead(BaseModel):
+    unlocked: list[str]
+    equipped: Equipped
+    games_completed: int
+    progress: list[AccessoryProgress] = Field(description="Locked accessories with a count goal")

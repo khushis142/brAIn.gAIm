@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import engine
 from app.generator.llm import get_llm
-from app.routers import auth, content, feed, games, projects, users
+from app.routers import auth, content, feed, games, projects, users, zombie
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ for router in (
     projects.router,
     feed.router,
     games.router,
+    zombie.router,
 ):
     app.include_router(router)
 
