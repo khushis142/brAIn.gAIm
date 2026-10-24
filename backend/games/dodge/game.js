@@ -69,8 +69,12 @@ function reset() {
 function update(dt, input) {
   if (gameOver) return;
 
-  const left = input.keys.ArrowLeft || touching('left');
-  const right = input.keys.ArrowRight || touching('right');
+  const leftHeld =
+    typeof input.keys.ArrowLeft === 'object' ? input.keys.ArrowLeft.held : input.keys.ArrowLeft;
+  const rightHeld =
+    typeof input.keys.ArrowRight === 'object' ? input.keys.ArrowRight.held : input.keys.ArrowRight;
+  const left = leftHeld || touching('left');
+  const right = rightHeld || touching('right');
   if (left) player.x -= player.speed * dt;
   if (right) player.x += player.speed * dt;
   player.x = Math.max(0, Math.min(W - player.w, player.x));

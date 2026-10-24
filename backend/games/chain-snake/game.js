@@ -147,7 +147,9 @@ function loadChains(data) {
 
 // ------------------------------------------------------------------ helpers
 function pressed(input, key) {
-  return input.keys[key] && !prevKeys[key];
+  const state = input.keys[key];
+  if (state && typeof state === 'object') return Boolean(state.justPressed);
+  return Boolean(state && !prevKeys[key]);
 }
 
 function shuffle(list) {

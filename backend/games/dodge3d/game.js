@@ -89,8 +89,12 @@ function reset() {
 function update(dt, input) {
   if (gameOver) return;
 
-  if (input.keys.ArrowLeft || touching('left')) playerX -= 2.8 * dt;
-  if (input.keys.ArrowRight || touching('right')) playerX += 2.8 * dt;
+  const leftHeld =
+    typeof input.keys.ArrowLeft === 'object' ? input.keys.ArrowLeft.held : input.keys.ArrowLeft;
+  const rightHeld =
+    typeof input.keys.ArrowRight === 'object' ? input.keys.ArrowRight.held : input.keys.ArrowRight;
+  if (leftHeld || touching('left')) playerX -= 2.8 * dt;
+  if (rightHeld || touching('right')) playerX += 2.8 * dt;
   playerX = Math.max(-3, Math.min(3, playerX));
   score += dt;
   spawnTimer -= dt;

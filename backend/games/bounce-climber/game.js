@@ -257,8 +257,14 @@ function update(dt, input) {
 
   // Steering controls
   let moveDir = 0;
-  if (input.keys?.ArrowLeft || input.keys?.KeyA || isTouching('left')) moveDir -= 1;
-  if (input.keys?.ArrowRight || input.keys?.KeyD || isTouching('right')) moveDir += 1;
+  const leftHeld =
+    typeof input.keys?.ArrowLeft === 'object' ? input.keys.ArrowLeft.held : input.keys?.ArrowLeft;
+  const rightHeld =
+    typeof input.keys?.ArrowRight === 'object' ? input.keys.ArrowRight.held : input.keys?.ArrowRight;
+  const aHeld = typeof input.keys?.KeyA === 'object' ? input.keys.KeyA.held : input.keys?.KeyA;
+  const dHeld = typeof input.keys?.KeyD === 'object' ? input.keys.KeyD.held : input.keys?.KeyD;
+  if (leftHeld || aHeld || isTouching('left')) moveDir -= 1;
+  if (rightHeld || dHeld || isTouching('right')) moveDir += 1;
 
   if (moveDir !== 0) {
     facing = moveDir;
