@@ -35,6 +35,19 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('focuses the iframe when the game loads so it receives keyboard controls', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const focus = vi.spyOn(iframe, 'focus');
+
+    iframe.dispatchEvent(new Event('load'));
+
+    expect(focus).toHaveBeenCalledOnce();
+    session.destroy();
+  });
+
   it('embeds the configured mobile performance profile', () => {
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source');

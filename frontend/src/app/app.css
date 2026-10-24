@@ -56,3 +56,9 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+@media (max-width: 600px) {
+  .page-content:has(app-home) {
+    padding: 0;
+  }
+}

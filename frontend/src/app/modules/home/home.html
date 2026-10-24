@@ -9,7 +9,61 @@
 
       @if (item(); as current) {
         @if (current.type === 'video') {
-          <video class="video" [src]="current.url" autoplay muted loop playsinline controls></video>
+          <video
+            #video
+            class="video"
+            [src]="current.url"
+            autoplay
+            muted
+            loop
+            playsinline
+            (loadedmetadata)="onVideoLoadedMetadata($event)"
+            (timeupdate)="onVideoTimeUpdate($event)"
+            (play)="onVideoPlay()"
+            (pause)="onVideoPause()"
+            (click)="togglePlayback()"
+          ></video>
+
+          @if (isSeeking()) {
+            <output class="seek-timestamp" aria-live="polite">{{ seekTimestamp() }}</output>
+          }
+
+          @if (playbackBubble(); as action) {
+            <span class="playback-bubble" aria-hidden="true">
+              @if (action === 'play') {
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+              } @else {
+                <svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>
+              }
+            </span>
+          }
+
+          <div class="player-controls" [class.visible]="arePlayerControlsVisible()">
+            <div class="timeline">
+              <input
+                class="seek-input"
+                type="range"
+                min="0"
+                [max]="duration()"
+                step="0.1"
+                [value]="currentTime()"
+                [style.--seek-progress.%]="playheadPercent()"
+                aria-label="Video progress"
+                (pointerdown)="onSeekStart($event)"
+                (input)="onSeekInput($event)"
+                (pointerup)="onSeekEnd($event)"
+                (pointercancel)="onSeekEnd($event)"
+                (change)="onSeekEnd($event)"
+              />
+              <span
+                class="brain-playhead"
+                [style.left.%]="playheadPercent()"
+                aria-hidden="true"
+              >
+                <span class="material-symbols-outlined">network_intelligence</span>
+              </span>
+            </div>
+          </div>
         }
       } @else if (!error()) {
         <p class="placeholder">Loading your feed…</p>

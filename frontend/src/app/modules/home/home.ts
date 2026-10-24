@@ -16,6 +16,7 @@ import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
 
 type Phase = 'idle' | 'leaving' | 'entering';
+type PlaybackBubble = 'play' | 'pause';
 
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
@@ -37,10 +38,22 @@ export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
+  private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
 
   protected readonly item = signal<FeedItem | null>(null);
   protected readonly phase = signal<Phase>('idle');
   protected readonly session = signal<GameSession | null>(null);
+  protected readonly currentTime = signal(0);
+  protected readonly duration = signal(0);
+  protected readonly isPlaying = signal(true);
+  protected readonly isSeeking = signal(false);
+  protected readonly arePlayerControlsVisible = signal(false);
+  protected readonly playbackBubble = signal<PlaybackBubble | null>(null);
+  protected readonly playheadPercent = computed(() => {
+    const duration = this.duration();
+    return duration > 0 ? (this.currentTime() / duration) * 100 : 0;
+  });
+  protected readonly seekTimestamp = computed(() => formatTime(this.currentTime()));
   private readonly loadError = signal<string | null>(null);
   protected readonly error = computed(
     () =>
@@ -50,6 +63,9 @@ export class Home {
   private busy = false;
   private username: string | null = null;
   private touchStartY: number | null = null;
+  private seekTimestampTimer: ReturnType<typeof setTimeout> | null = null;
+  private playbackBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+  private playerControlsTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -57,7 +73,12 @@ export class Home {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
       this.next();
     });
-    inject(DestroyRef).onDestroy(() => this.session()?.destroy());
+    inject(DestroyRef).onDestroy(() => {
+      this.session()?.destroy();
+      if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
+      if (this.playbackBubbleTimer !== null) clearTimeout(this.playbackBubbleTimer);
+      if (this.playerControlsTimer !== null) clearTimeout(this.playerControlsTimer);
+    });
   }
 
   protected async next(): Promise<void> {
@@ -109,6 +130,66 @@ export class Home {
     this.session()?.resize(host.clientWidth, host.clientHeight);
   }
 
+  protected onVideoLoadedMetadata(event: Event): void {
+    const video = event.target as HTMLVideoElement;
+    this.duration.set(Number.isFinite(video.duration) ? video.duration : 0);
+    this.currentTime.set(video.currentTime);
+  }
+
+  protected onVideoTimeUpdate(event: Event): void {
+    this.currentTime.set((event.target as HTMLVideoElement).currentTime);
+  }
+
+  protected onVideoPlay(): void {
+    this.isPlaying.set(true);
+  }
+
+  protected onVideoPause(): void {
+    this.isPlaying.set(false);
+  }
+
+  protected togglePlayback(): void {
+    const video = this.video()?.nativeElement;
+    if (!video) return;
+
+    this.showPlayerControls();
+    if (video.paused) {
+      void video.play();
+      this.showPlaybackBubble('play');
+    } else {
+      video.pause();
+      this.showPlaybackBubble('pause');
+    }
+  }
+
+  protected onSeekStart(event: Event): void {
+    event.stopPropagation();
+    this.seekToRangeValue(event);
+    this.showPlayerControls();
+    this.showSeekTimestamp();
+  }
+
+  protected onSeekInput(event: Event): void {
+    event.stopPropagation();
+    this.seekToRangeValue(event);
+    this.showPlayerControls();
+    this.showSeekTimestamp();
+  }
+
+  private seekToRangeValue(event: Event): void {
+    const nextTime = (event.target as HTMLInputElement).valueAsNumber;
+    const video = this.video()?.nativeElement;
+    if (!video || !Number.isFinite(nextTime)) return;
+
+    video.currentTime = nextTime;
+    this.currentTime.set(nextTime);
+  }
+
+  protected onSeekEnd(event: Event): void {
+    event.stopPropagation();
+    this.hideSeekTimestampSoon();
+  }
+
   private async show(item: FeedItem): Promise<void> {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
@@ -130,6 +211,37 @@ export class Home {
       });
     }
   }
+
+  private showSeekTimestamp(): void {
+    if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
+    this.isSeeking.set(true);
+  }
+
+  private hideSeekTimestampSoon(): void {
+    if (this.seekTimestampTimer !== null) clearTimeout(this.seekTimestampTimer);
+    this.seekTimestampTimer = setTimeout(() => {
+      this.isSeeking.set(false);
+      this.seekTimestampTimer = null;
+    }, 700);
+  }
+
+  private showPlaybackBubble(action: PlaybackBubble): void {
+    if (this.playbackBubbleTimer !== null) clearTimeout(this.playbackBubbleTimer);
+    this.playbackBubble.set(action);
+    this.playbackBubbleTimer = setTimeout(() => {
+      this.playbackBubble.set(null);
+      this.playbackBubbleTimer = null;
+    }, 500);
+  }
+
+  private showPlayerControls(): void {
+    if (this.playerControlsTimer !== null) clearTimeout(this.playerControlsTimer);
+    this.arePlayerControlsVisible.set(true);
+    this.playerControlsTimer = setTimeout(() => {
+      this.arePlayerControlsVisible.set(false);
+      this.playerControlsTimer = null;
+    }, 2_000);
+  }
 }
 
 async function loadGameCode(url: string): Promise<string> {
@@ -145,4 +257,10 @@ function describeError(err: unknown): string {
     return `Server error (${err.status}).`;
   }
   return err instanceof Error ? err.message : String(err);
+}
+
+function formatTime(seconds: number): string {
+  const wholeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(wholeSeconds / 60);
+  return `${String(minutes).padStart(2, '0')}:${String(wholeSeconds % 60).padStart(2, '0')}`;
 }

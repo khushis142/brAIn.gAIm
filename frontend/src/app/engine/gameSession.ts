@@ -99,7 +99,10 @@ export class GameSession {
     iframe.addEventListener('touchcancel', forwardTouches, { passive: false });
     iframe.srcdoc = this.buildSrcdoc(gameCode, width, height, options);
     // Key events only reach the iframe once it has focus
-    iframe.addEventListener('load', () => iframe.contentWindow?.focus());
+    iframe.addEventListener('load', () => {
+      iframe.focus();
+      iframe.contentWindow?.focus();
+    });
 
     this.container.appendChild(iframe);
     this.iframe = iframe;
