@@ -1,4 +1,4 @@
-"""The zombie mascot's wardrobe; the accessory catalog itself lives in code (app/zombie.py)."""
+"""The zombie mascot's wardrobe; the catalogs themselves live in code (app/zombie.py)."""
 
 import uuid
 from datetime import datetime
@@ -39,3 +39,31 @@ class EquippedAccessory(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
     slot: Mapped[str] = mapped_column(String(16), primary_key=True)
     accessory_id: Mapped[str] = mapped_column(String(32))
+
+
+class UserAvatar(Base):
+    """An avatar a user unlocked. Permanent; starting avatars are implicit, never stored."""
+
+    __tablename__ = "user_avatars"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    avatar_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    unlocked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SelectedAvatar(Base):
+    """The avatar a user chose; no row = the default avatar.
+
+    No foreign key to user_avatars: starting avatars have no row there.
+    """
+
+    __tablename__ = "selected_avatars"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    avatar_id: Mapped[str] = mapped_column(String(32))

@@ -4,11 +4,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from app import zombie
+from app import feed, zombie
 from app.cdn import file_url
 from app.db import SessionDep
 from app.models import Content, GameRound, Score, User
-from app.schemas import ContentRead, LeaderboardEntry, ScoreCreate, ScoreResult
+from app.schemas import ContentRead, GameItem, LeaderboardEntry, ScoreCreate, ScoreResult
 from app.security import CurrentUser
 
 router = APIRouter(prefix="/games", tags=["games"])
@@ -74,6 +74,51 @@ async def get_game(game_id: uuid.UUID, session: SessionDep) -> ContentRead:
     )
 
 
+@router.post("/{game_id}/play", response_model=GameItem)
+async def play_game(
+    game_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> GameItem:
+    game = await session.get(Content, game_id)
+    if game is None or game.kind != "game":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Game not found")
+    url = file_url(game.id, game.filename)
+
+    ready_round = await session.scalar(
+        select(GameRound)
+        .where(
+            GameRound.user_id == user.id,
+            GameRound.game_id == game_id,
+            GameRound.served_at.is_(None),
+        )
+        .order_by(GameRound.created_at)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    )
+    if ready_round is None:
+        ready_round = await feed.prepare_round(session, user.id, game_id)
+
+    if ready_round is not None:
+        ready_round.served_at = func.now()
+        await session.commit()
+        return GameItem(
+            id=game.id,
+            title=game.title,
+            url=url,
+            round_id=ready_round.id,
+            data=ready_round.input,
+            assets=ready_round.assets,
+        )
+
+    return GameItem(
+        id=game.id,
+        title=game.title,
+        url=url,
+        round_id=uuid.uuid4(),
+        data={},
+        assets=[],
+    )
+
+
 @router.post("/{game_id}/scores", response_model=ScoreResult)
 async def submit_score(
     game_id: uuid.UUID, body: ScoreCreate, user: CurrentUser, session: SessionDep
@@ -91,11 +136,17 @@ async def submit_score(
     )
     if score_id is None:  # the round was scored already: keep the first score
         return ScoreResult(
-            newly_unlocked=[], games_completed=await zombie.games_completed(session, user.id)
+            newly_unlocked=[],
+            newly_unlocked_avatars=[],
+            games_completed=await zombie.games_completed(session, user.id),
         )
-    stats, newly_unlocked = await zombie.grant_unlocks(session, user.id)
+    unlocks = await zombie.grant_unlocks(session, user.id)
     await session.commit()
-    return ScoreResult(newly_unlocked=newly_unlocked, games_completed=stats.games_completed)
+    return ScoreResult(
+        newly_unlocked=unlocks.accessories,
+        newly_unlocked_avatars=unlocks.avatars,
+        games_completed=unlocks.stats.games_completed,
+    )
 
 
 @router.get("/{game_id}/leaderboard", response_model=list[LeaderboardEntry])
