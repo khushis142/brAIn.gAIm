@@ -431,3 +431,133 @@ async def test_project_attachments(client: AsyncClient) -> None:
         f"/projects/{again.json()['id']}/attachments", json=reuse, headers=owner
     )
     assert reused.status_code == 201
+
+
+async def test_active_project_feeds_the_games(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _auth(client, "gamemaker")
+    await _create_game("gamemaker")
+    owner = await _auth(client, "learner")
+    other = await _auth(client, "nosy")
+    materials: list[list[str]] = []
+    real_generate_input = feed.generate_input
+
+    async def recording_generate_input(llm, config, given):  # type: ignore[no-untyped-def]
+        materials.append(list(given))
+        return await real_generate_input(llm, config, given)
+
+    monkeypatch.setattr(feed, "generate_input", recording_generate_input)
+
+    async def ready_rounds() -> int:
+        async with SessionLocal() as session:
+            return await session.scalar(
+                select(func.count()).select_from(GameRound).where(GameRound.served_at.is_(None))
+            )
+
+    first = (await client.post("/projects", json={"name": "A", "body": "aa"}, headers=owner)).json()
+    second = (
+        await client.post("/projects", json={"name": "B", "body": "bb"}, headers=owner)
+    ).json()
+    foreign = (await client.post("/projects", json={"name": "X"}, headers=other)).json()
+    assert (await client.get("/users/me", headers=owner)).json()["active_project_id"] is None
+
+    # Without an active project, rounds use no material, even though projects exist.
+    await client.post("/feed/next", headers=owner)
+    assert materials == [[]]
+    assert await ready_rounds() == 1
+
+    # Activating a project replaces the prepared round with one about that project.
+    res = await client.patch("/users/me", json={"active_project_id": second["id"]}, headers=owner)
+    assert res.json()["active_project_id"] == second["id"]
+    # No flashcards yet: the round uses the project text.
+    assert materials[-1] == ["# B\n\nbb"]
+    assert await ready_rounds() == 1
+
+    # Setting the same project again or other fields keeps the prepared round.
+    await client.patch("/users/me", json={"active_project_id": second["id"]}, headers=owner)
+    await client.patch("/users/me", json={"interests": "x"}, headers=owner)
+    assert len(materials) == 2
+
+    # Others' projects can't be activated, and look the same as missing ones.
+    for project_id in [foreign["id"], str(uuid.uuid4())]:
+        res = await client.patch("/users/me", json={"active_project_id": project_id}, headers=owner)
+        assert res.status_code == 404
+    assert (await client.get("/users/me", headers=owner)).json()["active_project_id"] == second[
+        "id"
+    ]
+
+    # Deleting an inactive project keeps everything; deleting the active one clears it.
+    await client.delete(f"/projects/{first['id']}", headers=owner)
+    assert await ready_rounds() == 1
+    await client.delete(f"/projects/{second['id']}", headers=owner)
+    assert (await client.get("/users/me", headers=owner)).json()["active_project_id"] is None
+    assert await ready_rounds() == 0
+
+    # null deactivates as well.
+    third = (await client.post("/projects", json={"name": "C"}, headers=owner)).json()
+    await client.patch("/users/me", json={"active_project_id": third["id"]}, headers=owner)
+    res = await client.patch("/users/me", json={"active_project_id": None}, headers=owner)
+    assert res.json()["active_project_id"] is None
+    assert materials[-1] == []
+
+
+async def test_flashcards_are_generated_on_request(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = await _auth(client, "carder")
+    other = await _auth(client, "peeker")
+    project = (
+        await client.post("/projects", json={"name": "P", "body": "v1"}, headers=owner)
+    ).json()
+    path = f"/projects/{project['id']}"
+    cards_path = f"{path}/flashcards"
+
+    async def card_ids() -> list[str]:
+        res = await client.get(cards_path, headers=owner)
+        assert res.status_code == 200
+        return [card["id"] for card in res.json()]
+
+    async def generate() -> list[str]:
+        res = await client.post(cards_path, headers=owner)
+        assert res.status_code == 200, res.text
+        return [card["id"] for card in res.json()]
+
+    # Nothing happens on its own.
+    edited = (await client.patch(path, json={"body": "v1 edited"}, headers=owner)).json()
+    assert await card_ids() == []
+    for method in (client.get, client.post):
+        assert (await method(cards_path, headers=other)).status_code == 404
+
+    first = await generate()
+    assert len(first) == 10  # the fake LLM's minimum
+    assert await card_ids() == first
+    # Our bookkeeping doesn't count as the user's edit.
+    assert (await client.get(path, headers=owner)).json()["updated_at"] == edited["updated_at"]
+
+    # Unchanged text needs no LLM call; a failing LLM keeps the old cards.
+    async def failing_generate(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise LLMError("down")
+
+    with monkeypatch.context() as m:
+        m.setattr(FakeLLM, "generate", failing_generate)
+        assert await generate() == first
+        await client.patch(path, json={"body": "v2"}, headers=owner)
+        assert (await client.post(cards_path, headers=owner)).status_code == 502
+    assert await card_ids() == first
+
+    second = await generate()
+    assert len(second) == 10 and not set(second) & set(first)
+    await client.patch(path, json={"body": ""}, headers=owner)
+    assert await generate() == []
+
+    # Rounds use a few random cards of the active project.
+    await client.patch(path, json={"body": "v3"}, headers=owner)
+    await generate()
+    await client.patch("/users/me", json={"active_project_id": project["id"]}, headers=owner)
+    async with SessionLocal() as session:
+        user_id = await session.scalar(select(User.id).where(User.username == "carder"))
+        assert user_id is not None
+        materials = await feed._project_materials(session, user_id)
+    assert len(materials) == feed.CARDS_PER_ROUND
+    assert all(m.startswith("# P: ") for m in materials)

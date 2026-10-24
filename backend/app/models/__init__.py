@@ -8,12 +8,13 @@ from app.models.base import Base
 from app.models.content import Content
 from app.models.feed import Impression
 from app.models.games import GameRound, Score
-from app.models.projects import Project, ProjectAttachment
+from app.models.projects import Flashcard, Project, ProjectAttachment
 from app.models.users import User
 
 __all__ = [
     "Base",
     "Content",
+    "Flashcard",
     "GameRound",
     "Impression",
     "Project",

@@ -5,10 +5,21 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app import feed
 from app.cdn import file_url
 from app.db import SessionDep
-from app.models import Project, ProjectAttachment, User
-from app.schemas import AttachmentCreate, AttachmentRead, ProjectCreate, ProjectRead, ProjectUpdate
+from app.generator.flashcards import refresh_flashcards
+from app.generator.inputs import InputGenerationError
+from app.generator.llm import LLMError
+from app.models import Flashcard, Project, ProjectAttachment, User
+from app.schemas import (
+    AttachmentCreate,
+    AttachmentRead,
+    FlashcardRead,
+    ProjectCreate,
+    ProjectRead,
+    ProjectUpdate,
+)
 from app.security import CurrentUser
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -80,10 +91,49 @@ async def update_project(
     return _read(project)
 
 
+async def _flashcards(session: SessionDep, project_id: uuid.UUID) -> Sequence[Flashcard]:
+    return (
+        await session.scalars(
+            select(Flashcard)
+            .where(Flashcard.project_id == project_id)
+            .order_by(Flashcard.created_at, Flashcard.id)
+        )
+    ).all()
+
+
+@router.get("/{project_id}/flashcards", response_model=list[FlashcardRead])
+async def list_flashcards(
+    project_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> Sequence[Flashcard]:
+    """Empty until the user generates them."""
+    await _get_own(session, project_id, user)
+    return await _flashcards(session, project_id)
+
+
+@router.post(
+    "/{project_id}/flashcards",
+    response_model=list[FlashcardRead],
+    responses={status.HTTP_502_BAD_GATEWAY: {"description": "The LLM failed; old cards kept"}},
+)
+async def generate_flashcards(
+    project_id: uuid.UUID, user: CurrentUser, session: SessionDep
+) -> Sequence[Flashcard]:
+    """(Re)generate the cards from the project's current text; one LLM call, so it takes a
+    while. Unchanged text returns the existing cards without one."""
+    project = await _get_own(session, project_id, user)
+    try:
+        await refresh_flashcards(session, project)
+    except (InputGenerationError, LLMError):
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Generating flashcards failed") from None
+    return await _flashcards(session, project_id)
+
+
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> None:
     """Removes the project and its attachment records; the CDN files stay."""
     await session.delete(await _get_own(session, project_id, user))
+    if user.active_project_id == project_id:  # the database clears the reference itself
+        await feed.discard_ready_rounds(session, user.id)
     await session.commit()
 
 

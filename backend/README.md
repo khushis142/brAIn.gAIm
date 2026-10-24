@@ -38,7 +38,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | POST   | `/auth/register`             |      | `{username, password}`                     |
 | POST   | `/auth/token`                |      | OAuth2 password form → bearer JWT          |
 | GET    | `/users/me`                  | ✓    | Current user                               |
-| PATCH  | `/users/me`                  | ✓    | `{interests}`: free text, `null` clears    |
+| PATCH  | `/users/me`                  | ✓    | `{interests?, active_project_id?}`, `null` clears; the active project must be your own |
 | POST   | `/content`                   | ✓    | Register an uploaded video: `{id, filename, title, tags}` |
 | GET    | `/content`                   |      | List, filters `kind`, `tag`, `owner`; `limit`/`offset` |
 | GET    | `/content/{id}`              |      | One item with `url`                        |
@@ -49,6 +49,8 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | GET    | `/projects/{id}`             | ✓    | One project with its attachments           |
 | PATCH  | `/projects/{id}`             | ✓    | `{name?, body?}`                           |
 | DELETE | `/projects/{id}`             | ✓    | Project and attachment records; CDN files are kept |
+| GET    | `/projects/{id}/flashcards`  | ✓    | The project's flashcards; empty until generated |
+| POST   | `/projects/{id}/flashcards`  | ✓    | (Re)generate them from the current text (one LLM call, waits for it; 502 keeps the old ones) |
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
 | POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
@@ -62,7 +64,8 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 
 **Games** are fixed JS files on the CDN with a `config` in the database:
 `{"input_schema": <JSON Schema>, "context": "..."}`. The LLM writes `data` matching the
-schema from the context and the user's projects; it is validated, stored as a game round
+schema from the context and 5 random flashcards of the user's active project (its text
+while it has no cards yet, a general topic without one); it is validated, stored as a game round
 and returned with the game's `url`. The frontend starts the game with it
 (`session.start(code, {username, data})`, see `games/README.md`). Rounds are prepared ahead of time: after every `/feed/next`, a background task tops the
 user up to one ready round (LLM plus the game's `preconditions`, e.g. TTS via Piper at
@@ -89,15 +92,19 @@ other requests. Uploads set `fileId`/`filename`, project creation sets `projectI
 
 ## Design
 
-- **Feed decision** (`app/feed.py`): every `VIDEOS_PER_GAME` (3) videos a game is
+- **Feed decision** (`app/feed.py`): every `VIDEOS_PER_GAME` (5) videos a game is
   served. Unseen items are preferred; once everything was seen, items repeat. If one
   kind has no content, the other is served. Personalization based on the users'
   free-text `interests` is planned but not implemented yet.
   Every served item is stored as an `Impression`, which is the feed state.
 - **Content**: the CDN only stores files. All metadata (owner, kind, title, tags)
   lives in the `content` table, keyed by the CDN file id.
-- **Projects**: a user's private knowledge (Markdown body plus CDN attachments), the
-  input for enriching generated games later. They replace the planned decks and
+- **Projects**: a user's private knowledge (Markdown body plus CDN attachments). The
+  one set as `active_project_id` on the user is the material for the mini games;
+  switching it (or deleting it) discards the prepared round so the next game is about it.
+  On the user's request (`POST /projects/{id}/flashcards`), the LLM splits it into
+  flashcards (short, self-contained snippets), replacing the old ones; unchanged text
+  skips the call. Nothing regenerates them automatically, to keep LLM calls down. They replace the planned decks and
   documents (#20). Other users get 404, not 403, so projects don't reveal they exist.
 - **Migrations**: Alembic. After changing a model in `app/models/` (one module per domain;
   re-export new models in `app/models/__init__.py` so autogenerate sees them):

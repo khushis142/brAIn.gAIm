@@ -58,12 +58,12 @@ class GameConfig(BaseModel):
 
 
 class InputGenerationError(Exception):
-    """The LLM did not produce a valid input within MAX_ATTEMPTS."""
+    """The LLM did not produce schema-valid JSON within MAX_ATTEMPTS."""
 
 
-def material_message(materials: Sequence[str]) -> Message:
-    """The learner's projects as the user turn, capped to keep prompts small."""
-    material = "\n\n---\n\n".join(materials)[:_MATERIAL_CHARS]
+def material_message(materials: Sequence[str], max_chars: int = _MATERIAL_CHARS) -> Message:
+    """The learner's study material as the user turn, capped to keep prompts small."""
+    material = "\n\n---\n\n".join(materials)[:max_chars]
     content = (
         f"Study material:\n\n{material}"
         if material
@@ -83,13 +83,23 @@ def _prompt(config: GameConfig, materials: Sequence[str]) -> tuple[str, list[Mes
 
 
 async def generate_input(llm: LLM, config: GameConfig, materials: Sequence[str]) -> dict[str, Any]:
-    """Ask the LLM for an input matching `config.input_schema`, retrying with its errors."""
+    """Ask the LLM for an input matching `config.input_schema`."""
     system, messages = _prompt(config, materials)
-    validator = Draft202012Validator(config.input_schema)
+    return await generate_json(llm, system, messages, config.input_schema)
+
+
+async def generate_json(
+    llm: LLM,
+    system: str,
+    messages: list[Message],
+    schema: dict[str, Any],
+    *,
+    max_tokens: int = _MAX_TOKENS,
+) -> dict[str, Any]:
+    """Ask the LLM for a JSON object matching `schema`, retrying with its errors."""
+    validator = Draft202012Validator(schema)
     for _ in range(MAX_ATTEMPTS):
-        reply = await llm.generate(
-            system, messages, json_schema=config.input_schema, max_tokens=_MAX_TOKENS
-        )
+        reply = await llm.generate(system, messages, json_schema=schema, max_tokens=max_tokens)
         try:
             data = json.loads(reply)
         except json.JSONDecodeError as error:
@@ -105,4 +115,4 @@ async def generate_input(llm: LLM, config: GameConfig, materials: Sequence[str])
             {"role": "assistant", "content": reply},
             {"role": "user", "content": f"That reply was invalid:\n- {feedback}\nReply again."},
         ]
-    raise InputGenerationError(f"no valid input after {MAX_ATTEMPTS} attempts: {errors}")
+    raise InputGenerationError(f"no valid reply after {MAX_ATTEMPTS} attempts: {errors}")

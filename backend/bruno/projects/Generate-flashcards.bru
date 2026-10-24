@@ -1,0 +1,15 @@
+meta {
+  name: Generate flashcards
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{api}}/projects/{{projectId}}/flashcards
+  body: none
+  auth: inherit
+}
+
+docs {
+  One LLM call from the project's current text; unchanged text returns the existing cards.
+}

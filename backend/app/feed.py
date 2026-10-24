@@ -4,20 +4,22 @@ import logging
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal
 from app.generator.inputs import GameConfig, InputGenerationError, generate_input
 from app.generator.llm import LLMError, get_llm
 from app.generator.preconditions import PreconditionError, run_preconditions
-from app.models import Content, GameRound, Impression, Project, User
+from app.models import Content, Flashcard, GameRound, Impression, Project, User
 
 logger = logging.getLogger(__name__)
 
-VIDEOS_PER_GAME = 3
-# Prepared game rounds kept waiting per user; one suffices, as a game comes every 4th item.
+VIDEOS_PER_GAME = 5
+# Prepared game rounds kept waiting per user; one suffices, as a game comes every 6th item.
 READY_ROUNDS = 1
+# Flashcards of the active project a round is generated from.
+CARDS_PER_ROUND = 5
 
 
 def videos_since_last_game(recent_kinds: list[str]) -> int:
@@ -99,10 +101,30 @@ async def next_item(session: AsyncSession, user: User) -> Served | None:
 
 
 async def _project_materials(session: AsyncSession, user_id: uuid.UUID) -> list[str]:
-    projects = await session.scalars(
-        select(Project).where(Project.owner_id == user_id).order_by(Project.updated_at.desc())
+    """A few random flashcards of the user's active project; without one, a general topic."""
+    project = await session.scalar(
+        select(Project).join(User, User.active_project_id == Project.id).where(User.id == user_id)
     )
-    return [f"# {p.name}\n\n{p.body}" for p in projects]
+    if project is None:
+        return []
+    cards = (
+        await session.scalars(
+            select(Flashcard)
+            .where(Flashcard.project_id == project.id)
+            .order_by(func.random())
+            .limit(CARDS_PER_ROUND)
+        )
+    ).all()
+    if not cards:  # not generated yet
+        return [f"# {project.name}\n\n{project.body}"]
+    return [f"# {project.name}: {card.title}\n\n{card.body}" for card in cards]
+
+
+async def discard_ready_rounds(session: AsyncSession, user_id: uuid.UUID) -> None:
+    """Drop prepared rounds, e.g. once their material is no longer active; the caller commits."""
+    await session.execute(
+        delete(GameRound).where(GameRound.user_id == user_id, GameRound.served_at.is_(None))
+    )
 
 
 async def _prepare_round(session: AsyncSession, user_id: uuid.UUID) -> GameRound | None:

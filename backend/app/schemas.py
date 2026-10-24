@@ -32,6 +32,9 @@ def _blank_to_none(text: str | None) -> str | None:
 class UserUpdate(BaseModel):
     # Omitted = unchanged, null or blank = cleared.
     interests: Annotated[str | None, Field(max_length=2000), AfterValidator(_blank_to_none)] = None
+    active_project_id: uuid.UUID | None = Field(
+        None, description="Own project the mini games are generated from"
+    )
 
 
 class UserRead(BaseModel):
@@ -40,6 +43,7 @@ class UserRead(BaseModel):
     id: uuid.UUID
     username: str
     interests: str | None
+    active_project_id: uuid.UUID | None
 
 
 class Token(BaseModel):
@@ -128,6 +132,15 @@ class ProjectRead(BaseModel):
     attachments: list[AttachmentRead]
     created_at: datetime
     updated_at: datetime
+
+
+class FlashcardRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    body: str
+    created_at: datetime
 
 
 class VideoItem(BaseModel):
