@@ -11,6 +11,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?postgresql://user:pass@host:5432/db}
       JWT_SECRET: ${JWT_SECRET:?at least 32 characters}
       CDN_BASE_URL: ${CDN_BASE_URL:?public CDN URL, e.g. https://cdn.example.com}
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
 
 networks:
   default:
