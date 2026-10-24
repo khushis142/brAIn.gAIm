@@ -58,6 +58,29 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 - **Migrations**: Alembic. After changing `app/models.py`:
   `alembic revision --autogenerate -m "..."`, review, `alembic upgrade head`.
 
+## Deployment
+
+CI (`.github/workflows/`) builds `ghcr.io/brain-gaim/backend` (amd64 + arm64) and
+tags it `:<version>` and `:latest` whenever `version.txt` changes on `main`.
+**To deploy, bump `version.txt`.**
+
+The container runs `alembic upgrade head` on start, then serves on port 8000
+(healthcheck: `/health`).
+
+Portainer setup (once):
+
+1. *Stacks → Add stack → Repository*: this repo, compose path `docker-compose.yaml`.
+2. Enable *GitOps updates* with polling, plus *Re-pull image* and *Force
+   redeployment*. Every poll then pulls `:latest` and recreates the container only
+   if the image changed. Without force, Portainer can redeploy on the version-bump
+   commit before CI has pushed the new image, and stay on the old one.
+3. Set the stack environment variables: `DATABASE_URL`, `S3_BUCKET`,
+   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `JWT_SECRET` (required) and
+   `S3_ENDPOINT_URL`, `S3_REGION`, `CORS_ORIGINS` (optional), as in `.env.example`.
+
+Seed production content from a dev machine with `.env` pointing at the production
+database and bucket: `python -m app.seed seed/`.
+
 ## Tests
 
 ```sh
