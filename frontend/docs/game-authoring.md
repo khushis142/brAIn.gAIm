@@ -282,6 +282,83 @@ sandboxed and the Content Security Policy still prevents normal network
 access, so advanced WebGL libraries and assets must be bundled or supplied by
 the approved asset system. The existing 200 KB source limit still applies.
 
+## Security and resource budgets
+
+Games run in a sandboxed iframe, but game code is still untrusted. The runtime
+automatically stops a game when it exceeds any hard budget below. These limits
+are runtime enforcement, not a replacement for backend validation.
+
+| Resource | Hard limit |
+| --- | ---: |
+| Execution time | 5 minutes per run |
+| Approved asset entries | 32 |
+| Aggregate declared asset bytes | 32 MiB |
+| Image / audio / font / model | 5 / 10 / 2 / 15 MiB each |
+| Logical canvas width or height | 4096 px |
+| Canvas backing-store area | 16 megapixels |
+| One result payload | 32 KiB of UTF-8 JSON |
+| Result submissions | 3 per run |
+| One UI text value | 200 characters |
+| Complete UI design | 8 KiB of UTF-8 JSON |
+
+The execution timer starts when the sandbox is created and includes asset
+loading and game initialization. Pausing or hiding the game does not reset the
+timer. A failed budget reports an error and calls `destroy()` before the iframe
+is removed.
+
+Asset limits apply to the approved manifest and to bytes read from the network.
+Use `maxBytes` to choose a smaller per-asset limit; it cannot raise the hard
+per-kind limit. Keep the manifest to assets the game actually uses. Invalid,
+unknown, non-HTTPS, oversized, and over-budget entries are unavailable.
+
+Canvas dimensions are capped both when the host creates or resizes the iframe
+and when the runtime calculates the device-pixel backing store. Draw in logical
+coordinates and use `api.viewport.pixelWidth` and `api.viewport.pixelHeight`
+only when physical dimensions are genuinely required.
+
+Results must be JSON-compatible objects with a finite numeric `score`. Keep
+results compact and submit only when the game has a final result; repeated
+submissions are capped even when their content is valid. UI design labels are
+also bounded, so keep titles and controls short enough for a phone screen.
+
+The host validates all messages again before exposing them to the application.
+Do not treat result or UI validation as an authorization boundary: scores and
+display text still need normal backend validation before persistence or display
+to other users.
+
+## Feed lifecycle
+
+The feed owns the lifecycle of every game. A game cannot resume itself; the host
+must explicitly put it into the `playing` state after the card is visible and
+focused.
+
+The lifecycle states are:
+
+- `preloading`: game code and startup resources are being prepared.
+- `visible`: the card is fully visible, but the feed is transitioning or the
+  game is not yet eligible to run.
+- `playing`: the card is fully visible, the browser tab is visible, and the
+  game iframe has focus. The runtime loop may run.
+- `partially visible`: part of the card is visible. The game is paused.
+- `paused`: the game is temporarily inactive because the card left the
+  viewport, the tab was hidden, focus was lost, or the feed changed items.
+- `completed`: the game submitted a result. It remains paused and must not
+  resume while the result view is shown.
+- `disposed`: the feed removed the game permanently and called `destroy()`.
+
+Games are automatically paused when the card leaves the viewport, when the
+user swipes to another item, when the browser tab becomes hidden, and when a
+video item becomes active. A partially visible card is also paused to avoid
+running gameplay that the user cannot fully see. Returning to the card does
+not reload it: the feed resumes only after the card is fully visible, the tab
+is visible, the window is focused, and the transition has finished.
+
+When a game submits its first valid result, the host enters `completed` and
+pauses the runtime. Treat result submission as the end of gameplay; the feed
+controls navigation to the next item. `destroy()` is reserved for permanent
+teardown, such as leaving the feed or destroying the component, and is the only
+transition to `disposed`.
+
 ## Inputs
 
 The host starts a game with a game-code string and an input object:

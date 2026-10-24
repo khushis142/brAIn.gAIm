@@ -5,9 +5,11 @@ import {
   GameStartInput,
   GamePerformanceOptions,
   GameAssetManifest,
+  GameLifecycleState,
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
+  GAME_BUDGETS,
 } from './gameProtocol';
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
@@ -35,16 +37,19 @@ export class GameSession {
   private resizeObserver?: ResizeObserver;
   private lastBeat = 0;
   private watchdog?: ReturnType<typeof setInterval>;
+  private resultSubmissions = 0;
 
   private readonly _status = signal<SessionStatus>('idle');
   private readonly _error = signal<string | null>(null);
   private readonly _result = signal<GameResult | null>(null);
   private readonly _uiDesign = signal<GameUiDesign>({});
+  private readonly _lifecycle = signal<GameLifecycleState>('disposed');
 
   readonly status = this._status.asReadonly();
   readonly error = this._error.asReadonly();
   readonly result = this._result.asReadonly();
   readonly uiDesign = this._uiDesign.asReadonly();
+  readonly lifecycle = this._lifecycle.asReadonly();
 
   constructor(
     private readonly doc: Document,
@@ -65,10 +70,13 @@ export class GameSession {
     this._error.set(null);
     this._result.set(null);
     this._uiDesign.set({});
+    this.resultSubmissions = 0;
+    this._lifecycle.set('preloading');
     this._status.set('starting');
 
     const width = options.width ?? 800;
     const height = options.height ?? 600;
+    this.validateCanvasSize(width, height);
 
     const iframe = this.doc.createElement('iframe');
     // No allow-same-origin: the game gets an opaque origin and cannot touch the host.
@@ -135,6 +143,13 @@ export class GameSession {
     if (this._status() !== 'error') this._status.set('idle');
   }
 
+  setLifecycle(state: Exclude<GameLifecycleState, 'disposed'>): void {
+    if (this._lifecycle() === 'disposed') return;
+    this._lifecycle.set(state);
+    if (state === 'playing') this.resume();
+    else this.pause();
+  }
+
   pause(): void {
     this.send({ type: 'pause' });
   }
@@ -152,6 +167,11 @@ export class GameSession {
     if (!this.iframe || !Number.isFinite(width) || !Number.isFinite(height)) return;
     width = Math.max(1, Math.floor(width));
     height = Math.max(1, Math.floor(height));
+    if (width > GAME_BUDGETS.maxCanvasDimension || height > GAME_BUDGETS.maxCanvasDimension ||
+        width * height > GAME_BUDGETS.maxCanvasPixels) {
+      this.fail('Canvas dimensions exceed the game budget');
+      return;
+    }
     this.iframe.style.width = `${width}px`;
     this.iframe.style.height = `${height}px`;
     this.send({ type: 'resize', width, height });
@@ -159,6 +179,7 @@ export class GameSession {
 
   destroy(): void {
     this.stop();
+    this._lifecycle.set('disposed');
     this.doc.defaultView?.removeEventListener('message', this.onMessage);
   }
 
@@ -173,6 +194,14 @@ export class GameSession {
     }
     if (/<\/script/i.test(gameCode)) {
       throw new Error('Game code must not contain a closing script tag');
+    }
+  }
+
+  private validateCanvasSize(width: number, height: number): void {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1 ||
+        width > GAME_BUDGETS.maxCanvasDimension || height > GAME_BUDGETS.maxCanvasDimension ||
+        Math.floor(width) * Math.floor(height) > GAME_BUDGETS.maxCanvasPixels) {
+      throw new Error('Canvas dimensions exceed the game budget');
     }
   }
 
@@ -200,7 +229,13 @@ export class GameSession {
         this._uiDesign.set(e.data.design);
         break;
       case 'result':
+        this.resultSubmissions += 1;
+        if (this.resultSubmissions > GAME_BUDGETS.maxResultSubmissions) {
+          this.fail('Game exceeded the result submission budget');
+          break;
+        }
         this._result.set(e.data.result);
+        this.setLifecycle('completed');
         break;
       case 'error':
         this.fail(e.data.message.slice(0, MAX_ERROR_LENGTH));

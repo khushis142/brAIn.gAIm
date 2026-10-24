@@ -1,5 +1,6 @@
 <section class="feed" (touchstart)="onTouchStart($event)" (touchend)="onTouchEnd($event)">
   <article
+    #card
     class="card"
     [class.leaving]="phase() === 'leaving'"
     [class.entering]="phase() === 'entering'"

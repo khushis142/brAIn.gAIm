@@ -1,7 +1,28 @@
 /** Version of the host/game contract. Increase when the contract changes incompatibly. */
 export const GAME_PROTOCOL_VERSION = 2;
+/** Hard limits enforced by the sandbox runtime and mirrored by the host. */
+export const GAME_BUDGETS = Object.freeze({
+  executionTimeMs: 5 * 60 * 1000,
+  maxAssets: 32,
+  maxAssetBytes: 32 * 1024 * 1024,
+  maxCanvasDimension: 4096,
+  maxCanvasPixels: 16 * 1024 * 1024,
+  maxResultBytes: 32 * 1024,
+  maxUiTextLength: 200,
+  maxUiDesignBytes: 8 * 1024,
+  maxResultSubmissions: 3,
+});
 
 export type GameRenderer = '2d' | 'webgl';
+
+export type GameLifecycleState =
+  | 'preloading'
+  | 'visible'
+  | 'playing'
+  | 'partially visible'
+  | 'paused'
+  | 'completed'
+  | 'disposed';
 
 export type GameInputKind = 'touch' | 'keyboard' | 'gamepad';
 
@@ -189,6 +210,7 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
       return false;
     }
   }
+  let textBytes = 0;
   for (const section of [design.pauseMenu, design.leaderboard]) {
     if (section === undefined) continue;
     if (typeof section !== 'object' || section === null || Array.isArray(section)) return false;
@@ -200,12 +222,21 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
       scoreLabel?: unknown;
     };
     if (typeof title !== 'string') return false;
-    if (message !== undefined && typeof message !== 'string') return false;
-    if (resumeLabel !== undefined && typeof resumeLabel !== 'string') return false;
-    if (subtitle !== undefined && typeof subtitle !== 'string') return false;
-    if (scoreLabel !== undefined && typeof scoreLabel !== 'string') return false;
+    const text = [title, message, resumeLabel, subtitle, scoreLabel];
+    if (typeof title !== 'string') return false;
+    if (text.some((item) => item !== undefined && (typeof item !== 'string' || item.length > GAME_BUDGETS.maxUiTextLength))) {
+      return false;
+    }
+    for (const item of text) {
+      if (typeof item === 'string') textBytes += item.length;
+    }
   }
-  return true;
+  try {
+    return textBytes <= GAME_BUDGETS.maxUiDesignBytes &&
+      new TextEncoder().encode(JSON.stringify(value)).byteLength <= GAME_BUDGETS.maxUiDesignBytes;
+  } catch {
+    return false;
+  }
 }
 
 export interface InputState {
@@ -276,12 +307,17 @@ export function isSandboxEvent(value: unknown): value is SandboxEvent {
   if (type === 'started' || type === 'heartbeat') return true;
   if (type === 'ui-design') return isGameUiDesign(design);
   if (type === 'result') {
-    return (
+    if (!(
       typeof result === 'object' &&
       result !== null &&
       typeof (result as { score?: unknown }).score === 'number' &&
       Number.isFinite((result as { score: number }).score)
-    );
+    )) return false;
+    try {
+      return new TextEncoder().encode(JSON.stringify(result)).byteLength <= GAME_BUDGETS.maxResultBytes;
+    } catch {
+      return false;
+    }
   }
   return type === 'error' && typeof message === 'string';
 }

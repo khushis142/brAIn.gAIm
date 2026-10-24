@@ -150,6 +150,24 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('tracks lifecycle states and only resumes while playing', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+
+    session.setLifecycle('partially visible');
+    expect(session.lifecycle()).toBe('partially visible');
+
+    session.setLifecycle('playing');
+    expect(session.lifecycle()).toBe('playing');
+
+    session.setLifecycle('completed');
+    expect(session.lifecycle()).toBe('completed');
+
+    session.destroy();
+    expect(session.lifecycle()).toBe('disposed');
+  });
+
   it('forwards touches on the iframe element to the game', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -179,6 +197,31 @@ describe('GameSession', () => {
     expect(() => session.start('</script>', options)).toThrow('closing script tag');
     expect(() => session.start('x'.repeat(200 * 1024 + 1), options)).toThrow('200 KB');
     expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('rejects canvas dimensions outside the resource budget', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+
+    expect(() => session.start(gameCode, { ...options, width: 4097 })).toThrow('Canvas dimensions');
+    expect(() => session.start(gameCode, { ...options, width: 4096, height: 4097 })).toThrow('Canvas dimensions');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('stops after too many result submissions', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const result = { type: 'result', result: { score: 1 } };
+
+    for (let submission = 0; submission < 4; submission += 1) {
+      window.dispatchEvent(new MessageEvent('message', { source: iframe.contentWindow, data: result }));
+    }
+
+    expect(session.status()).toBe('error');
+    expect(session.error()).toContain('result submission budget');
+    session.destroy();
   });
 
   it('removes the iframe after stopping and lets the runtime shut down first', () => {

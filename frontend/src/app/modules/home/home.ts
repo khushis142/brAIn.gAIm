@@ -47,6 +47,7 @@ export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
+  private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
 
   protected readonly item = signal<FeedItem | null>(null);
@@ -87,17 +88,76 @@ export class Home {
   private lastTapAt = -Infinity;
   private nextBurstId = 0;
   private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
+  private intersectionObserver?: IntersectionObserver;
+  private visibleRatio = 1;
+  private windowFocused = true;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
     afterNextRender(() => {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
+      this.observeCardLifecycle();
       this.next();
     });
-    inject(DestroyRef).onDestroy(() => {
+    const destroyRef = inject(DestroyRef);
+    const view = document.defaultView;
+    const onVisibilityChange = () => this.syncGameLifecycle();
+    const onFocus = () => {
+      this.windowFocused = true;
+      this.syncGameLifecycle();
+    };
+    const onBlur = () => {
+      this.windowFocused = false;
+      this.syncGameLifecycle();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    view?.addEventListener('focus', onFocus);
+    view?.addEventListener('blur', onBlur);
+    destroyRef.onDestroy(() => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      view?.removeEventListener('focus', onFocus);
+      view?.removeEventListener('blur', onBlur);
+      this.intersectionObserver?.disconnect();
       this.session()?.destroy();
       this.clearTimers();
     });
+  }
+
+  private observeCardLifecycle(): void {
+    const Observer = document.defaultView?.IntersectionObserver;
+    if (!Observer) return;
+    this.intersectionObserver = new Observer(
+      ([entry]) => {
+        this.visibleRatio = entry?.intersectionRatio ?? 0;
+        this.syncGameLifecycle();
+      },
+      { threshold: [0, 0.5, 1] },
+    );
+    this.intersectionObserver.observe(this.card().nativeElement);
+  }
+
+  private syncGameLifecycle(): void {
+    const current = this.item();
+    const game = this.session();
+    if (!game || current?.type !== 'game') return;
+    if (game.result() !== null) {
+      game.setLifecycle('completed');
+      return;
+    }
+    if (document.visibilityState === 'hidden' || !this.windowFocused || this.visibleRatio === 0) {
+      game.setLifecycle('paused');
+      return;
+    }
+    if (this.visibleRatio < 1) {
+      game.setLifecycle('partially visible');
+      return;
+    }
+    if (this.phase() !== 'idle') {
+      game.setLifecycle('visible');
+      return;
+    }
+    game.focus();
+    game.setLifecycle('playing');
   }
 
   private clearTimers(): void {
@@ -113,6 +173,7 @@ export class Home {
 
   protected async next(): Promise<void> {
     if (this.busy) return; // ignore input while a transition is running
+    this.session()?.setLifecycle('paused');
     this.busy = true;
     this.loadError.set(null);
 
@@ -291,6 +352,7 @@ export class Home {
         width: host.clientWidth,
         height: host.clientHeight,
       });
+      this.syncGameLifecycle();
     }
   }
 
