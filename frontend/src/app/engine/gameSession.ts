@@ -176,6 +176,14 @@ export class GameSession {
   private readonly onMessage = (e: MessageEvent): void => {
     // Only accept messages from our own iframe, and only well-formed ones
     if (!this.iframe || e.source !== this.iframe.contentWindow) return;
+    if (
+      e.data?.type === 'asset-request' &&
+      typeof e.data.path === 'string' &&
+      e.data.path.startsWith('/assets/')
+    ) {
+      void this.sendAsset(e.data.path);
+      return;
+    }
     if (!isSandboxEvent(e.data)) return;
 
     switch (e.data.type) {
@@ -219,6 +227,21 @@ export class GameSession {
     this.iframe?.contentWindow?.postMessage(command, '*');
   }
 
+  private async sendAsset(path: string): Promise<void> {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) throw new Error(`Asset request failed (${response.status})`);
+      const data = await response.arrayBuffer();
+      this.iframe?.contentWindow?.postMessage({ type: 'asset-response', path, data }, '*', [data]);
+    } catch (error) {
+      this.iframe?.contentWindow?.postMessage({
+        type: 'asset-error',
+        path,
+        message: error instanceof Error ? error.message : 'Asset request failed',
+      }, '*');
+    }
+  }
+
   /** Asks the runtime to shut down (so game.destroy() runs), then removes the iframe. */
   private retire(iframe: HTMLIFrameElement): void {
     iframe.contentWindow?.postMessage({ type: 'stop' } satisfies HostCommand, '*');
@@ -233,7 +256,7 @@ export class GameSession {
   ): string {
     const csp = [
       "default-src 'none'",
-      "script-src 'unsafe-inline'",
+      "script-src 'unsafe-inline' https://esm.sh",
       "style-src 'unsafe-inline'",
       `img-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
       `media-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
