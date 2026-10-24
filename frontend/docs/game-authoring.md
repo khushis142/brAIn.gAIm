@@ -241,8 +241,20 @@ JSON-compatible values: objects, arrays, strings, numbers, booleans, and
 references. The host can add fields to the startup object later without
 changing the game lifecycle.
 
-Keyboard input is available through `input.keys`. The runtime currently tracks
-`ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.
+Keyboard, touch, and gamepad input is available through `input.keys`. The
+runtime currently tracks `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and
+`Space`. Each key has the same edge-aware shape regardless of its source:
+
+```js
+const space = input.keys.Space;
+if (space.justPressed) startAction();
+if (space.held) continueAction();
+if (space.justReleased) finishAction();
+```
+
+`justPressed` and `justReleased` are true only during the update frame where
+the transition occurs. Gamepad button 0 maps to `Space`, the D-pad maps to the
+arrow keys, and the left stick maps to the arrow keys with a 0.5 deadzone.
 
 On touch screens the runtime presses the same keys, so a game written for the
 keyboard also works on phones without extra code:
@@ -254,9 +266,9 @@ keyboard also works on phones without extra code:
 | Press and hold on the left or right half | `ArrowLeft` or `ArrowRight`, held until the finger lifts (dragging across switches it) |
 
 Design controls around these gestures: use Space to confirm or act, arrow
-presses to choose, and held left/right for continuous movement. A brief press
-lasts several frames, so detect it as a key edge (pressed this frame, not the
-previous one) when an action should happen once.
+presses to choose, and held left/right for continuous movement. Use
+`justPressed` for one-shot actions instead of keeping a separate previous-key
+snapshot.
 
 ## Outputs
 
@@ -307,15 +319,11 @@ function init(gameApi) {
   });
 }
 
-let previousKeys = {};
-
 function update(dt, input) {
   if (finished) return;
 
   time += dt;
-  const spacePressed = input.keys.Space && !previousKeys.Space;
-  previousKeys = { ...input.keys };
-  if (spacePressed) {
+  if (input.keys.Space.justPressed) {
     finished = true;
     api.submitResult({
       score: Math.floor(time * 10),

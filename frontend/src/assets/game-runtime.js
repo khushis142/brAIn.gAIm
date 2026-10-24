@@ -41,6 +41,11 @@
   const GAME_KEYS = new Set([
     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
   ]);
+  const GAMEPAD_BUTTON_KEYS = new Map([
+    [0, 'Space'], [12, 'ArrowUp'], [13, 'ArrowDown'],
+    [14, 'ArrowLeft'], [15, 'ArrowRight'],
+  ]);
+  const GAMEPAD_AXIS_DEADZONE = 0.5;
 
   // ---------------------------------------------------------------- helpers
   // '*' is required: a sandboxed iframe without allow-same-origin has an
@@ -88,7 +93,16 @@
     deltaY: 0,
   };
   let viewport = null;
-  const input = { keys: {}, pointer };
+  const keySources = {
+    keyboard: {},
+    touch: {},
+    gamepad: {},
+  };
+  const keyStates = {};
+  for (const code of GAME_KEYS) {
+    keyStates[code] = { held: false, justPressed: false, justReleased: false };
+  }
+  const input = { keys: keyStates, pointer };
   const gameInput = window.__GAME_INPUT__;
   delete window.__GAME_INPUT__;
 
@@ -224,7 +238,51 @@
   // ---------------------------------------------------------------- input
   // Mutate in place so a game holding a reference to input.keys stays valid.
   const clearKeys = () => {
-    for (const code of Object.keys(input.keys)) delete input.keys[code];
+    for (const source of Object.values(keySources)) {
+      for (const code of Object.keys(source)) delete source[code];
+    }
+  };
+
+  const setSourceKey = (source, code, held) => {
+    if (!GAME_KEYS.has(code)) return;
+    source[code] = held;
+  };
+
+  const updateGamepadKeys = () => {
+    const next = {};
+    for (const gamepad of navigator.getGamepads?.() || []) {
+      if (!gamepad || !gamepad.connected) continue;
+      for (const [buttonIndex, code] of GAMEPAD_BUTTON_KEYS) {
+        if (gamepad.buttons[buttonIndex]?.pressed) next[code] = true;
+      }
+      if ((gamepad.axes[1] || 0) < -GAMEPAD_AXIS_DEADZONE) next.ArrowUp = true;
+      if ((gamepad.axes[1] || 0) > GAMEPAD_AXIS_DEADZONE) next.ArrowDown = true;
+      if ((gamepad.axes[0] || 0) < -GAMEPAD_AXIS_DEADZONE) next.ArrowLeft = true;
+      if ((gamepad.axes[0] || 0) > GAMEPAD_AXIS_DEADZONE) next.ArrowRight = true;
+    }
+    for (const code of Object.keys(keySources.gamepad)) {
+      if (!next[code]) delete keySources.gamepad[code];
+    }
+    Object.assign(keySources.gamepad, next);
+  };
+
+  const updateKeyStates = () => {
+    updateGamepadKeys();
+    const codes = new Set([
+      ...Object.keys(keyStates),
+      ...Object.keys(keySources.keyboard),
+      ...Object.keys(keySources.touch),
+      ...Object.keys(keySources.gamepad),
+    ]);
+    for (const code of codes) {
+      const previous = keyStates[code]?.held === true;
+      const held = Boolean(keySources.keyboard[code] || keySources.touch[code] || keySources.gamepad[code]);
+      keyStates[code] = {
+        held,
+        justPressed: held && !previous,
+        justReleased: !held && previous,
+      };
+    }
   };
 
   const updatePointer = (event) => {
@@ -264,11 +322,11 @@
 
   addEventListener('keydown', (e) => {
     if (GAME_KEYS.has(e.code)) e.preventDefault(); // no page scrolling
-    input.keys[e.code] = true;
+    setSourceKey(keySources.keyboard, e.code, true);
   });
   addEventListener('keyup', (e) => {
     if (GAME_KEYS.has(e.code)) e.preventDefault();
-    input.keys[e.code] = false;
+    setSourceKey(keySources.keyboard, e.code, false);
   });
   // Without this, a key held while focus is lost would stay "pressed" forever.
   addEventListener('blur', () => {
@@ -291,17 +349,17 @@
   let touch = null;                  // the one finger we follow
 
   const pressBriefly = (code) => {
-    input.keys[code] = true;
-    setTimeout(() => { input.keys[code] = false; }, BRIEF_PRESS_MS);
+    setSourceKey(keySources.touch, code, true);
+    setTimeout(() => setSourceKey(keySources.touch, code, false), BRIEF_PRESS_MS);
   };
 
   const sideKey = (x) => (x < innerWidth / 2 ? 'ArrowLeft' : 'ArrowRight');
 
   const setHoldKey = (code) => {
     if (touch.holdKey === code) return;
-    if (touch.holdKey) input.keys[touch.holdKey] = false;
+    if (touch.holdKey) setSourceKey(keySources.touch, touch.holdKey, false);
     touch.holdKey = code;
-    if (code) input.keys[code] = true;
+    if (code) setSourceKey(keySources.touch, code, true);
   };
 
   // Touches arrive here directly, or from the host as 'touch' commands (see below)
@@ -380,6 +438,7 @@
     const startedAt = performance.now();
 
     try {
+      updateKeyStates();
       game.update(dt, input);
 
       pointer.justPressed = false;

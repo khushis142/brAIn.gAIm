@@ -138,9 +138,15 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
 }
 
 export interface InputState {
-  /** Current held state. Games should detect one-shot actions as key transitions. */
-  keys: Record<string, boolean>;
+  /** Current key state, merged across keyboard, touch, and gamepad input. */
+  keys: Record<string, KeyState>;
   readonly pointer: PointerInput;
+}
+
+export interface KeyState {
+  readonly held: boolean;
+  readonly justPressed: boolean;
+  readonly justReleased: boolean;
 }
 
 export interface PointerInput {
