@@ -1,0 +1,53 @@
+.card {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-top: 24px;
+  padding: 20px;
+}
+
+.card h3 {
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+  margin: 0 0 8px;
+  padding-bottom: 16px;
+}
+
+.settings-button {
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  padding: 11px 12px;
+  text-align: start;
+  transition: background 150ms ease, color 150ms ease;
+  width: 100%;
+}
+
+.logout-button {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+.logout-button-container {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+.settings-button:hover,
+.settings-button:focus-visible,
+.settings-button:focus-visible {
+  background: var(--surface);
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.logout-button:hover,
+.logout-button:focus-visible {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #b91c1c;
+}

@@ -6,7 +6,7 @@ import { environment } from '../../environments/environment';
 export interface UserCreate {
   username: string;
   password: string;
-  field: string;
+  field?: string;
 }
 
 export interface UserRead {

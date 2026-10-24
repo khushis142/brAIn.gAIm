@@ -15,7 +15,6 @@ export class Register {
   protected readonly registerForm = this.formBuilder.group({
     username: this.formBuilder.control<string | null>(null, Validators.required),
     password: this.formBuilder.control<string | null>(null, Validators.required),
-    field: this.formBuilder.control<string | null>(null, Validators.required),
   });
   protected readonly error = signal('');
   protected readonly submitting = signal(false);
@@ -23,12 +22,12 @@ export class Register {
   protected submit(): void {
     this.error.set('');
     this.submitting.set(true);
-    const { username, password, field } = this.registerForm.getRawValue();
-    if (username === null || password === null || field === null) {
+    const { username, password } = this.registerForm.getRawValue();
+    if (username === null || password === null) {
       return;
     }
 
-    this.userService.register({ username, password, field }).subscribe({
+    this.userService.register({ username, password }).subscribe({
       error: () => {
         this.error.set('Unable to create your account. Please try again.');
         this.submitting.set(false);
