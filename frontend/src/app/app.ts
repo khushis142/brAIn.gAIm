@@ -1,9 +1,19 @@
 import { Component, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import {LucideDynamicIcon, LucideHouse, LucideMoon, LucideSettings, LucideSun, LucideUpload} from '@lucide/angular';
+import {LucideDynamicIcon, LucideHouse, LucideSettings, LucideUpload, LucideSun, LucideMoon} from '@lucide/angular';
+import { HealthBadge } from './shared/health-badge/health-badge';
 
 @Component({
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, LucideHouse, LucideUpload, LucideSettings, LucideDynamicIcon],
+  imports: [
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+    LucideHouse,
+    LucideUpload,
+    LucideSettings,
+    LucideDynamicIcon,
+    HealthBadge,
+  ],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',

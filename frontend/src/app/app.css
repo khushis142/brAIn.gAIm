@@ -61,6 +61,12 @@
   outline: none;
 }
 
+.header-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 .page-content {
   margin: 0 auto;
   max-width: 720px;

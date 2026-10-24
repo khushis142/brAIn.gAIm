@@ -1,0 +1,10 @@
+<div
+  class="health-badge"
+  [class.healthy]="status() === 'Healthy'"
+  [class.unavailable]="status() === 'Unavailable'"
+  aria-live="polite"
+  role="status"
+  [attr.aria-label]="'Backend: ' + status()"
+>
+  <span class="material-symbols-outlined" aria-hidden="true">dns</span>
+</div>
