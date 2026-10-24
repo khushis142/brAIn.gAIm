@@ -1,9 +1,10 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { ApiService, AttachmentRead, ProjectRead } from '../../core/api.service';
 import { FileItem, FileKind, UploadedFile } from '../../shared/file-item/file-item';
 import { DEFAULT_FOLDER_COLOR, ProjectFolder } from '../../shared/project-folder/project-folder';
 import { UploadDropzone } from '../../shared/upload-dropzone/upload-dropzone';
+import { UserService } from '../user/service/user-service';
 
 interface Project {
   id: string;
@@ -45,6 +46,7 @@ function toFile(attachment: AttachmentRead): UploadedFile {
 })
 export class Upload implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly userService = inject(UserService);
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly selectedId = signal<string | null>(null);
@@ -57,12 +59,20 @@ export class Upload implements OnInit {
   );
 
   ngOnInit(): void {
-    this.api.listProjects().subscribe({
-      next: (projects) => {
+    forkJoin({
+      user: this.userService.loadUser(),
+      projects: this.api.listProjects(),
+    }).subscribe({
+      next: ({ user, projects }) => {
         const colors = this.loadColors();
         this.projects.set(projects.map((project) => this.toProject(project, colors)));
+        this.selectedId.set(
+          projects.some((project) => project.id === user.active_project_id)
+            ? (user.active_project_id ?? null)
+            : null,
+        );
       },
-      error: () => this.error.set('Projekte konnten nicht geladen werden.'),
+      error: () => this.error.set('Knowledge konnte nicht geladen werden.'),
     });
   }
 
@@ -89,12 +99,16 @@ export class Upload implements OnInit {
     }
 
     if (dialog.mode === 'create') {
+      let createdId: string | null = null;
       await this.run('Projekt konnte nicht erstellt werden.', async () => {
         const created = await firstValueFrom(this.api.createProject(name));
+        createdId = created.id;
         this.projects.update((projects) => [...projects, this.toProject(created, {})]);
-        this.selectedId.set(created.id);
         this.nameDialog.set(null);
       });
+      if (createdId) {
+        await this.switchProject(createdId);
+      }
       return;
     }
 
@@ -114,6 +128,16 @@ export class Upload implements OnInit {
     const colors = this.loadColors();
     colors[id] = color;
     localStorage.setItem(COLORS_KEY, JSON.stringify(colors));
+  }
+
+  protected async switchProject(id: string): Promise<void> {
+    if (id === this.selectedId() || this.busy()) {
+      return;
+    }
+    await this.run('Projekt konnte nicht gewechselt werden.', async () => {
+      await firstValueFrom(this.userService.setActiveProject(id));
+      this.selectedId.set(id);
+    });
   }
 
   protected async removeProject(id: string): Promise<void> {
@@ -142,6 +166,16 @@ export class Upload implements OnInit {
           files: [...(this.findProject(projectId)?.files ?? []), toFile(attachment)],
         });
       }
+    });
+  }
+
+  protected async processKnowledge(): Promise<void> {
+    const projectId = this.selectedId();
+    if (!projectId) {
+      return;
+    }
+    await this.run('Wissen konnte nicht verarbeitet werden.', async () => {
+      await firstValueFrom(this.api.processProjectFlashcards(projectId));
     });
   }
 

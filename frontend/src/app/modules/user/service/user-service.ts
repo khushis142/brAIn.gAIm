@@ -35,6 +35,12 @@ export class UserService {
     );
   }
 
+  setActiveProject(projectId: string | null): Observable<UserRead> {
+    return this.api.updateMe({ active_project_id: projectId }).pipe(
+      tap((user) => this.user.set(user)),
+    );
+  }
+
   logout(): void {
     this.api.logout();
     this.user.set(null);

@@ -13,10 +13,12 @@ export interface UserRead {
   id: string;
   username: string;
   interests: string;
+  active_project_id?: string | null;
 }
 
 export interface UserUpdate {
-  interests: string;
+  interests?: string;
+  active_project_id?: string | null;
 }
 
 export interface Token {
@@ -201,6 +203,14 @@ export class ApiService {
   deleteProject(id: string): Observable<void> {
     return this.http.delete<void>(
       this.url(`projects/${encodeURIComponent(id)}`),
+      this.authOptions(),
+    );
+  }
+
+  processProjectFlashcards(projectId: string): Observable<void> {
+    return this.http.post<void>(
+      this.url(`projects/${encodeURIComponent(projectId)}/flashcards`),
+      null,
       this.authOptions(),
     );
   }

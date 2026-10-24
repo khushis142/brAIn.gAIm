@@ -62,6 +62,34 @@ describe('ApiService', () => {
     request.flush({ id: 'user-id', username: 'alex', interests: 'physics' });
   });
 
+  it('updates the active project on the authenticated user', () => {
+    authenticate();
+    api.updateMe({ active_project_id: 'project-id' }).subscribe();
+
+    const request = httpTesting.expectOne(`${environment.apiBaseUrl}/users/me`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ active_project_id: 'project-id' });
+    request.flush({
+      id: 'user-id',
+      username: 'alex',
+      interests: 'biology',
+      active_project_id: 'project-id',
+    });
+  });
+
+  it('requests flashcard processing for a project', () => {
+    authenticate();
+    api.processProjectFlashcards('project/id').subscribe();
+
+    const request = httpTesting.expectOne(
+      `${environment.apiBaseUrl}/projects/project%2Fid/flashcards`,
+    );
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    expect(request.request.body).toBeNull();
+    request.flush(null);
+  });
+
   it('lists study fields', () => {
     api.listFields().subscribe();
 

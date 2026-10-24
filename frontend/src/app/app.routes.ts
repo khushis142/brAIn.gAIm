@@ -15,7 +15,8 @@ const requireAuth = () => {
 
 export const routes: Routes = [
   { path: '', component: Home, canActivate: [requireAuth] },
-  { path: 'upload', component: Upload, canActivate: [requireAuth] },
+  { path: 'knowledge', component: Upload, canActivate: [requireAuth] },
+  { path: 'upload', redirectTo: 'knowledge', pathMatch: 'full' },
   { path: 'settings', component: Settings, canActivate: [requireAuth] },
   { path: 'video-upload', component: VideoUpload, canActivate: [requireAuth] },
   { path: 'login', component: Login },

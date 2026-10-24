@@ -1,5 +1,5 @@
 <section class="upload">
-  <h2>Meine Dokumente</h2>
+  <h2>Knowledge</h2>
 
   @if (error(); as message) {
     <p class="error" role="alert">{{ message }}</p>
@@ -13,7 +13,7 @@
         [color]="project.color"
         [count]="project.files.length"
         [selected]="project.id === selectedId()"
-        (pressed)="selectedId.set(project.id)"
+        (pressed)="switchProject(project.id)"
         (colorChange)="setColor(project.id, $event)"
         (rename)="openRenameProject(project)"
         (remove)="removeProject(project.id)"
@@ -38,6 +38,10 @@
   @if (selected()) {
     <div class="dropzone-bar">
       <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
+      <button class="process-button" type="button" [disabled]="busy()" (click)="processKnowledge()">
+        <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
+        <span>Wissen verarbeiten</span>
+      </button>
     </div>
   }
 

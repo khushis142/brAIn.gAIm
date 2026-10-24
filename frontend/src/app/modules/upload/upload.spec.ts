@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ApiService, ProjectRead } from '../../core/api.service';
+import { UserService } from '../user/service/user-service';
 import { Upload } from './upload';
 
 const project: ProjectRead = {
@@ -19,6 +20,7 @@ describe('Upload', () => {
   let fixture: ComponentFixture<Upload>;
   let el: HTMLElement;
   let api: Record<string, ReturnType<typeof vi.fn>>;
+  let userService: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(async () => {
     localStorage.clear();
@@ -29,6 +31,7 @@ describe('Upload', () => {
         of({ ...project, id, name: update.name }),
       ),
       deleteProject: vi.fn(() => of(undefined)),
+      processProjectFlashcards: vi.fn(() => of(undefined)),
       uploadToCdn: vi.fn((file: File) =>
         of({ id: 'a3', filename: file.name, url: 'http://cdn/files/a3/' + file.name }),
       ),
@@ -38,10 +41,21 @@ describe('Upload', () => {
       deleteAttachment: vi.fn(() => of(undefined)),
       deleteFromCdn: vi.fn(() => of(undefined)),
     };
+    userService = {
+      loadUser: vi.fn(() =>
+        of({ id: 'u1', username: 'alex', interests: '', active_project_id: 'p1' }),
+      ),
+      setActiveProject: vi.fn((projectId: string | null) =>
+        of({ id: 'u1', username: 'alex', interests: '', active_project_id: projectId }),
+      ),
+    };
 
     await TestBed.configureTestingModule({
       imports: [Upload],
-      providers: [{ provide: ApiService, useValue: api }],
+      providers: [
+        { provide: ApiService, useValue: api },
+        { provide: UserService, useValue: userService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Upload);
@@ -51,9 +65,10 @@ describe('Upload', () => {
 
   const folders = () => el.querySelectorAll('app-project-folder');
 
-  it('loads projects from the API without a dropzone until one is selected', () => {
+  it('loads projects and selects the active project from the user profile', () => {
     expect(folders().length).toBe(2);
-    expect(el.querySelector('app-upload-dropzone')).toBeNull();
+    expect(folders()[1].querySelector('.folder')?.classList.contains('selected')).toBe(true);
+    expect(el.querySelector('app-upload-dropzone')).not.toBeNull();
   });
 
   it('shows attachments of the selected project with an image preview', async () => {
@@ -64,6 +79,13 @@ describe('Upload', () => {
     expect(el.querySelector('img.preview')?.getAttribute('src')).toBe(
       'http://cdn/files/a1/bild.png',
     );
+  });
+
+  it('processes knowledge for the selected project', async () => {
+    (el.querySelector('.process-button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(api['processProjectFlashcards']).toHaveBeenCalledWith('p1');
   });
 
   it('creates a project via the API', async () => {
@@ -79,7 +101,9 @@ describe('Upload', () => {
     await fixture.whenStable();
 
     expect(api['createProject']).toHaveBeenCalledWith('Physik');
+    expect(userService['setActiveProject']).toHaveBeenCalledWith('p2');
     expect(folders().length).toBe(3);
+    expect(folders()[2].querySelector('.folder')?.classList.contains('selected')).toBe(true);
     expect(el.querySelector('form[role="dialog"]')).toBeNull();
   });
 

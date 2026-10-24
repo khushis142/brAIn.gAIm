@@ -23,12 +23,15 @@
 .icon {
   color: #ffc800;
   font-size: 56px;
-  font-variation-settings: 'FILL' 1;
+  font-variation-settings: 'FILL' 0;
 }
 
 .new .icon {
   color: var(--muted);
-  font-variation-settings: 'FILL' 0;
+}
+
+.folder.selected .icon {
+  font-variation-settings: 'FILL' 1;
 }
 
 .label {
