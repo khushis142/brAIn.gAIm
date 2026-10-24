@@ -25,7 +25,9 @@ describe('Upload', () => {
     api = {
       listProjects: vi.fn(() => of([project])),
       createProject: vi.fn((name: string) => of({ ...project, id: 'p2', name, attachments: [] })),
-      updateProject: vi.fn(),
+      updateProject: vi.fn((id: string, update: { name: string }) =>
+        of({ ...project, id, name: update.name }),
+      ),
       deleteProject: vi.fn(() => of(undefined)),
       uploadToCdn: vi.fn((file: File) =>
         of({ id: 'a3', filename: file.name, url: 'http://cdn/files/a3/' + file.name }),
@@ -65,11 +67,40 @@ describe('Upload', () => {
   });
 
   it('creates a project via the API', async () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('Physik');
     (folders()[0].querySelector('.folder') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('form[role="dialog"]')).not.toBeNull();
+
+    const input = el.querySelector('#project-name') as HTMLInputElement;
+    input.value = 'Physik';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (el.querySelector('button[type="submit"]') as HTMLButtonElement).click();
     await fixture.whenStable();
+
     expect(api['createProject']).toHaveBeenCalledWith('Physik');
     expect(folders().length).toBe(3);
+    expect(el.querySelector('form[role="dialog"]')).toBeNull();
+  });
+
+  it('renames a project with the custom name dialog', async () => {
+    vi.useFakeTimers();
+    (folders()[1].querySelector('.folder') as HTMLElement).dispatchEvent(new Event('pointerdown'));
+    vi.advanceTimersByTime(600);
+    vi.useRealTimers();
+    fixture.detectChanges();
+
+    (el.querySelector('.action:not(.delete)') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const input = el.querySelector('#project-name') as HTMLInputElement;
+    input.value = 'Neue Mathe';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (el.querySelector('button[type="submit"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(api['updateProject']).toHaveBeenCalledWith('p1', { name: 'Neue Mathe' });
+    expect(folders()[1].textContent).toContain('Neue Mathe');
   });
 
   it('uploads to the CDN, registers the attachment and deletes it again', async () => {

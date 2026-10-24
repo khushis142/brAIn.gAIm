@@ -1,5 +1,5 @@
 // dodge.js: dodge the falling blocks. Arrow keys to move.
-let W, H, gameApi, username, difficulty;
+let W, H, gameApi, username, difficulty, context;
 let player, blocks, spawnTimer, score, gameOver;
 let best = 0;
 
@@ -9,6 +9,24 @@ function init(api) {
   H = api.height;
   username = api.username;
   difficulty = api.data?.difficulty || 'normal';
+  context = api.data.context;
+  api.setUiDesign({
+    theme: {
+      accent: 'teal',
+      panel: 'dark',
+      density: 'comfortable',
+    },
+    pauseMenu: {
+      title: api.data.pauseTitle || 'Dodge pause',
+      message: api.data.pauseMessage || `Context: ${context}`,
+      resumeLabel: api.data.resumeLabel || 'Keep playing',
+    },
+    leaderboard: {
+      title: api.data.leaderboardTitle || 'Dodge leaderboard',
+      subtitle: api.data.leaderboardSubtitle || `Based on: ${context}`,
+      scoreLabel: api.data.scoreLabel || 'Survival score',
+    },
+  });
   reset();
 }
 

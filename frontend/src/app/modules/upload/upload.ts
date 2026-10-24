@@ -12,6 +12,9 @@ interface Project {
   files: UploadedFile[];
 }
 
+type ProjectNameDialog =
+  { mode: 'create'; name: string } | { mode: 'rename'; projectId: string; name: string };
+
 const COLORS_KEY = 'braingain-folder-colors';
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'];
 
@@ -47,6 +50,7 @@ export class Upload implements OnInit {
   protected readonly selectedId = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
+  protected readonly nameDialog = signal<ProjectNameDialog | null>(null);
 
   protected readonly selected = computed(
     () => this.projects().find((project) => project.id === this.selectedId()) ?? null,
@@ -62,26 +66,46 @@ export class Upload implements OnInit {
     });
   }
 
-  protected async addProject(): Promise<void> {
-    const name = prompt('Projektname')?.trim();
-    if (!name) {
-      return;
-    }
-    await this.run('Projekt konnte nicht erstellt werden.', async () => {
-      const created = await firstValueFrom(this.api.createProject(name));
-      this.projects.update((projects) => [...projects, this.toProject(created, {})]);
-      this.selectedId.set(created.id);
-    });
+  protected openCreateProject(): void {
+    this.nameDialog.set({ mode: 'create', name: '' });
   }
 
-  protected async renameProject(project: Project): Promise<void> {
-    const name = prompt('Projektname', project.name)?.trim();
-    if (!name || name === project.name) {
+  protected openRenameProject(project: Project): void {
+    this.nameDialog.set({ mode: 'rename', projectId: project.id, name: project.name });
+  }
+
+  protected updateProjectName(event: Event): void {
+    const dialog = this.nameDialog();
+    if (dialog) {
+      this.nameDialog.set({ ...dialog, name: (event.target as HTMLInputElement).value });
+    }
+  }
+
+  protected async saveProjectName(): Promise<void> {
+    const dialog = this.nameDialog();
+    const name = dialog?.name.trim();
+    if (!dialog || !name || this.busy()) {
+      return;
+    }
+
+    if (dialog.mode === 'create') {
+      await this.run('Projekt konnte nicht erstellt werden.', async () => {
+        const created = await firstValueFrom(this.api.createProject(name));
+        this.projects.update((projects) => [...projects, this.toProject(created, {})]);
+        this.selectedId.set(created.id);
+        this.nameDialog.set(null);
+      });
+      return;
+    }
+
+    if (name === this.findProject(dialog.projectId)?.name) {
+      this.nameDialog.set(null);
       return;
     }
     await this.run('Projekt konnte nicht umbenannt werden.', async () => {
-      const updated = await firstValueFrom(this.api.updateProject(project.id, { name }));
-      this.patchProject(project.id, { name: updated.name });
+      const updated = await firstValueFrom(this.api.updateProject(dialog.projectId, { name }));
+      this.patchProject(dialog.projectId, { name: updated.name });
+      this.nameDialog.set(null);
     });
   }
 
