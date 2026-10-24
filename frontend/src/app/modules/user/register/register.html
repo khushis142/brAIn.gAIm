@@ -10,6 +10,9 @@
 
       <label for="password">Password</label>
       <input id="password" name="password" formControlName="password" minlength="8" type="password" autocomplete="new-password" />
+      @if (registerForm.controls.password.hasError('minlength') && registerForm.controls.password.touched) {
+        <p class="error" role="alert">Password must be at least 8 characters long.</p>
+      }
 
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>

@@ -11,11 +11,11 @@ export interface UserCreate {
 export interface UserRead {
   id: string;
   username: string;
-  field: string;
+  interests: string;
 }
 
 export interface UserUpdate {
-  field: string;
+  interests: string;
 }
 
 export interface Token {
