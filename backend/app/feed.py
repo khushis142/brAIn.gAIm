@@ -127,11 +127,16 @@ async def discard_ready_rounds(session: AsyncSession, user_id: uuid.UUID) -> Non
     )
 
 
-async def _prepare_round(session: AsyncSession, user_id: uuid.UUID) -> GameRound | None:
-    game = await session.scalar(
-        select(Content).where(Content.kind == "game").order_by(func.random()).limit(1)
-    )
-    if game is None:
+async def prepare_round(
+    session: AsyncSession, user_id: uuid.UUID, game_id: uuid.UUID | None = None
+) -> GameRound | None:
+    if game_id is not None:
+        game = await session.get(Content, game_id)
+    else:
+        game = await session.scalar(
+            select(Content).where(Content.kind == "game").order_by(func.random()).limit(1)
+        )
+    if game is None or game.kind != "game":
         return None
     assert game.config is not None  # guaranteed for games by a check constraint
     config = GameConfig(**game.config)
@@ -142,6 +147,9 @@ async def _prepare_round(session: AsyncSession, user_id: uuid.UUID) -> GameRound
         logger.exception("preparing a round of game %s failed", game.id)
         return None
     return GameRound(user_id=user_id, game_id=game.id, input=data, assets=assets)
+
+
+_prepare_round = prepare_round
 
 
 async def top_up(user_id: uuid.UUID) -> None:

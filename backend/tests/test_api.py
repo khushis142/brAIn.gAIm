@@ -18,7 +18,16 @@ from app.generator.games import generate_game, publish_generated_game
 from app.generator.inputs import GameConfig, InputGenerationError
 from app.generator.llm import FakeLLM, LLMError
 from app.main import app
-from app.models import Base, Content, GameRound, Impression, Score, User, UserAccessory
+from app.models import (
+    Base,
+    Content,
+    GameRound,
+    Impression,
+    Score,
+    User,
+    UserAccessory,
+    UserAvatar,
+)
 from app.seed_game import seed_game, update_game
 from tests.test_attachments import text_pdf
 
@@ -629,6 +638,11 @@ async def test_zombie_endpoints_require_auth(client: AsyncClient) -> None:
         assert (await client.get("/users/me/zombie", headers=headers)).status_code == 401
         res = await client.put("/users/me/zombie/equipped", json={}, headers=headers)
         assert res.status_code == 401
+        assert (await client.get("/zombie/avatars", headers=headers)).status_code == 401
+        res = await client.put(
+            "/users/me/zombie/avatar", json={"avatar": "zombie"}, headers=headers
+        )
+        assert res.status_code == 401
         res = await client.post(f"/games/{game}/scores", json={"score": 1}, headers=headers)
         assert res.status_code == 401
 
@@ -650,6 +664,7 @@ async def test_score_is_persisted_and_unlocks_the_hat(client: AsyncClient) -> No
     game = await _create_game("newbie")
     assert await _score(client, headers, game, 3) == {
         "newly_unlocked": ["hat"],
+        "newly_unlocked_avatars": [],
         "games_completed": 1,
     }
     async with SessionLocal() as session:
@@ -663,7 +678,11 @@ async def test_score_is_persisted_and_unlocks_the_hat(client: AsyncClient) -> No
     )
     assert score.created_at is not None
     # Unlocks are reported once.
-    assert await _score(client, headers, game, 0) == {"newly_unlocked": [], "games_completed": 2}
+    assert await _score(client, headers, game, 0) == {
+        "newly_unlocked": [],
+        "newly_unlocked_avatars": [],
+        "games_completed": 2,
+    }
 
 
 async def test_round_scores_are_idempotent(client: AsyncClient) -> None:
@@ -680,10 +699,10 @@ async def test_round_scores_are_idempotent(client: AsyncClient) -> None:
     round_id = str(game_round.id)
 
     first = await _score(client, headers, game, 5, round_id=round_id)
-    assert first == {"newly_unlocked": ["hat"], "games_completed": 1}
+    assert first == {"newly_unlocked": ["hat"], "newly_unlocked_avatars": [], "games_completed": 1}
     # A resubmission (even with a better score) is ignored and runs no unlocks.
     again = await _score(client, headers, game, 50, round_id=round_id)
-    assert again == {"newly_unlocked": [], "games_completed": 1}
+    assert again == {"newly_unlocked": [], "newly_unlocked_avatars": [], "games_completed": 1}
     async with SessionLocal() as session:
         assert list(await session.scalars(select(Score.score))) == [5]
     assert await _unlock_rows("replayer") == ["hat"]
@@ -746,11 +765,21 @@ async def test_zombie_backfills_existing_score_history(client: AsyncClient) -> N
             {"id": "sunglasses", "current": 3, "target": 5},
             {"id": "gold-chain", "current": 3, "target": 25},
         ],
+        "avatar": "zombie",
+        "unlocked_avatars": ["zombie"],
+        "avatar_progress": [
+            {"id": "half-human", "current": 3, "target": 10},
+            {"id": "human", "current": 3, "target": 100},
+        ],
     }
     assert (await client.get("/users/me/zombie", headers=headers)).json() == zombie
     assert await _unlock_rows("veteran") == ["hat", "red-sneakers"]
     # Backfilled accessories are not reported again by the next score.
-    assert await _score(client, headers, game, 0) == {"newly_unlocked": [], "games_completed": 4}
+    assert await _score(client, headers, game, 0) == {
+        "newly_unlocked": [],
+        "newly_unlocked_avatars": [],
+        "games_completed": 4,
+    }
 
 
 async def test_equip_accessories(client: AsyncClient) -> None:
@@ -860,3 +889,123 @@ async def test_flashcards_read_text_and_pdf_attachments(
 
     monkeypatch.setattr(cdn, "download", unreachable)
     assert (await client.post(f"{path}/flashcards", headers=owner)).status_code == 502
+
+
+async def _add_scores(username: str, game: str, count: int) -> None:
+    """Score history written directly, e.g. from before unlocks existed."""
+    user_id = await _user_id(username)
+    async with SessionLocal() as session:
+        session.add_all(
+            Score(user_id=user_id, game_id=uuid.UUID(game), score=0) for _ in range(count)
+        )
+        await session.commit()
+
+
+async def _avatar_rows(username: str) -> list[str]:
+    user_id = await _user_id(username)
+    async with SessionLocal() as session:
+        return sorted(
+            await session.scalars(select(UserAvatar.avatar_id).where(UserAvatar.user_id == user_id))
+        )
+
+
+async def test_avatar_catalog(client: AsyncClient) -> None:
+    headers = await _auth(client, "browser")
+    catalog = (await client.get("/zombie/avatars", headers=headers)).json()
+    assert [a["id"] for a in catalog] == ["zombie", "half-human", "human"]
+    assert all(set(a) == {"id", "name", "unlock_description"} for a in catalog)
+
+
+async def test_zombie_is_the_default_avatar(client: AsyncClient) -> None:
+    headers = await _auth(client, "rookie")
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert (zombie["avatar"], zombie["unlocked_avatars"]) == ("zombie", ["zombie"])
+    assert zombie["avatar_progress"] == [
+        {"id": "half-human", "current": 0, "target": 10},
+        {"id": "human", "current": 0, "target": 100},
+    ]
+    res = await client.put("/users/me/zombie/avatar", json={"avatar": "zombie"}, headers=headers)
+    assert res.status_code == 200
+    assert res.json() == zombie
+    assert await _avatar_rows("rookie") == []  # the starting avatar is implicit
+
+
+async def test_avatars_unlock_at_games_completed(client: AsyncClient) -> None:
+    headers = await _auth(client, "marathoner")
+    game = await _create_game("marathoner")
+    for _ in range(9):
+        assert (await _score(client, headers, game, 0))["newly_unlocked_avatars"] == []
+    async with SessionLocal() as session:
+        game_round = GameRound(
+            user_id=await _user_id("marathoner"), game_id=uuid.UUID(game), input={}
+        )
+        session.add(game_round)
+        await session.commit()
+    tenth = await _score(client, headers, game, 0, round_id=str(game_round.id))
+    assert (tenth["newly_unlocked_avatars"], tenth["games_completed"]) == (["half-human"], 10)
+    # Resubmitting the round unlocks nothing again.
+    again = await _score(client, headers, game, 0, round_id=str(game_round.id))
+    assert (again["newly_unlocked_avatars"], again["games_completed"]) == ([], 10)
+    # Unlocking doesn't switch: the player chooses.
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert (zombie["avatar"], zombie["unlocked_avatars"]) == ("zombie", ["zombie", "half-human"])
+    assert zombie["avatar_progress"] == [{"id": "human", "current": 10, "target": 100}]
+
+    await _add_scores("marathoner", game, 88)
+    assert (await _score(client, headers, game, 0))["newly_unlocked_avatars"] == []  # 99
+    hundredth = await _score(client, headers, game, 0)
+    assert (hundredth["newly_unlocked_avatars"], hundredth["games_completed"]) == (["human"], 100)
+    assert (await _score(client, headers, game, 0))["newly_unlocked_avatars"] == []
+    assert await _avatar_rows("marathoner") == ["half-human", "human"]
+
+
+@pytest.mark.parametrize(
+    ("count", "unlocked", "progress"),
+    [
+        (12, ["zombie", "half-human"], [{"id": "human", "current": 12, "target": 100}]),
+        (100, ["zombie", "half-human", "human"], []),
+    ],
+)
+async def test_avatars_are_backfilled(
+    client: AsyncClient, count: int, unlocked: list[str], progress: list[dict]
+) -> None:
+    headers = await _auth(client, "oldtimer")
+    game = await _create_game("oldtimer")
+    await _add_scores("oldtimer", game, count)
+
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert (zombie["avatar"], zombie["unlocked_avatars"]) == ("zombie", unlocked)
+    assert zombie["avatar_progress"] == progress
+    assert (await client.get("/users/me/zombie", headers=headers)).json() == zombie
+    assert await _avatar_rows("oldtimer") == sorted(unlocked[1:])
+    assert (await _score(client, headers, game, 0))["newly_unlocked_avatars"] == []
+
+
+async def test_switching_avatar_keeps_accessories(client: AsyncClient) -> None:
+    headers = await _auth(client, "shapeshifter")
+    game = await _create_game("shapeshifter")
+    await _add_scores("shapeshifter", game, 10)
+    equip = {"head": "hat", "eyes": "sunglasses"}
+    before = (await client.put("/users/me/zombie/equipped", json=equip, headers=headers)).json()
+    assert before["equipped"]["head"] == "hat" and before["avatar"] == "zombie"
+    path = "/users/me/zombie/avatar"
+
+    def accessories(zombie: dict) -> tuple:
+        return zombie["unlocked"], zombie["equipped"], zombie["progress"]
+
+    res = await client.put(path, json={"avatar": "half-human"}, headers=headers)
+    assert res.status_code == 200
+    assert res.json()["avatar"] == "half-human"
+    assert accessories(res.json()) == accessories(before)
+    assert (await client.get("/users/me/zombie", headers=headers)).json() == res.json()
+
+    assert (await client.put(path, json={"avatar": "human"}, headers=headers)).status_code == 403
+    for body in [{"avatar": "robot"}, {}, {"avatar": "zombie", "extra": 1}]:
+        assert (await client.put(path, json=body, headers=headers)).status_code == 422, body
+    zombie = (await client.get("/users/me/zombie", headers=headers)).json()
+    assert zombie["avatar"] == "half-human"  # failed switches change nothing
+
+    back = (await client.put(path, json={"avatar": "zombie"}, headers=headers)).json()
+    assert back["avatar"] == "zombie"
+    assert accessories(back) == accessories(before)
+    assert back["unlocked_avatars"] == ["zombie", "half-human"]
