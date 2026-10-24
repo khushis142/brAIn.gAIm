@@ -15,6 +15,15 @@ export const GAME_BUDGETS = Object.freeze({
 
 export type GameRenderer = '2d' | 'webgl';
 
+export type GameLifecycleState =
+  | 'preloading'
+  | 'visible'
+  | 'playing'
+  | 'partially visible'
+  | 'paused'
+  | 'completed'
+  | 'disposed';
+
 export type GameInputKind = 'touch' | 'keyboard' | 'gamepad';
 
 export interface GamePackageMetadata {

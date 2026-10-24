@@ -150,6 +150,24 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('tracks lifecycle states and only resumes while playing', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+
+    session.setLifecycle('partially visible');
+    expect(session.lifecycle()).toBe('partially visible');
+
+    session.setLifecycle('playing');
+    expect(session.lifecycle()).toBe('playing');
+
+    session.setLifecycle('completed');
+    expect(session.lifecycle()).toBe('completed');
+
+    session.destroy();
+    expect(session.lifecycle()).toBe('disposed');
+  });
+
   it('forwards touches on the iframe element to the game', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

@@ -326,6 +326,39 @@ Do not treat result or UI validation as an authorization boundary: scores and
 display text still need normal backend validation before persistence or display
 to other users.
 
+## Feed lifecycle
+
+The feed owns the lifecycle of every game. A game cannot resume itself; the host
+must explicitly put it into the `playing` state after the card is visible and
+focused.
+
+The lifecycle states are:
+
+- `preloading`: game code and startup resources are being prepared.
+- `visible`: the card is fully visible, but the feed is transitioning or the
+  game is not yet eligible to run.
+- `playing`: the card is fully visible, the browser tab is visible, and the
+  game iframe has focus. The runtime loop may run.
+- `partially visible`: part of the card is visible. The game is paused.
+- `paused`: the game is temporarily inactive because the card left the
+  viewport, the tab was hidden, focus was lost, or the feed changed items.
+- `completed`: the game submitted a result. It remains paused and must not
+  resume while the result view is shown.
+- `disposed`: the feed removed the game permanently and called `destroy()`.
+
+Games are automatically paused when the card leaves the viewport, when the
+user swipes to another item, when the browser tab becomes hidden, and when a
+video item becomes active. A partially visible card is also paused to avoid
+running gameplay that the user cannot fully see. Returning to the card does
+not reload it: the feed resumes only after the card is fully visible, the tab
+is visible, the window is focused, and the transition has finished.
+
+When a game submits its first valid result, the host enters `completed` and
+pauses the runtime. Treat result submission as the end of gameplay; the feed
+controls navigation to the next item. `destroy()` is reserved for permanent
+teardown, such as leaving the feed or destroying the component, and is the only
+transition to `disposed`.
+
 ## Inputs
 
 The host starts a game with a game-code string and an input object:

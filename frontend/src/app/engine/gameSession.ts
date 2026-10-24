@@ -5,6 +5,7 @@ import {
   GameStartInput,
   GamePerformanceOptions,
   GameAssetManifest,
+  GameLifecycleState,
   GameUiDesign,
   HostCommand,
   isSandboxEvent,
@@ -42,11 +43,13 @@ export class GameSession {
   private readonly _error = signal<string | null>(null);
   private readonly _result = signal<GameResult | null>(null);
   private readonly _uiDesign = signal<GameUiDesign>({});
+  private readonly _lifecycle = signal<GameLifecycleState>('disposed');
 
   readonly status = this._status.asReadonly();
   readonly error = this._error.asReadonly();
   readonly result = this._result.asReadonly();
   readonly uiDesign = this._uiDesign.asReadonly();
+  readonly lifecycle = this._lifecycle.asReadonly();
 
   constructor(
     private readonly doc: Document,
@@ -67,7 +70,8 @@ export class GameSession {
     this._error.set(null);
     this._result.set(null);
     this._uiDesign.set({});
-      this.resultSubmissions = 0;
+    this.resultSubmissions = 0;
+    this._lifecycle.set('preloading');
     this._status.set('starting');
 
     const width = options.width ?? 800;
@@ -139,6 +143,13 @@ export class GameSession {
     if (this._status() !== 'error') this._status.set('idle');
   }
 
+  setLifecycle(state: Exclude<GameLifecycleState, 'disposed'>): void {
+    if (this._lifecycle() === 'disposed') return;
+    this._lifecycle.set(state);
+    if (state === 'playing') this.resume();
+    else this.pause();
+  }
+
   pause(): void {
     this.send({ type: 'pause' });
   }
@@ -168,6 +179,7 @@ export class GameSession {
 
   destroy(): void {
     this.stop();
+    this._lifecycle.set('disposed');
     this.doc.defaultView?.removeEventListener('message', this.onMessage);
   }
 
@@ -223,6 +235,7 @@ export class GameSession {
           break;
         }
         this._result.set(e.data.result);
+        this.setLifecycle('completed');
         break;
       case 'error':
         this.fail(e.data.message.slice(0, MAX_ERROR_LENGTH));
