@@ -74,9 +74,10 @@ Portainer setup (once):
    redeployment*. Every poll then pulls `:latest` and recreates the container only
    if the image changed. Without force, Portainer can redeploy on the version-bump
    commit before CI has pushed the new image, and stay on the old one.
-3. Set the stack environment variables: `DATABASE_URL`, `S3_BUCKET`,
-   `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `JWT_SECRET` (required) and
-   `S3_ENDPOINT_URL`, `S3_REGION`, `CORS_ORIGINS` (optional), as in `.env.example`.
+3. Set the stack environment variables (all required): `DATABASE_URL`,
+   `S3_ENDPOINT_URL`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+   `JWT_SECRET`. Easiest: import `.env.example` via *Load variables from .env file*
+   and replace every value.
 
 Seed production content from a dev machine with `.env` pointing at the production
 database and bucket: `python -m app.seed seed/`.

@@ -7,6 +7,8 @@ from botocore.config import Config
 from app.config import get_settings
 
 PRESIGNED_URL_TTL_SECONDS = 3600
+# SigV4 needs a region name; self-hosted S3-compatible stores ignore its value.
+_REGION = "us-east-1"
 
 
 @lru_cache
@@ -15,13 +17,13 @@ def _client():
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
-        region_name=settings.s3_region,
+        region_name=_REGION,
         aws_access_key_id=settings.s3_access_key_id,
         aws_secret_access_key=settings.s3_secret_access_key,
         config=Config(
             signature_version="s3v4",
-            # S3-compatible stores (MinIO etc.) generally need path-style URLs.
-            s3={"addressing_style": "path" if settings.s3_endpoint_url else "auto"},
+            # Self-hosted stores serve buckets under the path, not as subdomains.
+            s3={"addressing_style": "path"},
         ),
     )
 
