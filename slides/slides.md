@@ -59,6 +59,7 @@ Wir präsentieren eine Plattform, die das Endlos-Scrollen durchbricht.
 
 ---
 layout: none
+transition: fade-out
 ---
 
 <ProductWorkflowSlide />
@@ -69,6 +70,25 @@ Die KI generiert daraus gezielte Fragen und Lerninhalte.
 Diese Inhalte werden als schnelle, belohnende Minispiele in den Feed integriert.
 Rechts kann später ein Screenshot der App eingesetzt werden.
 -->
+
+---
+layout: none
+transition: fade
+---
+
+<GamesShowcase />
+
+---
+layout: none
+---
+
+<ScoreboardSlide />
+
+---
+layout: none
+---
+
+<ZombieEvolutionSlide />
 
 ---
 layout: none

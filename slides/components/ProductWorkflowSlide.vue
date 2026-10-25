@@ -1,5 +1,11 @@
+<script setup lang="ts">
+import { useSlideContext } from '@slidev/client'
+
+const { $clicks } = useSlideContext()
+</script>
+
 <template>
-  <div class="workflow-slide">
+  <div class="workflow-slide" :class="{ 'workflow-slide--transition': $clicks >= 4 }">
     <header class="slide-heading">
       <span class="eyebrow">VON WISSEN ZU SPIEL</span>
       <h1>Wie funktioniert’s?</h1>
@@ -44,6 +50,16 @@
 
       <KnowledgeTabDemo />
     </main>
+
+    <span v-click class="transition-click-anchor" aria-hidden="true"></span>
+    <div v-if="$clicks >= 4" class="game-portal" aria-label="Übergang zu den Minigames">
+      <div class="game-portal-content">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2ZM11 13H8v3H6v-3H3v-2h3V8h2v3h3v2Zm4.5 2a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm4-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" />
+        </svg>
+        <span>MINIGAMES</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -66,6 +82,70 @@
 
 .workflow-slide * {
   box-sizing: border-box;
+}
+
+.workflow-slide--transition .slide-heading,
+.workflow-slide--transition .workflow-main {
+  opacity: 0;
+  transform: scale(.96);
+  transition: opacity .3s ease, transform .3s ease;
+}
+
+.transition-click-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+}
+
+.game-portal {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  inset: 0;
+  overflow: hidden;
+  color: #fff;
+}
+
+.game-portal::before {
+  position: absolute;
+  width: min(72vmin, 620px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #53c99e, #218768 72%);
+  content: '';
+  animation: game-portal-grow .8s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.game-portal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: game-portal-title .45s .22s ease-out both;
+}
+
+.game-portal-content svg {
+  width: clamp(54px, 8vw, 92px);
+  fill: currentColor;
+}
+
+.game-portal-content span {
+  font-size: clamp(40px, 8vw, 92px);
+  font-weight: 800;
+  letter-spacing: -.075em;
+  line-height: 1;
+}
+
+@keyframes game-portal-grow {
+  from { transform: scale(.02); }
+  to { transform: scale(3.6); }
+}
+
+@keyframes game-portal-title {
+  from { opacity: 0; transform: scale(.72); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .slide-heading {

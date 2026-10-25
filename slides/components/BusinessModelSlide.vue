@@ -23,7 +23,6 @@
         <svg viewBox="0 0 48 24">
           <path d="M2 12h40m-9-9 9 9-9 9" />
         </svg>
-        <span></span>
       </div>
 
       <section class="model-card partner-card">
