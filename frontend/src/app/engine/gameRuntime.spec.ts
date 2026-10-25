@@ -390,3 +390,67 @@ describe('game runtime assets', () => {
     delete (document as { fonts?: unknown }).fonts;
   });
 });
+
+describe('game runtime asset progress', () => {
+  const model = (maxBytes: number) => ({ kind: 'model', url: 'https://cdn.example.com/m.glb', maxBytes });
+  let runtime: ReturnType<typeof startRuntime>;
+  const progress = () => {
+    const { loaded, total, bytesLoaded, bytesTotal } = runtime.api()!.assets.progress;
+    return { loaded, total, bytesLoaded, bytesTotal };
+  };
+
+  beforeEach(() => vi.useFakeTimers());
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    runtime.canvas.remove();
+  });
+
+  it('replaces the maxBytes estimate with Content-Length and streams bytesLoaded', async () => {
+    let body!: ReadableStreamDefaultController<Uint8Array>;
+    vi.stubGlobal('fetch', async () => new Response(
+      new ReadableStream<Uint8Array>({ start: (controller) => { body = controller; } }),
+      { headers: { 'content-length': '300' } },
+    ));
+    runtime = startRuntime({ scene: model(1000) });
+    runtime.frame();
+    const load = runtime.api()!.assets.loadModel('scene');
+    expect(progress()).toEqual({ loaded: 0, total: 1, bytesLoaded: 0, bytesTotal: 1000 });
+
+    await vi.waitFor(() => expect(progress().bytesTotal).toBe(300));
+    body.enqueue(new Uint8Array(100));
+    await vi.waitFor(() => expect(progress().bytesLoaded).toBe(100));
+    body.enqueue(new Uint8Array(200));
+    body.close();
+    await load;
+    expect(progress()).toEqual({ loaded: 1, total: 1, bytesLoaded: 300, bytesTotal: 300 });
+  });
+
+  it('settles on the real size when Content-Length is missing', async () => {
+    vi.stubGlobal('fetch', async () => new Response(new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(new Uint8Array(40));
+        controller.close();
+      },
+    })));
+    runtime = startRuntime({ scene: model(1000) });
+    runtime.frame();
+    await runtime.api()!.assets.loadModel('scene');
+    expect(progress()).toEqual({ loaded: 1, total: 1, bytesLoaded: 40, bytesTotal: 40 });
+  });
+
+  it('drops a failed asset out of the byte counts', async () => {
+    vi.stubGlobal('fetch', async (url: string) => url.endsWith('bad.glb')
+      ? new Response(null, { status: 404 })
+      : new Response(new Uint8Array(50)));
+    runtime = startRuntime({
+      good: model(1000),
+      bad: { ...model(1000), url: 'https://cdn.example.com/bad.glb' },
+    });
+    runtime.frame();
+    await runtime.api()!.assets.preload(['good', 'bad']);
+    expect(progress()).toEqual({ loaded: 2, total: 2, bytesLoaded: 50, bytesTotal: 50 });
+  });
+});

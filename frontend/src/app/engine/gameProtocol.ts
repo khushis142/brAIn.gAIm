@@ -185,6 +185,7 @@ export interface GameAssetsProgress {
   readonly loaded: number;
   readonly total: number;
   readonly bytesLoaded: number;
+  /** Real sizes where known, else the asset's maxBytes; equals bytesLoaded once all loads finish. */
   readonly bytesTotal: number;
 }
 

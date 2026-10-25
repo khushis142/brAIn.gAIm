@@ -320,7 +320,10 @@ family: `ctx.font = '32px "titleFont"'`.
 Loads are cached and concurrent requests share a promise. Missing or failed
 assets return `null` (`false` for fonts); provide a fallback. Progress is
 available as `api.assets.progress.loaded`, `total`, `bytesLoaded`, and
-`bytesTotal`. Preloads marked in the manifest begin before `init`.
+`bytesTotal`. `bytesTotal` starts from each asset's `maxBytes` and is corrected
+to the real size once the response reports it, so `bytesLoaded / bytesTotal`
+reaches 1 when all started loads have finished. Failed assets drop out of both
+byte counts. Preloads marked in the manifest begin before `init`.
 
 ## Budgets and security
 

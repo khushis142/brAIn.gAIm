@@ -244,12 +244,33 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     }
   }
 
-  const addAssetProgress = (id: string): void => {
-    if (assetProgress.total === 0 || !assetPending.has(id)) {
-      assetProgress.total += 1;
-      const definition = assetEntries.get(id);
-      assetProgress.bytesTotal += definition?.maxBytes || 0;
-    }
+  // Each load counts toward bytesTotal with maxBytes until Content-Length or the finished
+  // body gives its real size, so bytesLoaded / bytesTotal reaches 1 when the loads are done.
+  const trackAssetBytes = (estimate: number) => {
+    let expected = estimate;
+    let received = 0;
+    assetProgress.total += 1;
+    assetProgress.bytesTotal += expected;
+    const expect = (bytes: number): void => {
+      assetProgress.bytesTotal += bytes - expected;
+      expected = bytes;
+    };
+    return {
+      expect,
+      receive: (bytes: number): void => {
+        received += bytes;
+        assetProgress.bytesLoaded += bytes;
+        // Content-Length can undercount, e.g. for compressed responses
+        if (received > expected) expect(received);
+      },
+      finish: (): void => expect(received),
+      // A failed asset drops out of the byte counts instead of staying half loaded
+      fail: (): void => {
+        assetProgress.bytesLoaded -= received;
+        received = 0;
+        expect(0);
+      },
+    };
   };
 
   const materializeAsset = async (id: string, definition: AssetEntry, bytes: ArrayBuffer): Promise<unknown> => {
@@ -283,11 +304,16 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     }
   };
 
-  const readLimitedBody = async (response: Response, maxBytes: number): Promise<ArrayBuffer> => {
+  const readLimitedBody = async (
+    response: Response,
+    maxBytes: number,
+    onBytes: (bytes: number) => void,
+  ): Promise<ArrayBuffer> => {
     const reader = response.body?.getReader();
     if (!reader) {
       const bytes = await response.arrayBuffer();
       if (bytes.byteLength > maxBytes) throw new Error('asset is too large');
+      onBytes(bytes.byteLength);
       return bytes;
     }
     const chunks: Uint8Array[] = [];
@@ -302,6 +328,7 @@ export function gameRuntime(config: GameRuntimeConfig): void {
           throw new Error('asset is too large');
         }
         chunks.push(part.value);
+        onBytes(part.value.byteLength);
       }
     } finally {
       reader.releaseLock();
@@ -322,20 +349,24 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     if (assetCache.has(id)) return Promise.resolve(assetCache.get(id));
     if (assetPending.has(id)) return assetPending.get(id)!;
     const definition = assetEntries.get(id)!;
-    addAssetProgress(id);
+    const progress = trackAssetBytes(definition.maxBytes);
     const promise = fetch(definition.url, { credentials: 'omit' })
       .then((response) => {
         if (!response.ok) throw new Error('asset request failed');
         const declaredLength = Number(response.headers.get('content-length'));
         if (declaredLength > definition.maxBytes) throw new Error('asset is too large');
-        return readLimitedBody(response, definition.maxBytes);
+        if (declaredLength > 0) progress.expect(declaredLength);
+        return readLimitedBody(response, definition.maxBytes, progress.receive);
       })
       .then((bytes) => {
         if (bytes.byteLength > definition.maxBytes) throw new Error('asset is too large');
-        assetProgress.bytesLoaded += bytes.byteLength;
+        progress.finish();
         return materializeAsset(id, definition, bytes);
       })
-      .catch(() => expectedKind === 'font' ? false : null)
+      .catch(() => {
+        progress.fail();
+        return expectedKind === 'font' ? false : null;
+      })
       .then((asset) => {
         assetCache.set(id, asset);
         assetProgress.loaded += 1;
