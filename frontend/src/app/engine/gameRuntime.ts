@@ -220,7 +220,9 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     const kind = definition.kind as GameAssetKind;
     try {
       const url = new URL(definition.url);
-      if (url.protocol !== 'https:') continue;
+      const inlineImage = kind === 'image' && url.protocol === 'data:' &&
+        /^data:image\/(svg\+xml|png|jpeg|webp|gif)[;,]/.test(definition.url);
+      if (url.protocol !== 'https:' && !inlineImage) continue;
       const hardLimit = ASSET_LIMITS[kind];
       const maxBytes = Math.min(
         hardLimit,
@@ -349,6 +351,18 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     if (assetCache.has(id)) return Promise.resolve(assetCache.get(id));
     if (assetPending.has(id)) return assetPending.get(id)!;
     const definition = assetEntries.get(id)!;
+    if (definition.url.startsWith('data:')) {
+      // Inline images need no network request (the iframe's CSP allows data: images).
+      const inline = new Image();
+      inline.src = definition.url;
+      const decoded = inline.decode().then(() => inline as unknown, () => null).then((asset) => {
+        assetCache.set(id, asset);
+        assetPending.delete(id);
+        return asset;
+      });
+      assetPending.set(id, decoded);
+      return decoded;
+    }
     const progress = trackAssetBytes(definition.maxBytes);
     const promise = fetch(definition.url, { credentials: 'omit' })
       .then((response) => {

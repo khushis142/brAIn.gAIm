@@ -49,12 +49,13 @@ function resolvePointer(
   return { parent: parent as Record<string, unknown>, key };
 }
 
-async function toDataUrl(url: string): Promise<string> {
+export async function toDataUrl(url: string): Promise<string> {
   const { protocol } = new URL(url);
   if (protocol !== 'https:' && protocol !== 'http:') throw new Error(`Unsupported URL ${url}`);
   const res = await fetch(url, { credentials: 'omit' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const type = res.headers.get('content-type') ?? 'application/octet-stream';
+  const header = res.headers.get('content-type')?.split(';')[0].trim();
+  const type = url.endsWith('.svg') ? 'image/svg+xml' : (header ?? 'application/octet-stream');
   const bytes = new Uint8Array(await res.arrayBuffer());
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) {

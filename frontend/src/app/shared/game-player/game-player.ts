@@ -17,7 +17,7 @@ import { ApiService, LeaderboardEntry, ZombieRead } from '../../core/api.service
 import { GamePrefetchService } from '../../core/game-prefetch.service';
 import { ZombieService } from '../../core/zombie.service';
 import { GameAssetManifest } from '../../engine/gameProtocol';
-import { inlineGameAssets } from '../../engine/gameAssets';
+import { inlineGameAssets, toDataUrl } from '../../engine/gameAssets';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameCustomData, GameResult } from '../../engine/gameProtocol';
 import { GameSession } from '../../engine/gameSession';
@@ -218,6 +218,21 @@ export function zombieGameAssets(state: ZombieRead | null, baseUrl: string): Gam
   return manifest;
 }
 
+/** The sandboxed game can't fetch the app origin (CORS, http), so the art is handed over as data: URLs. */
+async function inlinePlayerAssets(manifest: GameAssetManifest): Promise<GameAssetManifest> {
+  const inlined: Record<string, GameAssetManifest[string]> = {};
+  await Promise.all(
+    Object.entries(manifest).map(async ([id, asset]) => {
+      try {
+        inlined[id] = { ...asset, url: await toDataUrl(asset.url) };
+      } catch (error) {
+        console.warn(`Could not load the zombie asset ${id}`, error);
+      }
+    }),
+  );
+  return inlined;
+}
+
 @Component({
   imports: [LucideRotateCcw, LucideTrophy, LucideX],
   selector: 'app-game-player',
@@ -377,7 +392,9 @@ export class GamePlayer {
           console.warn('Could not load the player zombie for the game', error);
         }
       }
-      const playerAssets = zombieGameAssets(this.zombie.state(), document.baseURI);
+      const playerAssets = await inlinePlayerAssets(
+        zombieGameAssets(this.zombie.state(), document.baseURI),
+      );
 
       const host = this.gameHost().nativeElement;
       const width = host.clientWidth > 0 ? host.clientWidth : 800;
