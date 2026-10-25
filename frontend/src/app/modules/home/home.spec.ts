@@ -1,7 +1,7 @@
 import { Signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError } from 'rxjs';
-import { ApiService, FeedItem } from '../../core/api.service';
+import { ApiService, FeedItem, LikeState } from '../../core/api.service';
 import { GAME_RUNTIME_SOURCE } from '../../engine/gameRuntimeToken';
 import { FeedEntry, FeedSession } from './feed';
 import { Home } from './home';
@@ -13,12 +13,20 @@ interface HomeInternals {
   gameOwnsInput: Signal<boolean>;
   next(): Promise<void>;
   previous(): Promise<void>;
+  updateLike(entry: FeedEntry, likeState: LikeState): void;
   onKeydown(event: KeyboardEvent): void;
   onTouchStart(event: TouchEvent): void;
   onTouchEnd(event: TouchEvent): void;
 }
 
-const video = (id: string): FeedItem => ({ type: 'video', id, title: id, url: `${id}.mp4` });
+const video = (id: string): FeedItem => ({
+  type: 'video',
+  id,
+  title: id,
+  url: `${id}.mp4`,
+  liked: false,
+  like_count: 0,
+});
 
 describe('Home', () => {
   let component: Home;
@@ -103,6 +111,15 @@ describe('Home', () => {
     expect(home.entries().length).toBe(20);
     expect(home.entries()[0].item.id).toBe('item-2');
     expect(home.entries()[home.index()].item.id).toBe('item-21');
+  });
+
+  it('keeps updated likes in feed history', () => {
+    const entry = { key: 0, item: video('a') };
+    home.entries.set([entry]);
+
+    home.updateLike(entry, { liked: true, like_count: 4 });
+
+    expect(home.entries()[0].item).toMatchObject({ liked: true, like_count: 4 });
   });
 
   it('stays on the current item when the feed cannot be fetched', async () => {

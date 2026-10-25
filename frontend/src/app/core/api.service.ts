@@ -36,6 +36,13 @@ export interface VideoItem {
   id: string;
   title: string;
   url: string;
+  liked: boolean;
+  like_count: number;
+}
+
+export interface LikeState {
+  liked: boolean;
+  like_count: number;
 }
 
 export interface GameItem {
@@ -236,6 +243,13 @@ export class ApiService {
 
   nextItem(): Observable<FeedItem> {
     return this.http.post<FeedItem>(this.url('feed/next'), null, this.authOptions());
+  }
+
+  setContentLike(contentId: string, liked: boolean): Observable<LikeState> {
+    const url = this.url(`content/${encodeURIComponent(contentId)}/like`);
+    return liked
+      ? this.http.put<LikeState>(url, null, this.authOptions())
+      : this.http.delete<LikeState>(url, this.authOptions());
   }
 
   submitScore(gameId: string, score: ScoreCreate): Observable<ScoreRead> {

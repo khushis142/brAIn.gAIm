@@ -1,7 +1,9 @@
-import { Component, computed, input, output, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { LucideBrain, LucideChevronDown, LucideChevronUp, LucideLock } from '@lucide/angular';
+import { firstValueFrom } from 'rxjs';
+import { ApiService, LikeState } from '../../../core/api.service';
 import { GameResult } from '../../../engine/gameProtocol';
-import { CardTransition, FeedEntry, GameAllowance } from '../feed';
+import { CardTransition, describeError, FeedEntry, GameAllowance } from '../feed';
 import { FeedGame } from '../feed-game/feed-game';
 import { FeedVideo } from '../feed-video/feed-video';
 
@@ -25,7 +27,9 @@ export class FeedCard {
   readonly hasPrevious = input(false);
   readonly next = output<void>();
   readonly previous = output<void>();
+  readonly likeChanged = output<LikeState>();
 
+  private readonly api = inject(ApiService);
   private readonly game = viewChild(FeedGame);
   readonly gameOwnsInput = computed(() => this.game()?.ownsInput() ?? false);
 
@@ -33,8 +37,31 @@ export class FeedCard {
     if (!this.active() || this.transition() === 'leaving') return 'paused';
     return this.transition() === 'entering' ? 'visible' : 'playing';
   });
-  // Likes are cosmetic for now: kept in memory until the backend has an endpoint
-  protected readonly liked = signal(false);
+  protected readonly liked = computed(() => {
+    const item = this.entry().item;
+    return item.type === 'video' && item.liked;
+  });
+  protected readonly likeCount = computed(() => {
+    const item = this.entry().item;
+    return item.type === 'video' ? item.like_count : 0;
+  });
+  protected readonly likePending = signal(false);
+  protected readonly likeError = signal<string | null>(null);
   protected readonly gameResult = signal<GameResult | null>(null);
   protected videoTime = 0;
+
+  protected async setLiked(liked: boolean): Promise<void> {
+    const item = this.entry().item;
+    if (item.type !== 'video' || this.likePending() || item.liked === liked) return;
+
+    this.likePending.set(true);
+    this.likeError.set(null);
+    try {
+      this.likeChanged.emit(await firstValueFrom(this.api.setContentLike(item.id, liked)));
+    } catch (error) {
+      this.likeError.set(`Couldn't update like. ${describeError(error)}`);
+    } finally {
+      this.likePending.set(false);
+    }
+  }
 }

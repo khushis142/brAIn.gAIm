@@ -12,6 +12,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .stage {
@@ -59,19 +60,46 @@
 .like {
   background: none;
   border: 0;
-  border-radius: 50%;
+  border-radius: 20px;
   color: inherit;
   cursor: pointer;
-  display: grid;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   height: 40px;
-  place-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 0 8px;
   transition: color 200ms ease;
-  width: 40px;
+}
+
+.like:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .like svg {
   fill: transparent;
+  height: 20px;
   transition: fill 200ms ease;
+  width: 20px;
+}
+
+.like-count {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.like-error {
+  background: var(--control);
+  border-radius: 8px;
+  bottom: 60px;
+  color: #b42318;
+  font-size: 0.75rem;
+  max-width: calc(100% - 24px);
+  padding: 6px 8px;
+  position: absolute;
+  right: 12px;
 }
 
 .like.liked {
@@ -132,11 +160,15 @@
 }
 
 @keyframes bob {
-  50% { transform: translateY(2px); }
+  50% {
+    transform: translateY(2px);
+  }
 }
 
 @keyframes like-pop {
-  50% { transform: scale(1.35) rotate(-8deg); }
+  50% {
+    transform: scale(1.35) rotate(-8deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -202,7 +202,30 @@ describe('ApiService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
     expect(request.request.body).toBeNull();
-    request.flush({ type: 'video', id: 'video-id', title: 'Biology', url: 'https://example.test' });
+    request.flush({
+      type: 'video',
+      id: 'video-id',
+      title: 'Biology',
+      url: 'https://example.test',
+      liked: false,
+      like_count: 0,
+    });
+  });
+
+  it('sets and removes an authenticated content like', () => {
+    authenticate();
+    api.setContentLike('video/id', true).subscribe();
+    const like = httpTesting.expectOne(`${environment.apiBaseUrl}/content/video%2Fid/like`);
+    expect(like.request.method).toBe('PUT');
+    expect(like.request.headers.get('Authorization')).toBe('Bearer access-token');
+    expect(like.request.body).toBeNull();
+    like.flush({ liked: true, like_count: 1 });
+
+    api.setContentLike('video/id', false).subscribe();
+    const unlike = httpTesting.expectOne(`${environment.apiBaseUrl}/content/video%2Fid/like`);
+    expect(unlike.request.method).toBe('DELETE');
+    expect(unlike.request.headers.get('Authorization')).toBe('Bearer access-token');
+    unlike.flush({ liked: false, like_count: 0 });
   });
 
   it('submits scores for a game', () => {
@@ -275,7 +298,9 @@ describe('ApiService', () => {
 
   it('registers a video from an already-uploaded CDN file', () => {
     authenticate();
-    api.createContent({ id: 'cdn-1', filename: 'clip.mp4', title: 'My clip', tags: ['bio'] }).subscribe();
+    api
+      .createContent({ id: 'cdn-1', filename: 'clip.mp4', title: 'My clip', tags: ['bio'] })
+      .subscribe();
 
     const request = httpTesting.expectOne(`${environment.apiBaseUrl}/content`);
     expect(request.request.method).toBe('POST');

@@ -17,6 +17,7 @@
       [hasPrevious]="i > 0"
       (next)="next()"
       (previous)="previous()"
+      (likeChanged)="updateLike(entry, $event)"
     />
   }
 

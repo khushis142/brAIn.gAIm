@@ -1,6 +1,6 @@
 import { afterNextRender, Component, computed, inject, signal, viewChildren } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ApiService } from '../../core/api.service';
+import { ApiService, LikeState } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
 import { CardTransition, describeError, FeedEntry, FeedSession, FeedUser, wait } from './feed';
 import { FeedCard } from './feed-card/feed-card';
@@ -47,7 +47,10 @@ export class Home {
    * moves on. Going back is still allowed; coming forward again lands on the same game.
    */
   protected readonly gameOwnsInput = computed(
-    () => this.cards().find((card) => card.entry() === this.current())?.gameOwnsInput() ?? false,
+    () =>
+      this.cards()
+        .find((card) => card.entry() === this.current())
+        ?.gameOwnsInput() ?? false,
   );
 
   private busy = false;
@@ -78,6 +81,16 @@ export class Home {
   protected previous(): Promise<void> {
     if (this.index() <= 0) return Promise.resolve();
     return this.move('back', async () => this.index() - 1);
+  }
+
+  protected updateLike(entry: FeedEntry, likeState: LikeState): void {
+    this.entries.update((entries) =>
+      entries.map((current) =>
+        current.key === entry.key && current.item.type === 'video'
+          ? { ...current, item: { ...current.item, ...likeState } }
+          : current,
+      ),
+    );
   }
 
   private append(item: FeedEntry['item']): number {

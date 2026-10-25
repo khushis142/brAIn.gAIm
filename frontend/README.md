@@ -8,7 +8,7 @@ All application routes (except `/login` and `/register`) are protected by the `r
 
 | Route | Component | Description |
 |---|---|---|
-| `/` | `Home` (`src/app/modules/home/`) | Vertical swipe / `ArrowDown` learning feed interleaving short MP4 videos (custom timeline scrubber, play/pause bubble, double-tap brain-burst likes) and sandboxed iframe learning games (`GameEngineService` / `GameSession`). |
+| `/` | `Home` (`src/app/modules/home/`) | Vertical swipe / `ArrowDown` learning feed interleaving short MP4 videos (custom timeline scrubber, play/pause bubble, persistent Brain likes with counts via button or double-tap) and sandboxed iframe learning games (`GameEngineService` / `GameSession`). |
 | `/upload` | `Upload` (`src/app/modules/upload/`) | Study project workspace: create, rename, delete, and color-code project folders, upload study attachments (PDF, images, text, Markdown, CSV) to the CDN, and select the active study project for mini-games. |
 | `/video-upload` | `VideoUpload` (`src/app/modules/video-upload/`) | MP4 video uploader (up to 500 MB) to the CDN and content registration with title and tags on the Backend. |
 | `/settings` | `Settings` (`src/app/modules/settings/`) | User profile view, study interests editor (`InterestsDialog`), and logout. |

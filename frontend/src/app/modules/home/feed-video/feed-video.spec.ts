@@ -7,7 +7,14 @@ describe('FeedVideo', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [FeedVideo] }).compileComponents();
     fixture = TestBed.createComponent(FeedVideo);
-    fixture.componentRef.setInput('item', { type: 'video', id: 'v', title: 'Clip', url: 'clip.mp4' });
+    fixture.componentRef.setInput('item', {
+      type: 'video',
+      id: 'v',
+      title: 'Clip',
+      url: 'clip.mp4',
+      liked: false,
+      like_count: 0,
+    });
     await fixture.whenStable();
   });
 
@@ -19,7 +26,13 @@ describe('FeedVideo', () => {
     const doubleTapped = vi.fn();
     fixture.componentInstance.doubleTapped.subscribe(doubleTapped);
     const tap = (timeStamp: number) => {
-      const event = { clientX: 50, clientY: 50, offsetX: 50, offsetY: 50, timeStamp } as PointerEvent;
+      const event = {
+        clientX: 50,
+        clientY: 50,
+        offsetX: 50,
+        offsetY: 50,
+        timeStamp,
+      } as PointerEvent;
       video.onTapStart(event);
       video.onTapEnd(event);
     };

@@ -8,7 +8,7 @@
           [active]="allowance() !== 'paused'"
           [startAt]="videoTime"
           (timeChange)="videoTime = $event"
-          (doubleTapped)="liked.set(true)"
+          (doubleTapped)="setLiked(true)"
         />
       } @else {
         <app-feed-game
@@ -32,11 +32,17 @@
         type="button"
         [class.liked]="liked()"
         [attr.aria-pressed]="liked()"
-        aria-label="Like"
-        (click)="liked.set(!liked())"
+        [attr.aria-label]="liked() ? 'Unlike' : 'Like'"
+        [attr.aria-busy]="likePending()"
+        [disabled]="likePending()"
+        (click)="setLiked(!liked())"
       >
         <svg lucideBrain></svg>
+        <span class="like-count">{{ likeCount() }}</span>
       </button>
+      @if (likeError(); as message) {
+        <span class="like-error" role="alert">{{ message }}</span>
+      }
     }
     <nav class="nav" aria-label="Feed">
       <button
