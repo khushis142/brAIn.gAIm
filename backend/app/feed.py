@@ -170,3 +170,26 @@ async def top_up(user_id: uuid.UUID) -> None:
                 break
             session.add(game_round)
         await session.commit()
+
+
+async def top_up_game(user_id: uuid.UUID, game_id: uuid.UUID) -> None:
+    """Prepare a round for a specific game in the background if none is waiting."""
+    async with SessionLocal() as session:
+        lock_key = int.from_bytes(user_id.bytes[:4] + game_id.bytes[:4], signed=True)
+        if not await session.scalar(select(func.pg_try_advisory_xact_lock(lock_key))):
+            return
+        ready = await session.scalar(
+            select(func.count())
+            .select_from(GameRound)
+            .where(
+                GameRound.user_id == user_id,
+                GameRound.game_id == game_id,
+                GameRound.served_at.is_(None),
+            )
+        )
+        if (ready or 0) >= 1:
+            return
+        game_round = await _prepare_round(session, user_id, game_id)
+        if game_round is not None:
+            session.add(game_round)
+            await session.commit()

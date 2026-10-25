@@ -1,6 +1,6 @@
 """Publish a game: upload its JS to the CDN and register it with its config.
 
-Usage: python -m app.seed_game <dir> --title "Quiz" --owner <username>
+Usage: python -m app.seed_game <dir> --title "Quiz" --owner <username> [--tags word,puzzle]
        python -m app.seed_game <dir> --title "Quiz" --update
 
 <dir> holds `game.js` and `config.json` ({"input_schema": <JSON Schema>, "context": "..."});
@@ -32,7 +32,9 @@ def _load_game(directory: Path) -> tuple[GameConfig, str]:
     return config, code
 
 
-async def seed_game(session: AsyncSession, directory: Path, title: str, owner: str) -> Content:
+async def seed_game(
+    session: AsyncSession, directory: Path, title: str, owner: str, tags: list[str] | None = None
+) -> Content:
     config, code = _load_game(directory)
     owner_id = await session.scalar(select(User.id).where(User.username == owner))
     if owner_id is None:
@@ -47,7 +49,8 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
         kind="game",
         filename=filename,
         title=title,
-        config=config.model_dump(),
+        tags=tags or [],
+        config=config.model_dump(mode="json"),
         owner_id=owner_id,
     )
     session.add(game)
@@ -77,7 +80,7 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
         filename=filename,
         title=title,
         tags=old.tags,
-        config=config.model_dump(),
+        config=config.model_dump(mode="json"),
         owner_id=old.owner_id,
         created_at=old.created_at,
     )
@@ -96,12 +99,12 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
     return game
 
 
-async def _main(directory: Path, title: str, owner: str | None) -> None:
+async def _main(directory: Path, title: str, owner: str | None, tags: list[str]) -> None:
     async with SessionLocal() as session:
         if owner is None:
             game = await update_game(session, directory, title)
         else:
-            game = await seed_game(session, directory, title, owner)
+            game = await seed_game(session, directory, title, owner, tags)
     await engine.dispose()
     print(json.dumps({"id": str(game.id), "title": game.title, "filename": game.filename}))
 
@@ -115,8 +118,10 @@ def main() -> None:
     who.add_argument(
         "--update", action="store_true", help="Replace the code and config of an existing game"
     )
+    parser.add_argument("--tags", default="", help="Comma-separated tags (new games only)")
     args = parser.parse_args()
-    asyncio.run(_main(args.dir, args.title, None if args.update else args.owner))
+    tags = [tag.strip() for tag in args.tags.split(",") if tag.strip()]
+    asyncio.run(_main(args.dir, args.title, None if args.update else args.owner, tags))
 
 
 if __name__ == "__main__":

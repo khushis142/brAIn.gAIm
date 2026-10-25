@@ -1,0 +1,11 @@
+{
+  "context": "No personalized data is generated for this game; the target word is picked by the fixed game code from its own built-in list.",
+  "input_schema": {
+    "type": "object",
+    "required": ["context"],
+    "additionalProperties": false,
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 }
+    }
+  }
+}
