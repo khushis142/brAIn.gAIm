@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, FeedItem } from '../../core/api.service';
 
@@ -36,7 +36,27 @@ export class FeedUser {
   }
 }
 
-export const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/**
+ * Stats for this visit to the website. They live in memory, so they survive leaving the
+ * feed and coming back, and start over the next time the site is opened or reloaded.
+ */
+@Injectable({ providedIn: 'root' })
+export class FeedSession {
+  readonly startedAt = Date.now();
+  // By entry, not key: keys start over with every feed, entries do not
+  private readonly seenVideos = new WeakSet<FeedEntry>();
+  private readonly _videosWatched = signal(0);
+  readonly videosWatched = this._videosWatched.asReadonly();
+
+  /** Counts each video in the history once, however often the user scrolls back to it */
+  shown(entry: FeedEntry): void {
+    if (entry.item.type !== 'video' || this.seenVideos.has(entry)) return;
+    this.seenVideos.add(entry);
+    this._videosWatched.update((count) => count + 1);
+  }
+}
+
+export const wait =(ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function describeError(err: unknown): string {
   if (err instanceof HttpErrorResponse) {

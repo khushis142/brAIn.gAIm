@@ -2,7 +2,7 @@ import { afterNextRender, Component, computed, inject, signal, viewChildren } fr
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
-import { CardTransition, describeError, FeedEntry, FeedUser, wait } from './feed';
+import { CardTransition, describeError, FeedEntry, FeedSession, FeedUser, wait } from './feed';
 import { FeedCard } from './feed-card/feed-card';
 
 type Phase = 'idle' | 'leaving' | 'entering';
@@ -29,6 +29,7 @@ const KEEP_ALIVE = 2;
 export class Home {
   private readonly api = inject(ApiService);
   private readonly zombie = inject(ZombieService);
+  private readonly session = inject(FeedSession);
   private readonly cards = viewChildren(FeedCard);
 
   protected readonly entries = signal<FeedEntry[]>([]);
@@ -99,6 +100,7 @@ export class Home {
       // Fetch the next item while the leave animation plays
       const [nextIndex] = await Promise.all([target(), wait(hasItem ? LEAVE_MS : 0)]);
       this.index.set(nextIndex);
+      this.session.shown(this.entries()[nextIndex]);
       this.phase.set('entering');
       await wait(ENTER_MS);
     } catch (err) {

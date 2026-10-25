@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { NEVER, of } from 'rxjs';
 import { ApiService, GameItem } from '../../../core/api.service';
 import { GAME_RUNTIME_SOURCE } from '../../../engine/gameRuntimeToken';
+import { GameSession } from '../../../engine/gameSession';
 import { FeedUser } from '../feed';
 import { FeedGame } from './feed-game';
 
@@ -52,6 +53,7 @@ describe('FeedGame', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('only plays once the feed has settled on its card', async () => {
@@ -98,5 +100,25 @@ describe('FeedGame', () => {
 
     expect(fetch).toHaveBeenCalledWith('quiz.js');
     expect(fixture.componentInstance.ownsInput()).toBe(true);
+  });
+
+  it('shows an intro with session stats and starts the round only on Start', async () => {
+    fetch.mockResolvedValue(new Response('game code'));
+    const start = vi.spyOn(GameSession.prototype, 'start').mockImplementation(() => {});
+    await create();
+    const element: HTMLElement = fixture.nativeElement;
+
+    expect(element.querySelector('.intro-title')?.textContent).toBe('Quiz');
+    expect([...element.querySelectorAll('.intro-stat dd')].map((dd) => dd.textContent)).toEqual([
+      '0',
+      '0 s',
+    ]);
+    expect(fixture.componentInstance.ownsInput()).toBe(true);
+    expect(start).not.toHaveBeenCalled();
+
+    element.querySelector<HTMLButtonElement>('.intro-start')!.click();
+    await vi.waitFor(() => expect(start).toHaveBeenCalledWith('game code', expect.anything()));
+    await fixture.whenStable();
+    expect(element.querySelector('.intro')).toBeNull();
   });
 });

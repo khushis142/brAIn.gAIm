@@ -1,5 +1,28 @@
 <div #gameHost class="game-host"></div>
 
+@if (intro()) {
+  <div class="intro">
+    <div class="intro-content">
+      <p class="intro-label intro-section-heading">Your doomscrolling so far:</p>
+      <dl class="intro-stats">
+        <div class="intro-tile intro-stat">
+          <dt>Videos scrolled</dt>
+          <dd>{{ videosWatched() }}</dd>
+        </div>
+        <div class="intro-tile intro-stat">
+          <dt>Time in this session</dt>
+          <dd>{{ timeInFeed() }}</dd>
+        </div>
+      </dl>
+      <p class="intro-label intro-section-heading">To continue complete a game!</p>
+      <div class="intro-tile intro-game">
+        <h3 class="intro-title">{{ item().title }}</h3>
+        <button class="intro-start" type="button" (click)="start()">Start game</button>
+      </div>
+    </div>
+  </div>
+}
+
 @if (loading()) {
   <p class="placeholder">Loading game…</p>
 }

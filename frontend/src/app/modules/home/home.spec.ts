@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError } from 'rxjs';
 import { ApiService, FeedItem } from '../../core/api.service';
 import { GAME_RUNTIME_SOURCE } from '../../engine/gameRuntimeToken';
-import { FeedEntry } from './feed';
+import { FeedEntry, FeedSession } from './feed';
 import { Home } from './home';
 
 interface HomeInternals {
@@ -89,6 +89,8 @@ describe('Home', () => {
     await settle(home.next());
     expect(currentId()).toBe('b');
     expect(nextItem).toHaveBeenCalledTimes(2);
+    // Each video counts once toward the session stats, however often it is shown
+    expect(fixture.debugElement.injector.get(FeedSession).videosWatched()).toBe(2);
   });
 
   it('keeps the last 20 items', async () => {

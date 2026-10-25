@@ -18,12 +18,18 @@ import { ApiService, GameItem, LeaderboardEntry, ScoreRead } from '../../../core
 import { ZombieService } from '../../../core/zombie.service';
 import { inlineGameAssets } from '../../../engine/gameAssets';
 import { GameEngineService } from '../../../engine/gameEngineService';
-import { GameResult } from '../../../engine/gameProtocol';
+import { GameCustomData, GameResult } from '../../../engine/gameProtocol';
 import { GameSession } from '../../../engine/gameSession';
 import { Zombie } from '../../../shared/zombie/zombie';
-import { describeError, FeedUser, GameAllowance } from '../feed';
+import { describeError, FeedSession, FeedUser, GameAllowance } from '../feed';
 
 type ScoreSubmissionStatus = 'idle' | 'uploading' | 'saved' | 'failed';
+
+interface PreparedRound {
+  code: string;
+  data: GameCustomData;
+  username: string;
+}
 
 const LAYOUT_TIMEOUT_MS = 1000; // max wait for the game host to get a size
 const FALLBACK_GAME_SIZE = { width: 800, height: 600 };
@@ -71,6 +77,7 @@ export class FeedGame {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
   private readonly user = inject(FeedUser);
+  private readonly feedSession = inject(FeedSession);
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly zombie = inject(ZombieService);
@@ -90,8 +97,22 @@ export class FeedGame {
     () => this.session()?.error() === 'Execution time budget exceeded',
   );
   protected readonly result = computed(() => this.session()?.result() ?? this.finishedResult());
+  /** The player pressed Start; until then the intro shows while the round downloads */
+  protected readonly started = signal(false);
+  protected readonly intro = computed(
+    () => !this.started() && this.result() === null && this.error() === null,
+  );
   protected readonly loading = computed(
-    () => this.result() === null && this.error() === null && this.session()?.status() !== 'running',
+    () =>
+      this.started() &&
+      this.result() === null &&
+      this.error() === null &&
+      this.session()?.status() !== 'running',
+  );
+  protected readonly videosWatched = this.feedSession.videosWatched;
+  private readonly now = signal(Date.now());
+  protected readonly timeInFeed = computed(() =>
+    formatDuration(this.now() - this.feedSession.startedAt),
   );
   /**
    * While the round is being played, swipes and arrow keys belong to it. A finished or
@@ -116,6 +137,8 @@ export class FeedGame {
   private intersectionObserver?: IntersectionObserver;
   private visibleRatio = 1;
   private submitted = false;
+  private prepared: Promise<PreparedRound | null> = Promise.resolve(null);
+  private clock?: ReturnType<typeof setInterval>;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -123,7 +146,8 @@ export class FeedGame {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
       this.observeVisibility();
       if (this.finishedResult() === null) {
-        void this.load();
+        this.prepared = this.prepare();
+        this.clock = setInterval(() => this.now.set(Date.now()), 1000);
       } else {
         void this.user.username().then((name) => this.username.set(name), () => {});
         void this.loadLeaderboard();
@@ -150,15 +174,24 @@ export class FeedGame {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       this.intersectionObserver?.disconnect();
       this.session()?.destroy();
+      clearInterval(this.clock);
     });
+  }
+
+  protected start(): void {
+    this.started.set(true);
+    clearInterval(this.clock);
+    void this.launch();
   }
 
   /** Loads the round again after a failed download or a crash; it has not been scored yet */
   protected retry(): void {
-    void this.load();
+    this.prepared = this.prepare();
+    if (this.started()) void this.launch();
   }
 
-  private async load(): Promise<void> {
+  /** Downloads everything the round needs; resolves with null and shows the error on failure */
+  private async prepare(): Promise<PreparedRound | null> {
     const item = this.item();
     this.loadError.set(null);
     try {
@@ -171,18 +204,25 @@ export class FeedGame {
         this.user.username(),
       ]);
       this.username.set(username);
-      const { width, height } = await waitForSize(this.gameHost().nativeElement, LAYOUT_TIMEOUT_MS);
-      if (this.destroyRef.destroyed) return;
-      this.session()?.start(code, {
-        username,
-        data,
-        width,
-        height,
-      });
-      this.syncLifecycle();
+      return { code, data, username };
     } catch (err) {
       this.loadError.set(describeError(err));
+      return null;
     }
+  }
+
+  private async launch(): Promise<void> {
+    const round = await this.prepared;
+    if (round === null) return;
+    const { width, height } = await waitForSize(this.gameHost().nativeElement, LAYOUT_TIMEOUT_MS);
+    if (this.destroyRef.destroyed) return;
+    this.session()?.start(round.code, {
+      username: round.username,
+      data: round.data,
+      width,
+      height,
+    });
+    this.syncLifecycle();
   }
 
   private observeVisibility(): void {
@@ -272,6 +312,13 @@ export class FeedGame {
     const host = this.gameHost().nativeElement;
     this.session()?.resize(host.clientWidth, host.clientHeight);
   }
+}
+
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000);
+  if (totalMinutes < 1) return `${Math.max(0, Math.floor(ms / 1000))} s`;
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  return `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min`;
 }
 
 async function loadGameCode(url: string): Promise<string> {

@@ -5,6 +5,7 @@
 }
 
 .game-host,
+.intro,
 .placeholder,
 .error,
 .result {
@@ -40,6 +41,122 @@
   color: #fff;
   cursor: pointer;
   padding: 8px 16px;
+}
+
+/* Shown before the round starts, while it downloads behind it */
+.intro {
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 65%),
+    rgb(0 0 0 / 0.85);
+  color: #fff;
+  container-type: size;
+  display: grid;
+  overflow-y: auto;
+  place-items: center;
+}
+
+.intro-content {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 4cqh, 24px);
+  max-width: 340px;
+  padding: 24px 20px;
+  text-align: center;
+  width: 100%;
+}
+
+.intro-label {
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+/* Each heading sits right above the tiles it introduces; the sections get room between them */
+.intro-section-heading {
+  margin-bottom: calc(10px - clamp(12px, 4cqh, 24px));
+}
+
+.intro-section-heading:not(:first-child) {
+  margin-top: 8px;
+}
+
+.intro-tile {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 24px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-sizing: border-box;
+}
+
+.intro-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+  width: 100%;
+}
+
+/* Label on top, value at the bottom, so values line up when one label wraps */
+.intro-stat {
+  align-content: space-between;
+  display: grid;
+  gap: 4px;
+  padding: 12px 8px;
+}
+
+/* The game gets one wide tile, its title and the start button inside */
+.intro-game {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 18px 16px;
+  width: 100%;
+}
+
+.intro-title {
+  border-bottom: 0; /* undo the global h3 rule */
+  font-size: clamp(1.4rem, 7cqh, 1.9rem);
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding-bottom: 0;
+}
+
+.intro-stat dt {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  text-transform: uppercase;
+}
+
+.intro-stat dd {
+  font-size: 1.75rem;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  margin: 0;
+}
+
+.intro-start {
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 12px 32px;
+}
+
+.intro-start:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 /* Sizes follow the card height (cqh), so short phones get a smaller zombie and type */
