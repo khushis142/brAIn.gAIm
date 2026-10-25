@@ -28,6 +28,11 @@
   z-index: 10;
 }
 
+.player-header.actions-only {
+  background: none;
+  justify-content: flex-end;
+}
+
 .game-meta {
   align-items: center;
   display: flex;

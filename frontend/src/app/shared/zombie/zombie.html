@@ -1,7 +1,12 @@
 <svg [attr.viewBox]="viewBox">
   @for (layer of layers(); track layer.anchor) {
     <g [attr.class]="'part ' + layer.anchor">
-      @for (href of layer.hrefs; track href) {
+      <!-- Avatars share one outline, so fading the new one in over the old is seamless -->
+      @if (layer.previousBase; as previousBase) {
+        <use [attr.href]="previousBase" />
+      }
+      <use [attr.href]="layer.base" [class.avatar-in]="layer.previousBase !== null" />
+      @for (href of layer.accessories; track href) {
         <use [attr.href]="href" />
       }
     </g>

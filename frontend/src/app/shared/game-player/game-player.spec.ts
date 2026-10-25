@@ -18,6 +18,18 @@ describe('GamePlayer', () => {
             getMe: () => of({ username: 'tester' }),
             submitScore: () => of(undefined),
             getLeaderboard: () => of([{ username: 'top1', score: 100 }]),
+            playGame: () =>
+              of({
+                id: '1',
+                title: 'game',
+                url: 'http://test',
+                round_id: 'round-123',
+                data: {
+                  context: 'AI context',
+                  questions: [{ question: 'AI Question?', correctAnswer: 'Ans A', wrongAnswer: 'Ans B' }],
+                },
+                assets: [],
+              }),
           },
         },
         { provide: GAME_RUNTIME_SOURCE, useValue: '' },
@@ -48,6 +60,8 @@ describe('GamePlayer', () => {
     const q = (resolved['questions'] as any[])[0];
     expect(q.question).toBeTruthy();
     expect(q.options).toBeInstanceOf(Array);
+    expect(q.correctAnswer).toBeTruthy();
+    expect(q.wrongAnswer).toBeTruthy();
     expect(q.left_option).toBeTruthy();
     expect(q.right_option).toBeTruthy();
     expect(q.correct).toBe('left');
@@ -58,5 +72,35 @@ describe('GamePlayer', () => {
     const c = (resolved['chains'] as any[])[0];
     expect(c.title).toBeTruthy();
     expect(c.steps.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('normalizes custom questions to include correctAnswer and wrongAnswer for glass-bridge', () => {
+    const custom = {
+      context: 'Trivia test',
+      questions: [
+        {
+          question: 'Capital of France?',
+          options: ['Paris', 'London'],
+          answer: 0,
+        },
+      ],
+    };
+    const resolved = resolveGameData('Glass Bridge', custom);
+    const q = (resolved['questions'] as any[])[0];
+    expect(q.question).toBe('Capital of France?');
+    expect(q.correctAnswer).toBe('Paris');
+    expect(q.wrongAnswer).toBe('London');
+  });
+
+  it('fetches AI round when game data is not provided', async () => {
+    const api = TestBed.inject(ApiService);
+    const spy = vi.spyOn(api, 'playGame');
+    fixture.componentRef.setInput('game', {
+      id: 'game-1',
+      title: 'Glass Bridge',
+      url: 'http://test/game.js',
+    });
+    await component.loadAndStart();
+    expect(spy).toHaveBeenCalledWith('game-1');
   });
 });

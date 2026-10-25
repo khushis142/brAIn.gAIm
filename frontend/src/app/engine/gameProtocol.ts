@@ -292,7 +292,8 @@ export type HostCommand =
   | { type: 'stop' }
   | { type: 'resize'; width: number; height: number }
   /** A touch the host received on the iframe element; x/y are relative to the iframe. */
-  | { type: 'touch'; phase: TouchPhase; id: number; x: number; y: number };
+  | { type: 'touch'; phase: TouchPhase; id: number; x: number; y: number }
+  | { type: 'key'; code: string; pressed: boolean };
 
 export type TouchPhase = 'start' | 'move' | 'end' | 'cancel';
 

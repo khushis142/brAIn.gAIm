@@ -124,19 +124,6 @@ export class Gamehub implements OnInit {
       queryParams: { play: game.id },
       queryParamsHandling: 'merge',
     });
-
-    try {
-      const item = await firstValueFrom(this.api.playGame(game.id));
-      if (this.selectedGame()?.id === game.id) {
-        this.selectedGame.set({
-          ...game,
-          round_id: item.round_id,
-          data: item.data && Object.keys(item.data).length > 0 ? item.data : undefined,
-        });
-      }
-    } catch {
-      // If round endpoint fails, defaultGameData handles all games seamlessly
-    }
   }
 
   closeGame(): void {

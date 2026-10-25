@@ -4,17 +4,16 @@ import {
   Component,
   computed,
   DestroyRef,
-  effect,
   ElementRef,
+  effect,
   inject,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideBrain, LucideChevronDown } from '@lucide/angular';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, FeedItem, GameItem } from '../../core/api.service';
+import { ApiService, FeedItem, LeaderboardEntry, ScoreRead } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
@@ -22,6 +21,7 @@ import { Zombie } from '../../shared/zombie/zombie';
 
 type Phase = 'idle' | 'leaving' | 'entering';
 type PlaybackBubble = 'play' | 'pause';
+type ScoreSubmissionStatus = 'idle' | 'uploading' | 'saved' | 'failed';
 
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
@@ -29,6 +29,8 @@ const SWIPE_MIN_PX = 60;
 const DOUBLE_TAP_MS = 300;
 const TAP_SLOP_PX = 10; // more movement than this is a swipe, not a tap
 const BURST_MS = 800; // keep in sync with the burst animation in home.css
+const LAYOUT_TIMEOUT_MS = 1000; // max wait for the game host to get a size
+const FALLBACK_GAME_SIZE = { width: 800, height: 600 };
 
 interface Burst {
   id: number;
@@ -37,6 +39,32 @@ interface Burst {
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Resolves with the element's size once layout gives it one. On mobile the host is
+ * often still 0×0 right after an item swap (address bar, keyboard, first render).
+ */
+function waitForSize(element: HTMLElement, timeoutMs: number): Promise<{ width: number; height: number }> {
+  const measure = () => ({ width: element.clientWidth, height: element.clientHeight });
+  const initial = measure();
+  const Observer = element.ownerDocument.defaultView?.ResizeObserver;
+  if ((initial.width > 0 && initial.height > 0) || !Observer) {
+    return Promise.resolve(initial.width > 0 && initial.height > 0 ? initial : FALLBACK_GAME_SIZE);
+  }
+  return new Promise((resolve) => {
+    const finish = (size: { width: number; height: number }) => {
+      observer.disconnect();
+      clearTimeout(timer);
+      resolve(size);
+    };
+    const observer = new Observer(() => {
+      const size = measure();
+      if (size.width > 0 && size.height > 0) finish(size);
+    });
+    const timer = setTimeout(() => finish(FALLBACK_GAME_SIZE), timeoutMs);
+    observer.observe(element);
+  });
+}
 
 @Component({
   imports: [LucideBrain, LucideChevronDown, RouterLink, Zombie],
@@ -51,6 +79,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly zombie = inject(ZombieService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
@@ -65,6 +94,18 @@ export class Home {
   protected readonly isSeeking = signal(false);
   protected readonly arePlayerControlsVisible = signal(false);
   protected readonly playbackBubble = signal<PlaybackBubble | null>(null);
+  protected readonly scoreSubmissionStatus = signal<ScoreSubmissionStatus>('idle');
+  /** Accessories and avatars unlocked by the game on screen */
+  protected readonly unlockedNames = signal<string[]>([]);
+  protected readonly leaderboard = signal<LeaderboardEntry[] | null>(null);
+  protected readonly leaderboardStatus = signal<'idle' | 'loading' | 'loaded' | 'failed'>('idle');
+  protected readonly topLeaderboard = computed(() => this.leaderboard()?.slice(0, 3) ?? []);
+  protected readonly playerBest = computed(() => {
+    const name = this.username();
+    const entries = this.leaderboard();
+    if (!name || !entries) return null;
+    return entries.find((entry) => entry.username === name) ?? null;
+  });
   protected readonly playheadPercent = computed(() => {
     const duration = this.duration();
     return duration > 0 ? (this.currentTime() / duration) * 100 : 0;
@@ -83,11 +124,9 @@ export class Home {
     return current !== null && this.likedIds().has(current.id);
   });
   protected readonly bursts = signal<Burst[]>([]);
-  /** Accessories unlocked by the game on screen */
-  protected readonly unlockedNames = signal<string[]>([]);
 
   private busy = false;
-  private username: string | null = null;
+  private readonly username = signal<string | null>(null);
   private touchStartY: number | null = null;
   private seekTimestampTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackBubbleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -98,6 +137,7 @@ export class Home {
   private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
   private intersectionObserver?: IntersectionObserver;
   private visibleRatio = 1;
+  private submittedRoundId: string | null = null;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -110,13 +150,15 @@ export class Home {
     });
     effect(() => {
       const result = this.session()?.result();
-      const current = untracked(this.item);
-      if (result && current?.type === 'game') untracked(() => this.submitScore(current, result.score));
+      const current = this.item();
+        if (result === null || result === undefined || current?.type !== 'game' ||
+          this.submittedRoundId === current.round_id) return;
+      this.submittedRoundId = current.round_id;
+      void this.submitScore(current.id, current.round_id, result.score);
     });
-    const destroyRef = inject(DestroyRef);
     const onVisibilityChange = () => this.syncGameLifecycle();
     document.addEventListener('visibilitychange', onVisibilityChange);
-    destroyRef.onDestroy(() => {
+    this.destroyRef.onDestroy(() => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       this.intersectionObserver?.disconnect();
       this.session()?.destroy();
@@ -206,8 +248,9 @@ export class Home {
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    // Swipes during a game belong to the game; the ↓ button still moves on
-    this.touchStartY = this.item()?.type === 'game' ? null : event.touches[0].clientY;
+    // Swipes during a game belong to the game; once it has finished they move on again
+    const gameRunning = this.item()?.type === 'game' && this.session()?.result() == null;
+    this.touchStartY = gameRunning ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
@@ -252,23 +295,6 @@ export class Home {
     setTimeout(() => this.bursts.update((all) => all.filter((b) => b !== burst)), BURST_MS);
   }
 
-  private async submitScore(game: GameItem, score: number): Promise<void> {
-    try {
-      // The backend rejects negative scores, but the finished game should still count
-      const { newly_unlocked } = await firstValueFrom(
-        this.api.submitScore(game.id, { score: Math.max(0, score), round_id: game.round_id }),
-      );
-      if (newly_unlocked.length === 0) return;
-      await this.zombie.load();
-      if (this.item() === game) {
-        this.unlockedNames.set(newly_unlocked.map((id) => this.zombie.accessoryName(id)));
-      }
-    } catch (err) {
-      // A lost score must not interrupt the feed
-      console.warn('Could not save game score', err);
-    }
-  }
-
   private setLiked(id: string, liked: boolean): void {
     this.likedIds.update((ids) => {
       const next = new Set(ids);
@@ -276,6 +302,50 @@ export class Home {
       else next.delete(id);
       return next;
     });
+  }
+
+  private async submitScore(gameId: string, roundId: string, score: number): Promise<void> {
+    this.scoreSubmissionStatus.set('uploading');
+    try {
+      const saved = await firstValueFrom(this.api.submitScore(gameId, {
+        score: Math.max(0, score),
+        round_id: roundId,
+      }));
+      this.scoreSubmissionStatus.set('saved');
+      await Promise.all([this.loadLeaderboard(gameId), this.showUnlocks(roundId, saved)]);
+    } catch (error) {
+      console.warn('Could not save game score', error);
+      this.scoreSubmissionStatus.set('failed');
+    }
+  }
+
+  private async showUnlocks(roundId: string, saved: ScoreRead): Promise<void> {
+    const { newly_unlocked, newly_unlocked_avatars } = saved;
+    if (newly_unlocked.length === 0 && newly_unlocked_avatars.length === 0) return;
+    try {
+      // Refresh so the zombie wears what was just unlocked and names resolve
+      await this.zombie.load();
+    } catch (error) {
+      console.warn('Could not refresh avatar', error);
+    }
+    const current = this.item();
+    if (current?.type !== 'game' || current.round_id !== roundId) return;
+    this.unlockedNames.set([
+      ...newly_unlocked_avatars.map((id) => `${this.zombie.avatarName(id)} avatar`),
+      ...newly_unlocked.map((id) => this.zombie.accessoryName(id)),
+    ]);
+  }
+
+  private async loadLeaderboard(gameId: string): Promise<void> {
+    this.leaderboardStatus.set('loading');
+    try {
+      const entries = await firstValueFrom(this.api.getLeaderboard(gameId, 100));
+      this.leaderboard.set([...entries].sort((left, right) => right.score - left.score));
+      this.leaderboardStatus.set('loaded');
+    } catch (error) {
+      console.warn('Could not load game leaderboard', error);
+      this.leaderboardStatus.set('failed');
+    }
   }
 
   protected onResize(): void {
@@ -348,7 +418,9 @@ export class Home {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
     const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
-    if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
+    if (gameItem !== null && this.username() === null) {
+      this.username.set((await firstValueFrom(this.api.getMe())).username);
+    }
 
     this.session()?.stop();
     this.clearTimers();
@@ -359,18 +431,23 @@ export class Home {
     this.arePlayerControlsVisible.set(false);
     this.playbackBubble.set(null);
     this.bursts.set([]);
+    this.scoreSubmissionStatus.set('idle');
+    this.leaderboard.set(null);
+    this.leaderboardStatus.set('idle');
     this.unlockedNames.set([]);
+    this.submittedRoundId = null;
     this.item.set(item);
 
     if (gameCode !== null && item.type === 'game') {
-      const host = this.gameHost().nativeElement;
+      const { width, height } = await waitForSize(this.gameHost().nativeElement, LAYOUT_TIMEOUT_MS);
+      if (this.destroyRef.destroyed || this.item() !== item) return;
       this.session()?.start(gameCode, {
-        username: this.username ?? '',
+        username: this.username() ?? '',
         data: gameItem?.data ?? {
           context: `"${item.title}", a short game in a learning feed.`,
         },
-        width: host.clientWidth,
-        height: host.clientHeight,
+        width,
+        height,
       });
       this.syncGameLifecycle();
     }
