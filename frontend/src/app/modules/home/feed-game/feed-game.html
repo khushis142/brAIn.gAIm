@@ -1,5 +1,15 @@
 <div #gameHost class="game-host"></div>
 
+@if (canPause()) {
+  <button class="pause-button" type="button" aria-label="Pause game" title="Pause" (click)="pause()">
+    <svg lucidePause aria-hidden="true"></svg>
+  </button>
+}
+
+@if (pausedByUser()) {
+  <app-game-pause-menu [design]="session()?.uiDesign() ?? {}" (resume)="resume()" />
+}
+
 @if (intro()) {
   <div class="intro">
     <div class="intro-content">

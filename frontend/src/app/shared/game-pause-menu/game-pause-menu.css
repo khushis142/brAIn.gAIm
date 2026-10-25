@@ -1,0 +1,109 @@
+/* Mobile first: the panel fills the card's width and the resume button is a full-width,
+   thumb-sized target. Larger cards get a narrower panel. */
+:host {
+  --menu-accent: var(--accent);
+  --menu-panel: rgb(16 18 24 / 0.92);
+  --menu-text: #fff;
+  --menu-muted: rgb(255 255 255 / 0.72);
+  --menu-gap: 16px;
+  align-items: center;
+  backdrop-filter: blur(6px);
+  background: rgb(0 0 0 / 0.55);
+  box-sizing: border-box;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  position: absolute;
+}
+
+/* The game's theme tokens; without one the app's accent is used */
+:host([data-accent='teal']) { --menu-accent: #14b8a6; }
+:host([data-accent='amber']) { --menu-accent: #f59e0b; }
+:host([data-accent='rose']) { --menu-accent: #f43f5e; }
+:host([data-accent='sky']) { --menu-accent: #0ea5e9; }
+
+:host(.light) {
+  --menu-panel: rgb(255 255 255 / 0.95);
+  --menu-text: #111318;
+  --menu-muted: rgb(17 19 24 / 0.7);
+}
+
+:host(.compact) {
+  --menu-gap: 10px;
+}
+
+.panel {
+  background: var(--menu-panel);
+  border: 1px solid color-mix(in srgb, var(--menu-accent) 45%, transparent);
+  border-radius: 20px;
+  box-shadow: 0 0 32px -8px color-mix(in srgb, var(--menu-accent) 60%, transparent);
+  box-sizing: border-box;
+  color: var(--menu-text);
+  display: grid;
+  gap: var(--menu-gap);
+  margin: auto; /* centers, but scrolls instead of clipping on very short cards */
+  padding: calc(var(--menu-gap) + 8px) 20px;
+  text-align: center;
+  width: 100%;
+}
+
+.title {
+  border-bottom: 0; /* undo the global h3 rule */
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding-bottom: 0;
+}
+
+.message {
+  color: var(--menu-muted);
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.resume {
+  align-items: center;
+  background: var(--menu-accent);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 24px;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.resume svg {
+  fill: currentColor;
+  flex: none;
+  height: 18px;
+  width: 18px;
+}
+
+.resume:focus-visible {
+  outline: 2px solid var(--menu-text);
+  outline-offset: 3px;
+}
+
+@media (min-width: 600px) {
+  .panel {
+    max-width: 360px;
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+}

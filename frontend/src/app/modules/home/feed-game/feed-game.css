@@ -43,6 +43,32 @@
   padding: 8px 16px;
 }
 
+/* Over the game's top-left corner: 44px to hit with a thumb, dark so it shows on any game */
+.pause-button {
+  align-items: center;
+  backdrop-filter: blur(4px);
+  background: rgb(0 0 0 / 0.45);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  left: 8px;
+  padding: 0;
+  position: absolute;
+  top: 8px;
+  touch-action: manipulation;
+  width: 44px;
+}
+
+.pause-button svg {
+  fill: currentColor;
+  height: 18px;
+  width: 18px;
+}
+
 /* Shown before the round starts, while it downloads behind it */
 .intro {
   background:

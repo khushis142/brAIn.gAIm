@@ -401,6 +401,10 @@ api.setUiDesign({
 `density` is `compact` or `comfortable`. Call this during `init` when possible.
 Later calls replace the previous design; do not update it every frame.
 
+The feed shows its own pause button over the game's top-left corner, 44 × 44
+CSS pixels at an 8px inset. Keep that corner free of scores and controls. The
+pause menu's text comes from `pauseMenu` above, its look from `theme`.
+
 ## Backend and source rules
 
 - Put all player-specific learning content in `api.data`, not in `game.js`.

@@ -13,6 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LucidePause } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, GameItem, LeaderboardEntry, ScoreRead } from '../../../core/api.service';
 import { ZombieService } from '../../../core/zombie.service';
@@ -20,6 +21,7 @@ import { inlineGameAssets } from '../../../engine/gameAssets';
 import { GameEngineService } from '../../../engine/gameEngineService';
 import { GameCustomData, GameResult } from '../../../engine/gameProtocol';
 import { GameSession } from '../../../engine/gameSession';
+import { GamePauseMenu } from '../../../shared/game-pause-menu/game-pause-menu';
 import { Zombie } from '../../../shared/zombie/zombie';
 import { describeError, FeedSession, FeedUser, GameAllowance } from '../feed';
 
@@ -65,7 +67,7 @@ function waitForSize(
 
 /** One round of a feed game in its own sandboxed session, with the result screen after it */
 @Component({
-  imports: [RouterLink, Zombie],
+  imports: [GamePauseMenu, LucidePause, RouterLink, Zombie],
   selector: 'app-feed-game',
   styleUrl: './feed-game.css',
   templateUrl: './feed-game.html',
@@ -121,6 +123,15 @@ export class FeedGame {
    * broken game hands them back to the feed.
    */
   readonly ownsInput = computed(() => this.result() === null && this.error() === null);
+  /**
+   * The player opened the pause menu. The game stays paused until they resume, also when
+   * the card goes off screen and comes back. The feed stays locked: pausing is no way to
+   * skip a game.
+   */
+  protected readonly pausedByUser = signal(false);
+  protected readonly canPause = computed(
+    () => this.session()?.status() === 'running' && this.result() === null && !this.pausedByUser(),
+  );
 
   protected readonly scoreSubmissionStatus = signal<ScoreSubmissionStatus>('idle');
   /** Accessories and avatars this round unlocked */
@@ -170,6 +181,7 @@ export class FeedGame {
       this.session();
       this.allowance();
       this.result();
+      this.pausedByUser();
       untracked(() => this.syncLifecycle());
     });
     const onVisibilityChange = () => this.syncLifecycle();
@@ -186,6 +198,14 @@ export class FeedGame {
     this.started.set(true);
     clearInterval(this.clock);
     void this.launch();
+  }
+
+  protected pause(): void {
+    if (this.canPause()) this.pausedByUser.set(true);
+  }
+
+  protected resume(): void {
+    this.pausedByUser.set(false);
   }
 
   /** Loads the round again after a failed download or a crash; it has not been scored yet */
@@ -250,6 +270,7 @@ export class FeedGame {
       return;
     }
     if (
+      this.pausedByUser() ||
       this.allowance() === 'paused' ||
       document.visibilityState === 'hidden' ||
       this.visibleRatio === 0

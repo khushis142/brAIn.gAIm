@@ -56,13 +56,14 @@ describe('FeedGame', () => {
     vi.restoreAllMocks();
   });
 
-  it('only plays once the feed has settled on its card', async () => {
-    await create();
+  /** Swaps in a session whose round is running, without loading a real game */
+  function runningSession(): { setLifecycle: ReturnType<typeof vi.fn> } {
     const game = fixture.componentInstance as unknown as {
       session: WritableSignal<{
         result(): unknown;
         error(): unknown;
         status(): string;
+        uiDesign(): unknown;
         focus(): void;
         setLifecycle(state: string): void;
         setSound(muted: boolean, volume: number): void;
@@ -74,11 +75,18 @@ describe('FeedGame', () => {
       result: () => null,
       error: () => null,
       status: () => 'running',
+      uiDesign: () => ({ pauseMenu: { title: 'Quiz paused', resumeLabel: 'Back to it' } }),
       focus: vi.fn(),
       setLifecycle,
       setSound: vi.fn(),
       destroy: vi.fn(),
     });
+    return { setLifecycle };
+  }
+
+  it('only plays once the feed has settled on its card', async () => {
+    await create();
+    const { setLifecycle } = runningSession();
 
     for (const allowance of ['paused', 'visible', 'playing']) {
       fixture.componentRef.setInput('allowance', allowance);
@@ -122,5 +130,38 @@ describe('FeedGame', () => {
     await vi.waitFor(() => expect(start).toHaveBeenCalledWith('game code', expect.anything()));
     await fixture.whenStable();
     expect(element.querySelector('.intro')).toBeNull();
+  });
+
+  it('pauses on the pause button until the player resumes, keeping the feed locked', async () => {
+    await create();
+    const { setLifecycle } = runningSession();
+    fixture.componentRef.setInput('allowance', 'playing');
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+
+    element.querySelector<HTMLButtonElement>('.pause-button')!.click();
+    await fixture.whenStable();
+    expect(setLifecycle).toHaveBeenLastCalledWith('paused');
+    expect(element.querySelector('.pause-button')).toBeNull();
+    expect(element.querySelector('app-game-pause-menu .title')?.textContent?.trim()).toBe('Quiz paused');
+    expect(fixture.componentInstance.ownsInput()).toBe(true);
+
+    // Leaving the card and coming back does not resume it
+    fixture.componentRef.setInput('allowance', 'paused');
+    await fixture.whenStable();
+    fixture.componentRef.setInput('allowance', 'playing');
+    await fixture.whenStable();
+    expect(setLifecycle).toHaveBeenLastCalledWith('paused');
+
+    element.querySelector<HTMLButtonElement>('app-game-pause-menu .resume')!.click();
+    await fixture.whenStable();
+    expect(setLifecycle).toHaveBeenLastCalledWith('playing');
+    expect(element.querySelector('app-game-pause-menu')).toBeNull();
+  });
+
+  it('offers no pause button before the round runs', async () => {
+    await create();
+
+    expect(fixture.nativeElement.querySelector('.pause-button')).toBeNull();
   });
 });
