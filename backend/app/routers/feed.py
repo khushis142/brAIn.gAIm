@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, status
 from fastapi.responses import JSONResponse
 
-from app import feed
+from app import feed, likes
 from app.cdn import file_url
 from app.db import SessionDep
 from app.schemas import FeedItem, GameItem, VideoItem
@@ -27,7 +27,14 @@ async def next_item(
         return JSONResponse({"detail": "No content yet"}, status.HTTP_404_NOT_FOUND)
     item, url = served.item, file_url(served.item.id, served.item.filename)
     if served.round is None:
-        return VideoItem(id=item.id, title=item.title, url=url)
+        like_state = await likes.state(session, user.id, item.id)
+        return VideoItem(
+            id=item.id,
+            title=item.title,
+            url=url,
+            liked=like_state.liked,
+            like_count=like_state.like_count,
+        )
     return GameItem(
         id=item.id,
         title=item.title,

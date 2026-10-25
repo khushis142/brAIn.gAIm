@@ -8,6 +8,7 @@ from app.models.base import Base
 from app.models.content import Content
 from app.models.feed import Impression
 from app.models.games import GameRound, Score
+from app.models.likes import ContentLike
 from app.models.projects import Flashcard, Project, ProjectAttachment
 from app.models.users import User
 from app.models.zombie import EquippedAccessory, SelectedAvatar, UserAccessory, UserAvatar
@@ -15,6 +16,7 @@ from app.models.zombie import EquippedAccessory, SelectedAvatar, UserAccessory, 
 __all__ = [
     "Base",
     "Content",
+    "ContentLike",
     "EquippedAccessory",
     "Flashcard",
     "GameRound",

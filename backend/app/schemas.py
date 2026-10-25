@@ -152,6 +152,13 @@ class VideoItem(BaseModel):
     id: uuid.UUID
     title: str
     url: str
+    liked: bool = False
+    like_count: int = 0
+
+
+class LikeRead(BaseModel):
+    liked: bool
+    like_count: int
 
 
 class GameItem(BaseModel):

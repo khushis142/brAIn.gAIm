@@ -44,6 +44,8 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | GET    | `/content/{id}`              |      | One item with `url`                        |
 | PATCH  | `/content/{id}`              | ✓    | Owner only: `{title?, tags?}`              |
 | DELETE | `/content/{id}`              | ✓    | Owner only; the CDN file is kept           |
+| PUT    | `/content/{id}/like`         | ✓    | Like a video; idempotent, returns `{liked, like_count}` |
+| DELETE | `/content/{id}/like`         | ✓    | Remove your like; returns `{liked, like_count}` |
 | GET    | `/projects`                  | ✓    | Own projects (private to the owner)        |
 | POST   | `/projects`                  | ✓    | `{name, body}`, body is Markdown           |
 | GET    | `/projects/{id}`             | ✓    | One project with its attachments           |
@@ -53,7 +55,7 @@ fastapi dev app/main.py    # http://localhost:8000/docs
 | POST   | `/projects/{id}/flashcards`  | ✓    | (Re)generate them from the body and txt/md/csv/PDF attachments (one LLM call, waits for it; 422 without any text, 502 keeps the old ones) |
 | POST   | `/projects/{id}/attachments` | ✓    | Attach a CDN upload `{id, filename}` (pdf, png, jpg, jpeg, webp, gif, txt, md, csv) |
 | DELETE | `/projects/{id}/attachments/{file_id}` | ✓ | Detach; CDN file is kept           |
-| POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url}` or game `{…, round_id, data, assets}` |
+| POST   | `/feed/next`                 | ✓    | Next item: video `{type, id, title, url, liked, like_count}` or game `{…, round_id, data, assets}` |
 | POST   | `/games/{id}/scores`         | ✓    | Submit `{score, round_id?}` → `{newly_unlocked, newly_unlocked_avatars, games_completed}`; a round is scored once |
 | GET    | `/games/{id}/leaderboard`    |      | Best score per user, `?limit=10`           |
 | GET    | `/zombie/accessories`        | ✓    | Accessory catalog `[{id, name, slot, unlock_description}]` |

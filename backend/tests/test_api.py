@@ -150,6 +150,47 @@ async def test_content_registration_and_ownership(client: AsyncClient) -> None:
     assert (await client.get(path)).status_code == 404
 
 
+async def test_video_likes_are_persistent_and_idempotent(client: AsyncClient) -> None:
+    owner = await _auth(client, "like-owner")
+    alice = await _auth(client, "like-alice")
+    bob = await _auth(client, "like-bob")
+    video = await _register(client, owner)
+    like_url = f"/content/{video['id']}/like"
+
+    liked = await client.put(like_url, headers=alice)
+    assert liked.status_code == 200
+    assert liked.json() == {"liked": True, "like_count": 1}
+    assert (await client.put(like_url, headers=alice)).json() == {
+        "liked": True,
+        "like_count": 1,
+    }
+    assert (await client.put(like_url, headers=bob)).json() == {
+        "liked": True,
+        "like_count": 2,
+    }
+
+    unliked = await client.delete(like_url, headers=alice)
+    assert unliked.json() == {"liked": False, "like_count": 1}
+    assert (await client.delete(like_url, headers=alice)).json() == {
+        "liked": False,
+        "like_count": 1,
+    }
+
+    feed_item = (await client.post("/feed/next", headers=alice)).json()
+    assert feed_item["id"] == video["id"]
+    assert feed_item["liked"] is False
+    assert feed_item["like_count"] == 1
+    assert (await client.put(like_url)).status_code == 401
+    assert (await client.put(f"/content/{uuid.uuid4()}/like", headers=alice)).status_code == 404
+
+
+async def test_games_cannot_be_liked(client: AsyncClient) -> None:
+    headers = await _auth(client, "game-liker")
+    game_id = await _create_game("game-liker")
+    response = await client.put(f"/content/{game_id}/like", headers=headers)
+    assert response.status_code == 422
+
+
 async def test_games_cannot_be_registered_via_api(client: AsyncClient) -> None:
     headers = await _auth(client, "regular")
     game = {"id": str(uuid.uuid4()), "filename": "g.js", "kind": "game", "title": "t"}

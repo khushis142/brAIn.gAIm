@@ -4,10 +4,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app import likes
 from app.cdn import file_url
 from app.db import SessionDep
 from app.models import Content, User
-from app.schemas import ContentCreate, ContentRead, ContentUpdate, Kind
+from app.schemas import ContentCreate, ContentRead, ContentUpdate, Kind, LikeRead
 from app.security import CurrentUser
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -94,6 +95,27 @@ async def update_content(
         setattr(content, name, value)
     await session.commit()
     return _read(content, user.username)
+
+
+async def _set_like(
+    content_id: uuid.UUID, liked: bool, user: CurrentUser, session: SessionDep
+) -> LikeRead:
+    content = await session.get(Content, content_id)
+    if content is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
+    if content.kind != "video":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Only videos can be liked")
+    return await likes.set_like(session, user.id, content_id, liked)
+
+
+@router.put("/{content_id}/like", response_model=LikeRead)
+async def like_content(content_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> LikeRead:
+    return await _set_like(content_id, True, user, session)
+
+
+@router.delete("/{content_id}/like", response_model=LikeRead)
+async def unlike_content(content_id: uuid.UUID, user: CurrentUser, session: SessionDep) -> LikeRead:
+    return await _set_like(content_id, False, user, session)
 
 
 @router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
