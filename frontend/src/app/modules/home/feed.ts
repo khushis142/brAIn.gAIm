@@ -2,11 +2,39 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, FeedItem } from '../../core/api.service';
+import { GameResult } from '../../engine/gameProtocol';
 
 /** One item in the feed history. The key stays the same while the item is in the history. */
 export interface FeedEntry {
   readonly key: number;
   readonly item: FeedItem;
+  /** What its card remembers; kept here because cards are recreated when the feed is */
+  readonly saved: SavedCard;
+}
+
+export interface SavedCard {
+  videoTime: number;
+  gameResult: GameResult | null;
+}
+
+/**
+ * The feed's history and position. It outlives the feed page, so switching tabs and coming
+ * back shows the same item again instead of loading a new one. Cleared on logout.
+ */
+@Injectable({ providedIn: 'root' })
+export class FeedHistory {
+  readonly entries = signal<FeedEntry[]>([]);
+  readonly index = signal(-1);
+  private nextKey = 0;
+
+  createEntry(item: FeedItem): FeedEntry {
+    return { key: this.nextKey++, item, saved: { videoTime: 0, gameResult: null } };
+  }
+
+  clear(): void {
+    this.entries.set([]);
+    this.index.set(-1);
+  }
 }
 
 /** Where a card stands in the feed transition, if it is the one on screen */
@@ -43,7 +71,7 @@ export class FeedUser {
 @Injectable({ providedIn: 'root' })
 export class FeedSession {
   readonly startedAt = Date.now();
-  // By entry, not key: keys start over with every feed, entries do not
+  // By entry, not key: keys start over after a logout, entries do not
   private readonly seenVideos = new WeakSet<FeedEntry>();
   private readonly _videosWatched = signal(0);
   readonly videosWatched = this._videosWatched.asReadonly();

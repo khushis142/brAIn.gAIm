@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output, signal, viewChild } from '@angular/core';
 import { LucideBrain, LucideChevronDown, LucideChevronUp, LucideLock } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, LikeState } from '../../../core/api.service';
@@ -9,7 +9,7 @@ import { FeedVideo } from '../feed-video/feed-video';
 
 /**
  * One feed item. The card stays for as long as its item is in the history; its video or
- * game only exists while it is `live`, and the card remembers where that was left off.
+ * game only exists while it is `live`, and its entry remembers where that was left off.
  */
 @Component({
   imports: [FeedGame, FeedVideo, LucideBrain, LucideChevronDown, LucideChevronUp, LucideLock],
@@ -47,8 +47,20 @@ export class FeedCard {
   });
   protected readonly likePending = signal(false);
   protected readonly likeError = signal<string | null>(null);
-  protected readonly gameResult = signal<GameResult | null>(null);
-  protected videoTime = 0;
+  protected readonly gameResult = linkedSignal(() => this.entry().saved.gameResult);
+
+  protected get videoTime(): number {
+    return this.entry().saved.videoTime;
+  }
+
+  protected setVideoTime(time: number): void {
+    this.entry().saved.videoTime = time;
+  }
+
+  protected setGameResult(result: GameResult): void {
+    this.gameResult.set(result);
+    this.entry().saved.gameResult = result;
+  }
 
   protected async setLiked(liked: boolean): Promise<void> {
     const item = this.entry().item;

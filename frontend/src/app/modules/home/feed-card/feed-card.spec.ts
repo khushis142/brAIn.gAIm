@@ -17,6 +17,7 @@ describe('FeedCard', () => {
       liked: false,
       like_count: 3,
     },
+    saved: { videoTime: 0, gameResult: null },
   };
 
   beforeEach(async () => {

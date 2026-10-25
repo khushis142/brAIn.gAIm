@@ -2,11 +2,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, switchMap, tap } from 'rxjs';
 import { ApiService, Token, UserCreate, UserRead } from '../../../core/api.service';
+import { FeedHistory } from '../../home/feed';
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly feedHistory = inject(FeedHistory);
   readonly user = signal<UserRead | null>(null);
   readonly isAuthenticated = signal(this.api.isAuthenticated());
 
@@ -43,6 +45,7 @@ export class UserService {
 
   logout(): void {
     this.api.logout();
+    this.feedHistory.clear();
     this.user.set(null);
     this.isAuthenticated.set(false);
     void this.router.navigateByUrl('/login');

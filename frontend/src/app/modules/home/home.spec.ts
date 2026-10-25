@@ -101,6 +101,28 @@ describe('Home', () => {
     expect(fixture.debugElement.injector.get(FeedSession).videosWatched()).toBe(2);
   });
 
+  it('shows the same item again after leaving the feed and coming back', async () => {
+    vi.useFakeTimers();
+    const nextItem = vi
+      .spyOn(api, 'nextItem')
+      .mockReturnValueOnce(of(video('a')))
+      .mockReturnValueOnce(of(video('b')));
+    await settle(home.next());
+    await settle(home.next());
+    await settle(home.previous());
+    home.entries()[home.index()].saved.videoTime = 12;
+    fixture.destroy(); // switching to another tab
+
+    const returned = TestBed.createComponent(Home);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const again = returned.componentInstance as unknown as HomeInternals;
+
+    expect(again.entries().map((entry) => entry.item.id)).toEqual(['a', 'b']);
+    expect(again.entries()[again.index()].item.id).toBe('a');
+    expect(again.entries()[again.index()].saved.videoTime).toBe(12);
+    expect(nextItem).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the last 20 items', async () => {
     vi.useFakeTimers();
     let count = 0;
@@ -114,7 +136,7 @@ describe('Home', () => {
   });
 
   it('keeps updated likes in feed history', () => {
-    const entry = { key: 0, item: video('a') };
+    const entry = { key: 0, item: video('a'), saved: { videoTime: 0, gameResult: null } };
     home.entries.set([entry]);
 
     home.updateLike(entry, { liked: true, like_count: 4 });

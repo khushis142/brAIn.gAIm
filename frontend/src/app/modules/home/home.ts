@@ -2,7 +2,7 @@ import { afterNextRender, Component, computed, inject, signal, viewChildren } fr
 import { firstValueFrom } from 'rxjs';
 import { ApiService, LikeState } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
-import { CardTransition, describeError, FeedEntry, FeedSession, FeedUser, wait } from './feed';
+import { CardTransition, describeError, FeedEntry, FeedHistory, FeedSession, FeedUser, wait } from './feed';
 import { FeedCard } from './feed-card/feed-card';
 
 type Phase = 'idle' | 'leaving' | 'entering';
@@ -30,10 +30,11 @@ export class Home {
   private readonly api = inject(ApiService);
   private readonly zombie = inject(ZombieService);
   private readonly session = inject(FeedSession);
+  private readonly history = inject(FeedHistory);
   private readonly cards = viewChildren(FeedCard);
 
-  protected readonly entries = signal<FeedEntry[]>([]);
-  protected readonly index = signal(-1);
+  protected readonly entries = this.history.entries;
+  protected readonly index = this.history.index;
   protected readonly phase = signal<Phase>('idle');
   protected readonly direction = signal<Direction>('forward');
   protected readonly transition = computed<CardTransition>(() => {
@@ -54,12 +55,12 @@ export class Home {
   );
 
   private busy = false;
-  private nextKey = 0;
   private touchStartY: number | null = null;
 
   constructor() {
     afterNextRender(() => {
-      void this.next();
+      // Coming back from another tab shows the item that was left, not a new one
+      if (!this.current()) void this.next();
       // The mascot is decoration; without it the result screen still works
       this.zombie.load().catch(() => {});
     });
@@ -94,7 +95,7 @@ export class Home {
   }
 
   private append(item: FeedEntry['item']): number {
-    const entries = [...this.entries(), { key: this.nextKey++, item }];
+    const entries = [...this.entries(), this.history.createEntry(item)];
     const dropped = Math.max(0, entries.length - HISTORY_LIMIT);
     this.entries.set(entries.slice(dropped));
     this.index.update((index) => index - dropped);

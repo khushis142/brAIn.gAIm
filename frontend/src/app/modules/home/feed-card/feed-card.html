@@ -7,7 +7,7 @@
           [item]="item"
           [active]="allowance() !== 'paused'"
           [startAt]="videoTime"
-          (timeChange)="videoTime = $event"
+          (timeChange)="setVideoTime($event)"
           (doubleTapped)="setLiked(true)"
         />
       } @else {
@@ -15,7 +15,7 @@
           [item]="item"
           [allowance]="allowance()"
           [finishedResult]="gameResult()"
-          (finished)="gameResult.set($event)"
+          (finished)="setGameResult($event)"
         />
       }
     }
