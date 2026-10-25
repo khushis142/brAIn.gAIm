@@ -19,7 +19,6 @@
   -webkit-touch-callout: none;
   width: 88px;
 }
-
 .icon {
   color: #ffc800;
   font-size: 56px;
@@ -60,13 +59,17 @@
   top: 4px;
 }
 
-.folder.selected {
-  background: var(--control);
-  border-color: var(--accent);
+.folder:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  transform: translateY(-1px);
 }
 
 .folder:focus-visible {
-  outline: 2px solid var(--accent);
+  background: var(--surface);
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset: 2px;
 }
 
 .backdrop {

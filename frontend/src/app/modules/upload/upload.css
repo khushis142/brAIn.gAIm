@@ -31,6 +31,10 @@
   transition: background-color 500ms ease, color 500ms ease, opacity 500ms ease;
 }
 
+.process-button:hover {
+  filter: brightness(1.1);
+}
+
 .process-button .material-symbols-outlined {
   font-size: 24px;
 }
@@ -99,7 +103,7 @@ hr {
   font: inherit;
   font-size: 0.8rem;
   justify-content: space-between;
-  padding: 0;
+  padding: 10px 0;
   text-align: left;
 }
 
@@ -108,9 +112,7 @@ hr {
 }
 
 .knowledge-count {
-  background: var(--control);
   border-radius: 999px;
-  font-size: 0.7rem;
   padding: 2px 8px;
 }
 
