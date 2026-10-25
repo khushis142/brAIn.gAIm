@@ -91,28 +91,48 @@ describe('GameSession', () => {
     const iframe = container.querySelector('iframe');
     expect(iframe?.srcdoc).toContain('"player"');
     expect(iframe?.srcdoc).toContain('https://cdn.example.test/games/player.png');
-    expect(iframe?.srcdoc).toContain(`connect-src ${CDN_URL} https://cdn.example.test https://esm.sh`);
+    expect(iframe?.srcdoc).toContain(
+      `connect-src ${CDN_URL} https://cdn.example.test/games/player.png https://esm.sh`,
+    );
     expect(iframe?.srcdoc).not.toContain('192.168.');
 
     session.destroy();
   });
 
-  it('relays asset requests only for paths under the CDN base URL', () => {
+  it('limits asset sources to the exact manifest URLs', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
+
+    session.start(gameCode, {
+      ...options,
+      assets: {
+        sky: { kind: 'image', url: 'https://assets.example.test/sky.png?v=2' },
+        odd: { kind: 'image', url: 'https://assets.example.test/a;b,c.png' },
+        plain: { kind: 'image', url: 'http://assets.example.test/plain.png' },
+      },
+    });
+
+    const srcdoc = container.querySelector('iframe')?.srcdoc ?? '';
+    const csp = /Content-Security-Policy" content="([^"]*)"/.exec(srcdoc)?.[1] ?? '';
+    const sources = `${CDN_URL} https://assets.example.test/sky.png https://assets.example.test/a%3Bb%2Cc.png`;
+    expect(csp).toContain(`img-src data: blob: ${sources};`);
+    expect(csp).toContain(`connect-src ${sources} https://esm.sh`);
+    expect(csp).not.toContain('http://assets.example.test');
+
+    session.destroy();
+  });
+
+  it('does not fetch anything for the game', () => {
     const fetchSpy = vi.fn(() => new Promise<Response>(() => undefined));
     vi.stubGlobal('fetch', fetchSpy);
     const container = document.createElement('div');
     const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
 
-    for (const path of [
-      `${CDN_URL}games/player.png`,
-      'https://app.example.test/api/v1/me',
-      `${CDN_URL}../api/v1/me`,
-      'https://app.example.test/cdnx/file.png',
-    ]) {
+    for (const path of [`${CDN_URL}games/player.png`, '/assets/../api/v1/me']) {
       window.dispatchEvent(new MessageEvent('message', { data: { type: 'asset-request', path } }));
     }
-    expect(fetchSpy.mock.calls).toEqual([[`${CDN_URL}games/player.png`]]);
+    expect(fetchSpy).not.toHaveBeenCalled();
 
     session.destroy();
     vi.unstubAllGlobals();

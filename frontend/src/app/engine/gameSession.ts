@@ -267,14 +267,6 @@ export class GameSession {
   private readonly onMessage = (e: MessageEvent): void => {
     // Only accept messages from our own iframe, and only well-formed ones
     if (!this.iframe || e.source !== this.iframe.contentWindow) return;
-    if (
-      e.data?.type === 'asset-request' &&
-      typeof e.data.path === 'string' &&
-      this.isAllowedAssetPath(e.data.path)
-    ) {
-      void this.sendAsset(e.data.path);
-      return;
-    }
     if (!isSandboxEvent(e.data)) return;
 
     switch (e.data.type) {
@@ -332,21 +324,6 @@ export class GameSession {
   private send(command: HostCommand): void {
     // '*' is required: a sandboxed iframe without allow-same-origin has an opaque origin
     this.iframe?.contentWindow?.postMessage(command, '*');
-  }
-
-  private async sendAsset(path: string): Promise<void> {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) throw new Error(`Asset request failed (${response.status})`);
-      const data = await response.arrayBuffer();
-      this.iframe?.contentWindow?.postMessage({ type: 'asset-response', path, data }, '*', [data]);
-    } catch (error) {
-      this.iframe?.contentWindow?.postMessage({
-        type: 'asset-error',
-        path,
-        message: error instanceof Error ? error.message : 'Asset request failed',
-      }, '*');
-    }
   }
 
   /** Asks the runtime to shut down (so game.destroy() runs), then removes the iframe. */
@@ -407,27 +384,22 @@ export class GameSession {
 </html>`;
   }
 
-  /** CSP sources for assets: the CDN path (not its whole origin) plus the manifest's origins. */
+  /**
+   * CSP sources for assets: the CDN path (not its whole origin) plus each manifest URL
+   * exactly. A whole origin would let game code reach anything else on that host.
+   */
   private assetSources(assets: GameAssetManifest | undefined): string[] {
-    const origins = new Set<string>([this.assetBaseUrl]);
+    const sources = new Set<string>([this.assetBaseUrl]);
     for (const asset of Object.values(assets ?? {})) {
       try {
         const url = new URL(asset.url);
-        if (url.protocol === 'https:') origins.add(url.origin);
+        if (url.protocol !== 'https:') continue;
+        // CSP matches paths without the query; ';' and ',' would end the source list
+        sources.add(url.origin + url.pathname.replace(/;/g, '%3B').replace(/,/g, '%2C'));
       } catch {
         // Invalid entries are ignored here and rejected by the runtime.
       }
     }
-    return [...origins];
-  }
-
-  private isAllowedAssetPath(path: string): boolean {
-    if (path.startsWith('/assets/')) return true;
-    try {
-      // new URL() resolves '..' segments, so a path cannot climb out of the CDN prefix
-      return new URL(path).href.startsWith(this.assetBaseUrl);
-    } catch {
-      return false;
-    }
+    return [...sources];
   }
 }
