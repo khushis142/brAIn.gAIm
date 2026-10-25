@@ -4,9 +4,9 @@
 // slows the pieces down, a wrong one speeds them up, and the correct answer is shown either way.
 // Keyboard: Left/Right move, Up rotates, Down soft-drops, Space hard-drops, Up/Down + Space
 // answer. Touch: drag sideways to move, tap to rotate, drag down to soft-drop, flick down to
-// hard-drop, tap an option to answer. Touch is read from input.touches directly, because the
-// runtime's gesture keys would turn every tap into Space (a hard drop); while fingers are on
-// the screen, keys are ignored.
+// hard-drop, tap an option to answer; the mouse works the same way (drag, click). Touch is read
+// from input.touches directly, because the runtime's gesture keys would turn every tap into
+// Space (a hard drop); while fingers are on the screen, keys are ignored.
 
 const COLS = 10;
 const ROWS = 20;
@@ -118,6 +118,7 @@ let keySoft = false;
 let touchSoft = false;
 let touchCooldown = 0;
 let gesture = null; // { id, anchorX, startTime, moved }
+let mouse = null; // the held mouse button, see mouseContacts()
 let usedKeyboard = false;
 let context = '';
 
@@ -434,6 +435,33 @@ function touchList(input) {
   return touches && typeof touches.length === 'number' ? Array.from(touches) : [];
 }
 
+// A held mouse button as a touch-like contact, so dragging and clicking work like touch in
+// desktop browsers (they send pointer events only). On phones the pointer mirrors the first
+// finger, so callers use this only while no finger has been down recently.
+function mouseContacts(input) {
+  const p = input && input.pointer;
+  const x = p ? Number(p.x) : NaN;
+  const y = p ? Number(p.y) : NaN;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    mouse = null;
+    return [];
+  }
+  if (!mouse && p.justPressed) {
+    mouse = { id: 'mouse', x, y, startX: x, startY: y, justStarted: true, justEnded: false, cancelled: false };
+  } else if (mouse) {
+    mouse.justStarted = false;
+    mouse.x = x;
+    mouse.y = y;
+  }
+  if (!mouse) return [];
+  const contact = mouse;
+  if (p.justReleased || !p.down) {
+    contact.justEnded = true;
+    mouse = null;
+  }
+  return [contact];
+}
+
 function handleRepeat(name, state, dir, dt) {
   if (state.pressed) {
     tryMove(dir, 0);
@@ -578,10 +606,11 @@ function update(dt, input) {
   const touches = touchList(input);
   touchCooldown = touches.length ? TOUCH_KEY_COOLDOWN : Math.max(0, touchCooldown - step);
   const useKeys = touchCooldown === 0;
+  const mice = useKeys ? mouseContacts(input) : [];
 
   if (mode === 'play') {
     sinceQuestion += step;
-    playTouches(touches);
+    playTouches(touches.length ? touches : mice);
     if (useKeys) playKeys(input, step);
     else keySoft = false;
     if (mode === 'play') applyGravity(step);
