@@ -8,7 +8,6 @@ let state = 'ready';
 let selectedSide = 0;
 let previousSide = 0;
 let jumpProgress = 0;
-let jumpStartDepth = 0;
 let feedbackTimer = 0;
 let lastCorrect = false;
 let finished = false;
@@ -97,9 +96,6 @@ function update(dt, input) {
       state = 'feedback';
       feedbackTimer = 0.8;
     }
-  } else if (state === 'advance') {
-    jumpProgress = Math.min(1, jumpProgress + dt / 0.45);
-    if (jumpProgress >= 1) state = 'ready';
   } else if (state === 'feedback') {
     feedbackTimer -= dt;
     if (feedbackTimer <= 0) {
@@ -112,9 +108,7 @@ function update(dt, input) {
           finish(true);
         } else {
           previousSide = selectedSide;
-          jumpStartDepth = choiceDepth(current - 1);
-          state = 'advance';
-          jumpProgress = 0;
+          state = 'ready';
         }
       }
     }
@@ -157,7 +151,7 @@ function bridgeY(depth) {
 }
 
 function choiceRow(index) {
-  return 5 - Math.round((index * 4) / Math.max(1, questions.length - 1));
+  return 6 - Math.round((index * 6) / Math.max(1, questions.length - 1));
 }
 
 function choiceDepth(index) {
@@ -218,7 +212,7 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-function drawQuestion(ctx) {
+function questionLayout(ctx) {
   const pad = Math.max(16, W * 0.055);
   const boxY = H * 0.055;
   const question = questions[current] ? questions[current].question : 'Bridge cleared!';
@@ -227,6 +221,11 @@ function drawQuestion(ctx) {
   const lines = wrapText(ctx, question, W - pad * 3.4).slice(0, 3);
   const lineHeight = fontSize * 1.25;
   const boxH = Math.min(H * 0.32, Math.max(H * 0.13, 48 + lines.length * lineHeight + 20));
+  return { pad, boxY, boxH, fontSize, lines, lineHeight };
+}
+
+function drawQuestion(ctx) {
+  const { pad, boxY, boxH, fontSize, lines, lineHeight } = questionLayout(ctx);
   ctx.fillStyle = 'rgba(11, 20, 38, 0.94)';
   roundedRect(ctx, pad, boxY, W - pad * 2, boxH, 16);
   ctx.fill();
@@ -253,6 +252,42 @@ function drawQuestion(ctx) {
   }
 }
 
+function drawAnswers(ctx) {
+  if (!questions[current]) return;
+  const { pad, boxY, boxH } = questionLayout(ctx);
+  const gap = Math.max(8, W * 0.025);
+  const cardY = boxY + boxH + gap;
+  const cardW = (W - pad * 2 - gap) / 2;
+  const fontSize = Math.max(10, Math.min(14, W * 0.036));
+  const answers = questions[current].answers.map((answer) => {
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    return wrapText(ctx, answer, cardW - 20);
+  });
+  const lineHeight = fontSize * 1.2;
+  const cardH = Math.max(42, Math.max(...answers.map((lines) => lines.length)) * lineHeight + 16);
+
+  for (let side = 0; side < 2; side += 1) {
+    const x = pad + side * (cardW + gap);
+    ctx.fillStyle = 'rgba(11, 20, 38, 0.96)';
+    roundedRect(ctx, x, cardY, cardW, cardH, 10);
+    ctx.fill();
+    ctx.strokeStyle = side === 0 ? 'rgba(76, 235, 198, 0.85)' : 'rgba(147, 197, 253, 0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lines = answers[side];
+    let y = cardY + cardH / 2 - ((lines.length - 1) * lineHeight) / 2;
+    for (const line of lines) {
+      ctx.fillText(line, x + cardW / 2, y, cardW - 20);
+      y += lineHeight;
+    }
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+
 function drawBridge(ctx) {
   const horizon = H * 0.39;
   const glow = ctx.createLinearGradient(0, horizon, 0, H * 0.9);
@@ -265,13 +300,13 @@ function drawBridge(ctx) {
     [W / 2 - bridgeWidth(1) / 2, bridgeY(1)],
   ], glow);
 
-  const activeRow = questions.length ? choiceRow(current) : -1;
-  for (let row = 6; row >= 0; row -= 1) {
+  for (let questionIndex = 0; questionIndex < questions.length; questionIndex += 1) {
+    const row = choiceRow(questionIndex);
     const near = 0.12 + row * 0.125;
     const far = near - 0.095;
     for (let side = 0; side < 2; side += 1) {
       const points = lanePoints(side, near, far, 5);
-      const isChoice = row === activeRow;
+      const isChoice = questionIndex === current;
       const chosen = isChoice && (state === 'feedback' || state === 'jump') && side === selectedSide;
       let fill = side === 0 ? 'rgba(27, 166, 153, 0.29)' : 'rgba(89, 126, 178, 0.32)';
       let stroke = side === 0 ? 'rgba(76, 235, 198, 0.75)' : 'rgba(147, 197, 253, 0.72)';
@@ -283,11 +318,12 @@ function drawBridge(ctx) {
         stroke = '#fde68a';
       }
       polygon(ctx, points, fill, stroke, isChoice ? 2 : 1);
-      if (isChoice && questions[current]) {
-        drawAnswer(ctx, questions[current].answers[side], points, side);
-      }
     }
-    const depth = near;
+  }
+
+  for (let row = 6; row >= 0; row -= 1) {
+    if (questions.length && !questions.some((_, index) => choiceRow(index) === row)) continue;
+    const depth = 0.12 + row * 0.125;
     const railY = bridgeY(depth);
     const railW = bridgeWidth(depth) / 2;
     ctx.strokeStyle = 'rgba(226, 243, 255, 0.8)';
@@ -306,55 +342,36 @@ function drawBridge(ctx) {
   ctx.fillText(state === 'ready' ? 'TAP LEFT OR RIGHT  |  ARROW KEYS' : 'ROBOT IN FLIGHT', W / 2, H * 0.93);
 }
 
-function drawAnswer(ctx, text, points, side) {
-  const centerX = (points[0][0] + points[1][0] + points[2][0] + points[3][0]) / 4;
-  const centerY = (points[0][1] + points[1][1] + points[2][1] + points[3][1]) / 4;
-  const width = Math.abs(points[1][0] - points[0][0]) * 0.82;
-  const fontSize = Math.max(10, Math.min(15, width / Math.max(8, String(text).length * 0.52)));
-  ctx.font = `bold ${fontSize}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#f8fafc';
-  ctx.shadowColor = '#07111d';
-  ctx.shadowBlur = 3;
-  const lines = wrapText(ctx, text, width).slice(0, 3);
-  const lineHeight = fontSize * 1.18;
-  let y = centerY - ((lines.length - 1) * lineHeight) / 2;
-  for (const line of lines) {
-    ctx.fillText(line, centerX, y, width);
-    y += lineHeight;
-  }
-  ctx.shadowBlur = 0;
-  ctx.textBaseline = 'alphabetic';
-}
-
 function drawRobot(ctx) {
   let x;
   let y;
-  let jumping = state === 'jump' || state === 'advance';
+  let jumping = state === 'jump';
+  const landed = state === 'feedback' || (state === 'finished' && questions.length > 0);
   if (state === 'jump') {
-    const startDepth = current === 0 ? 0.91 : choiceDepth(current);
+    const startDepth = current === 0 ? 0.91 : choiceDepth(current - 1);
     const startX = current === 0 ? W / 2 : laneX(previousSide, startDepth);
     const targetDepth = choiceDepth(current);
     x = startX + (laneX(selectedSide, targetDepth) - startX) * jumpProgress;
     y = bridgeY(startDepth) + (bridgeY(targetDepth) - bridgeY(startDepth)) * jumpProgress;
-  } else if (state === 'advance') {
-    const targetDepth = choiceDepth(current);
-    x = laneX(previousSide, targetDepth);
-    y = bridgeY(jumpStartDepth) + (bridgeY(targetDepth) - bridgeY(jumpStartDepth)) * jumpProgress;
+  } else if (landed) {
+    const questionIndex = Math.min(current, questions.length - 1);
+    const depth = choiceDepth(questionIndex);
+    x = laneX(selectedSide, depth);
+    y = bridgeY(depth);
   } else if (current === 0) {
     x = W / 2;
     y = bridgeY(0.91);
   } else {
-    const depth = choiceDepth(current);
+    const depth = choiceDepth(current - 1);
     x = laneX(previousSide, depth);
     y = bridgeY(depth);
   }
   const jump = jumping ? Math.sin(jumpProgress * Math.PI) * H * 0.13 : 0;
   const scale = Math.max(0.65, Math.min(1, W / 390));
-  const falling = state === 'feedback' && !lastCorrect;
+  const falling = !lastCorrect && (state === 'feedback' || finished);
+  const fallProgress = falling ? Math.max(0, Math.min(1, 1 - feedbackTimer / 0.8)) : 0;
   ctx.save();
-  ctx.translate(x, y - jump + (falling ? feedbackTimer * H * 0.18 : 0));
+  ctx.translate(x, y - jump + fallProgress * fallProgress * (H * 1.08 - y));
   if (jumping) ctx.rotate((selectedSide ? 1 : -1) * Math.sin(jumpProgress * Math.PI) * 0.18);
   if (falling) ctx.rotate(-0.35);
   ctx.scale(scale, scale);
@@ -412,6 +429,7 @@ function render(ctx) {
   drawQuestion(ctx);
   drawBridge(ctx);
   drawRobot(ctx);
+  drawAnswers(ctx);
 
   if (finished) {
     ctx.fillStyle = 'rgba(3, 9, 20, 0.78)';
