@@ -1,0 +1,60 @@
+{
+  "context": "Story time: a short story is read aloud by text-to-speech while it is shown as subtitles over gameplay footage. Write an engaging little story (60 to 110 words in total) that explains or applies one idea from the study material, with a character, a problem and a resolution; the facts in it must be correct and come from the material. `title` is a short story title. `sentences` holds the story in reading order, 3 to 6 parts; each `text` is one or two complete sentences of plain spoken English, at most 140 characters. The text is spoken by a TTS voice, so do not use markdown, emojis, bullet points, URLs or symbols; spell out abbreviations and short numbers as words. `context` is a short phrase naming the topic.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
+  "preconditions": [
+    { "type": "tts", "path": "/sentences/*/text", "into": "audio" },
+    {
+      "type": "random_file",
+      "into": "backgroundVideo",
+      "files": [
+        { "id": "662d0ee8-065e-4098-8f4b-fd06725d4d0f", "filename": "subway-01.mp4" },
+        { "id": "813ee724-eb95-442a-95ce-52573ac1c2c4", "filename": "subway-02.mp4" },
+        { "id": "2a267cfe-2cf6-4423-8f3f-f341cd424174", "filename": "subway-03.mp4" },
+        { "id": "ec81f2ae-36b4-4903-a363-29a23c366479", "filename": "subway-04.mp4" },
+        { "id": "faa9edb9-615d-4eb3-99ec-25793b5e5d11", "filename": "subway-05.mp4" },
+        { "id": "76f50d78-9be6-4056-9816-1bc5c952b603", "filename": "subway-06.mp4" },
+        { "id": "75b5fe91-52f6-4668-8a7c-c3dcbd56c11d", "filename": "subway-07.mp4" },
+        { "id": "a2d108ae-7f94-4b7c-80cd-752710f8fd5a", "filename": "subway-08.mp4" },
+        { "id": "760cc249-0a59-42a7-8028-7c88d15599db", "filename": "subway-09.mp4" },
+        { "id": "13f052d5-012a-459c-b136-88f40258ea52", "filename": "subway-10.mp4" },
+        { "id": "39b5f1b3-e212-4372-8da4-c0eb5bd9a453", "filename": "subway-11.mp4" },
+        { "id": "7b294dfe-e3cc-44cd-9c68-bceffe7e3e86", "filename": "subway-12.mp4" },
+        { "id": "ec185ab5-a928-4cac-a37e-fc9f7ce4cee7", "filename": "subway-13.mp4" },
+        { "id": "e26fab76-cabc-4f0c-850c-f0c2d659f257", "filename": "subway-14.mp4" },
+        { "id": "24bf8d3d-9e46-40db-ac5d-8e6c117037bc", "filename": "subway-15.mp4" },
+        { "id": "46480b84-311c-4c18-9743-b7dbde0497a6", "filename": "subway-16.mp4" },
+        { "id": "f500c211-60c6-4fe6-88b9-57c7d55a01da", "filename": "subway-17.mp4" },
+        { "id": "b7ccc0a3-3e0f-4e7d-b889-0252e78170c2", "filename": "subway-18.mp4" },
+        { "id": "9f87cf01-d70f-449a-bd82-096bf6034db6", "filename": "subway-19.mp4" },
+        { "id": "1abb09b8-6d8a-47b7-84fa-5e7f0371fa58", "filename": "subway-20.mp4" }
+      ]
+    }
+  ],
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "title", "sentences"],
+    "additionalProperties": false,
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "title": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "sentences": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "required": ["text"],
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "maxLength": 140 }
+          }
+        }
+      }
+    }
+  }
+}
