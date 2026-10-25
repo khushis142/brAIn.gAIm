@@ -1,6 +1,6 @@
 [project]
 name = "braingain-backend"
-version = "0.0.27"
+version = "0.0.28"
 description = "Backend for the brAIn.gAIn short-video learning feed"
 requires-python = ">=3.13"
 dependencies = [
