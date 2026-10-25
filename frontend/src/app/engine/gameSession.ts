@@ -14,8 +14,11 @@ import {
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
 
-const HEARTBEAT_TIMEOUT_MS = 3000;
 const WATCHDOG_INTERVAL_MS = 1000;
+// Watchdog checks in a row without a heartbeat before the game counts as hung.
+// Counting checks instead of elapsed time means a throttled phone, whose timers
+// all fire late, slows the watchdog down along with the game.
+const MAX_MISSED_HEARTBEATS = 3;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
@@ -49,7 +52,8 @@ export interface GameSessionOptions<CustomData extends GameCustomData = GameCust
 export class GameSession {
   private iframe?: HTMLIFrameElement;
   private resizeObserver?: ResizeObserver;
-  private lastBeat = 0;
+  private beatSinceLastCheck = false;
+  private missedHeartbeats = 0;
   private watchdog?: ReturnType<typeof setInterval>;
   private resultSubmissions = 0;
   private runtimeReady = false;
@@ -148,7 +152,8 @@ export class GameSession {
       this.resizeObserver.observe(this.container);
     }
 
-    this.lastBeat = Date.now();
+    this.beatSinceLastCheck = false;
+    this.missedHeartbeats = 0;
     this.watchdog = setInterval(() => this.checkHeartbeat(), WATCHDOG_INTERVAL_MS);
   }
 
@@ -287,7 +292,7 @@ export class GameSession {
         this.applyRequestedLifecycle();
         break;
       case 'heartbeat':
-        this.lastBeat = Date.now();
+        this.beatSinceLastCheck = true;
         break;
       case 'ui-design':
         this._uiDesign.set(e.data.design);
@@ -309,11 +314,14 @@ export class GameSession {
 
   private checkHeartbeat(): void {
     // Timers are throttled in background tabs, so a late heartbeat is not a hang
-    if (this.doc.hidden) {
-      this.lastBeat = Date.now();
+    const beat = this.beatSinceLastCheck;
+    this.beatSinceLastCheck = false;
+    if (this.doc.hidden || beat) {
+      this.missedHeartbeats = 0;
       return;
     }
-    if (Date.now() - this.lastBeat > HEARTBEAT_TIMEOUT_MS) {
+    this.missedHeartbeats += 1;
+    if (this.missedHeartbeats > MAX_MISSED_HEARTBEATS) {
       this.fail('Game is not responding');
     }
   }

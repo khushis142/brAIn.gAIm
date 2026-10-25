@@ -269,6 +269,50 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('tolerates up to three missed heartbeats in a row', () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+
+    vi.advanceTimersByTime(3000); // three watchdog checks without a heartbeat
+    expect(session.status()).toBe('starting');
+
+    vi.advanceTimersByTime(1000); // the fourth one
+    expect(session.status()).toBe('error');
+    expect(session.error()).toBe('Game is not responding');
+    session.destroy();
+  });
+
+  it('does not fail when a throttled phone delays the watchdog itself', () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+
+    // The device stalls for 10 s, then the late check runs once: one miss, not a hang
+    vi.setSystemTime(Date.now() + 10_000);
+    vi.advanceTimersByTime(1000);
+
+    expect(session.status()).toBe('starting');
+    session.destroy();
+  });
+
+  it('starts counting missed heartbeats again after one arrives', () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source');
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+
+    vi.advanceTimersByTime(3000);
+    window.dispatchEvent(new MessageEvent('message', { source: iframe.contentWindow, data: { type: 'heartbeat' } }));
+    vi.advanceTimersByTime(3000);
+
+    expect(session.status()).toBe('starting');
+    session.destroy();
+  });
+
   it('removes the iframe after stopping and lets the runtime shut down first', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
