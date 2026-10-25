@@ -1,4 +1,4 @@
-import { GAME_KEYS, GAME_PROTOCOL_VERSION, GameModule, InputState, TouchPhase, TouchPoint } from './gameProtocol';
+import { GAME_BUDGETS, GAME_KEYS, GAME_PROTOCOL_VERSION, GameApi, GameModule, HostCommand, InputState, TouchPhase, TouchPoint } from './gameProtocol';
 import { GAME_RUNTIME_SCRIPT } from './gameRuntime';
 
 const RUNTIME_SOURCE = GAME_RUNTIME_SCRIPT;
@@ -51,8 +51,11 @@ function startRuntime() {
   // Movement fields of the first finger, also per frame
   const motion: (Pick<TouchPoint, 'startX' | 'startY' | 'deltaX' | 'deltaY'> | undefined)[] = [];
   let lastInput: InputState | null = null;
+  let gameApi: GameApi | null = null;
   const game: GameModule = {
-    init: noop,
+    init: (api) => {
+      gameApi = api;
+    },
     update: (_dt, input) => {
       lastInput = input;
       seen.push(input.touches.map(({ id, x, y, justStarted, justEnded, cancelled }) =>
@@ -74,6 +77,12 @@ function startRuntime() {
     events.dispatchEvent(event);
   };
 
+  const hostCommand = (data: HostCommand) => {
+    const event = new Event('message');
+    Object.assign(event, { source: fakeParent, data });
+    events.dispatchEvent(event);
+  };
+
   /** A touch the host page received and forwarded as a 'touch' command. */
   const hostTouch = (phase: TouchPhase, id: number, x: number, y: number) => {
     const event = new Event('message');
@@ -89,13 +98,16 @@ function startRuntime() {
     seen,
     motion,
     input: () => lastInput,
+    api: () => gameApi,
     touch,
     hostTouch,
+    hostCommand,
     /** Runs one animation frame, far enough after the last one to pass the FPS cap. */
     frame: () => {
       const callback = frames.shift();
       if (!callback) throw new Error('No frame scheduled');
-      clock += 1000;
+      // The runtime restarts its frame clock from performance.now() on resume
+      clock = Math.max(clock, performance.now()) + 1000;
       callback(clock);
     },
     blur: () => events.dispatchEvent(new Event('blur')),
@@ -281,5 +293,54 @@ describe('game runtime script', () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     runtime.canvas.remove();
+  });
+});
+
+describe('game runtime execution budget', () => {
+  const BUDGET_SECONDS = GAME_BUDGETS.executionTimeMs / 1000;
+  let now = 0;
+  let runtime: ReturnType<typeof startRuntime>;
+  const errors = () => runtime.posted.filter((m) => m.type === 'error').map((m) => m.message);
+  // Each harness frame is one second of play
+  const play = (seconds: number) => {
+    for (let i = 0; i < seconds; i += 1) runtime.frame();
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    runtime = startRuntime();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    runtime.canvas.remove();
+  });
+
+  it('fails a game that plays past the budget', () => {
+    play(BUDGET_SECONDS);
+    expect(errors()).toEqual([]);
+    play(1);
+    expect(errors()).toEqual(['Execution time budget exceeded']);
+  });
+
+  it('does not count time spent paused', () => {
+    play(BUDGET_SECONDS - 10);
+    runtime.hostCommand({ type: 'pause' });
+    now += 2 * GAME_BUDGETS.executionTimeMs;
+    vi.advanceTimersByTime(2 * GAME_BUDGETS.executionTimeMs);
+    runtime.hostCommand({ type: 'resume' });
+    play(5);
+    expect(errors()).toEqual([]);
+  });
+
+  it('stops counting once a result is submitted', () => {
+    play(10);
+    runtime.api()!.submitResult({ score: 1 });
+    play(BUDGET_SECONDS);
+    expect(errors()).toEqual([]);
   });
 });

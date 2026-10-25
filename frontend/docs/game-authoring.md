@@ -339,7 +339,9 @@ The runtime stops a game that exceeds these hard limits:
 | Game source | 200 KiB UTF-8 bytes |
 
 `maxBytes` may lower an asset limit but cannot raise it. Asset bytes are
-checked while reading the response. Pausing does not reset execution time.
+checked while reading the response. Execution time counts
+only time spent playing: it stops while the game is paused or the tab is hidden,
+and pausing does not reset it. Submitting a result stops it for good.
 Canvas limits apply to host dimensions and the physical backing store.
 
 ## Results

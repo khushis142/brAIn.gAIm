@@ -124,7 +124,9 @@ export function gameRuntime(config: GameRuntimeConfig): void {
   let lastFrame = last;
   let registerTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
-  let executionTimer: ReturnType<typeof setTimeout> | undefined;
+  // Time spent in running frames only; paused, hidden or not-yet-started time is not play time.
+  let playTimeMs = 0;
+  let resultPosted = false;
   let resultSubmissions = 0;
   let qualityScale = 1;
   let frameTime = 0;
@@ -467,10 +469,7 @@ export function gameRuntime(config: GameRuntimeConfig): void {
         fail(new Error('Result exceeds the size budget'));
         return;
       }
-      // A submitted result ends gameplay. Do not let the execution budget
-      // turn a long-lived result screen into a timeout error.
-      clearTimeout(executionTimer);
-      executionTimer = undefined;
+      resultPosted = true;
       post({ type: 'result', result });
     },
     setUiDesign(design: GameUiDesign) {
@@ -938,7 +937,15 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     if (now - last < targetFrameTime - 1) return;
 
     const dt = Math.min(Math.max((now - last) / 1000, 0), MAX_DT);
+    // syncLoop() resets `last` on every resume, so pauses never add to play time.
+    playTimeMs += Math.max(now - last, 0);
     last = now;
+    // A submitted result ends gameplay. Do not let the execution budget
+    // turn a long-lived result screen into a timeout error.
+    if (!resultPosted && playTimeMs > EXECUTION_TIME_MS) {
+      fail(new Error('Execution time budget exceeded'));
+      return;
+    }
     lastFrame = performance.now();
     const startedAt = performance.now();
 
@@ -1024,7 +1031,6 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     syncLoop();
     clearInterval(heartbeatTimer);
     clearTimeout(registerTimer);
-    clearTimeout(executionTimer);
     try {
       if (game && typeof game.destroy === 'function') game.destroy();
     } catch (_) {
@@ -1144,11 +1150,6 @@ export function gameRuntime(config: GameRuntimeConfig): void {
         REGISTER_TIMEOUT_MS / 1000 + 's'));
     }
   }, REGISTER_TIMEOUT_MS);
-  executionTimer = setTimeout(() => {
-    if (game && !stopped && !failed && resultSubmissions === 0) {
-      fail(new Error('Execution time budget exceeded'));
-    }
-  }, EXECUTION_TIME_MS);
 
   // ---------------------------------------------------------------- heartbeat
   // Only sent while things are healthy. If the loop should be running but no
