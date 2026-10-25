@@ -5,7 +5,7 @@ import { VideoUploadService } from '../../core/video-upload.service';
 type Status = 'idle' | 'uploading' | 'success' | 'error';
 
 @Component({
-  imports: [LucideUpload, LucideSkull],
+  imports: [LucideUpload],
   selector: 'app-video-upload',
   styleUrl: './video-upload.css',
   templateUrl: './video-upload.html',

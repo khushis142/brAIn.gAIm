@@ -1,15 +1,8 @@
-.upload {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: calc(100dvh - 60px - 76px - 56px);
-}
-
 .dropzone-bar {
   align-items: stretch;
-  background: var(--surface);
   bottom: calc(76px + env(safe-area-inset-bottom));
   display: flex;
+  flex-direction: column;
   gap: 12px;
   padding: 8px 0;
   position: sticky;

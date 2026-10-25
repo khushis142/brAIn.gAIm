@@ -1,10 +1,10 @@
-<section class="upload">
+<section>
   @if (error(); as message) {
     <p class="error" role="alert">{{ message }}</p>
   }
 
   @if (knowledgeViewOpen()) {
-    <div class="knowledge-subview">
+    <div class="knowledge-subview card">
       <button class="back-button" type="button" (click)="closeKnowledgeView()">
         <span aria-hidden="true">←</span>
         Zurück
@@ -34,95 +34,97 @@
       </div>
     </header>
 
-    <div class="projects" role="list" aria-label="Projekte">
-      <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
-      @for (project of projects(); track project.id) {
-        <app-project-folder
-          [name]="project.name"
-          [color]="project.color"
-          [count]="project.files.length"
-          [selected]="project.id === selectedId()"
-          (pressed)="switchProject(project.id)"
-          (colorChange)="setColor(project.id, $event)"
-          (rename)="openRenameProject(project)"
-          (remove)="removeProject(project.id)"
-        />
-      }
-    </div>
-
-    <hr />
-
-    @if (selected()) {
-      <button class="knowledge-link" type="button" (click)="openKnowledgeView()">
-        <span>Extrahiertes Wissen</span>
-        <span class="knowledge-count">{{ flashcards().length }}</span>
-      </button>
-    }
-
-    <div class="files">
-      @if (selected(); as project) {
-        @for (file of project.files; track file.id) {
-          <app-file-item [file]="file" (remove)="removeFile(file)" />
-        } @empty {
-          <p class="hint">Noch keine Dateien in diesem Projekt.</p>
+    <div class="card">
+      <div class="projects" role="list" aria-label="Projekte">
+        <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
+        @for (project of projects(); track project.id) {
+          <app-project-folder
+              [name]="project.name"
+              [color]="project.color"
+              [count]="project.files.length"
+              [selected]="project.id === selectedId()"
+              (pressed)="switchProject(project.id)"
+              (colorChange)="setColor(project.id, $event)"
+              (rename)="openRenameProject(project)"
+              (remove)="removeProject(project.id)"
+          />
         }
-      } @else {
-        <p class="hint">Wähle oder erstelle ein Projekt.</p>
-      }
-    </div>
+      </div>
 
-    @if (selected()) {
-      <div class="dropzone-bar">
-        <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
-        <button
-          class="process-button"
-          type="button"
-          [disabled]="busy() || flashcardsRequested()"
-          [class.processing]="processingFlashcards()"
-          [class.requested]="flashcardsRequested()"
-          [attr.aria-label]="
+      <hr />
+
+      @if (selected()) {
+        <button class="knowledge-link" type="button" (click)="openKnowledgeView()">
+          <span>Extrahiertes Wissen</span>
+          <span class="knowledge-count">{{ flashcards().length }}</span>
+        </button>
+      }
+
+      <div class="files">
+        @if (selected(); as project) {
+          @for (file of project.files; track file.id) {
+            <app-file-item [file]="file" (remove)="removeFile(file)" />
+          } @empty {
+            <p class="hint">Noch keine Dateien in diesem Projekt.</p>
+          }
+        } @else {
+          <p class="hint">Wähle oder erstelle ein Projekt.</p>
+        }
+      </div>
+
+      @if (selected()) {
+        <div class="dropzone-bar">
+          <app-upload-dropzone [disabled]="busy()" (filesSelected)="addFiles($event)" />
+          <button
+              class="process-button"
+              type="button"
+              [disabled]="busy() || flashcardsRequested()"
+              [class.processing]="processingFlashcards()"
+              [class.requested]="flashcardsRequested()"
+              [attr.aria-label]="
             processingFlashcards() ? 'Wissen wird extrahiert' : 'Wissen extrahieren'
           "
-          (click)="processKnowledge()"
-        >
-          <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
-          @if (processingFlashcards()) {
-            <span class="bouncing-label" aria-hidden="true">
+              (click)="processKnowledge()"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">model_training</span>
+            @if (processingFlashcards()) {
+              <span class="bouncing-label" aria-hidden="true">
               @for (letter of extractingLabel; track $index) {
                 <span [style.--letter-index]="$index">{{ letter === ' ' ? '\u00a0' : letter }}</span>
               }
             </span>
-          } @else {
-            <span>Wissen extrahieren</span>
-          }
-        </button>
-      </div>
-    }
+            } @else {
+              <span>Wissen extrahieren</span>
+            }
+          </button>
+        </div>
+      }
+    </div>
   }
 
   @if (nameDialog(); as dialog) {
     <div class="dialog-backdrop" (click)="nameDialog.set(null)">
       <form
-        class="name-dialog"
-        role="dialog"
-        aria-modal="true"
-        [attr.aria-labelledby]="'project-name-title'"
-        (click)="$event.stopPropagation()"
-        (submit)="$event.preventDefault(); saveProjectName()"
+          class="name-dialog"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="'project-name-title'"
+          (click)="$event.stopPropagation()"
+          (submit)="$event.preventDefault(); saveProjectName()"
       >
         <h2 id="project-name-title">
           {{ dialog.mode === 'create' ? 'Neues Projekt' : 'Projekt umbenennen' }}
         </h2>
         <label for="project-name">Projektname</label>
         <input
-          id="project-name"
-          type="text"
-          maxlength="200"
-          required
-          autofocus
-          [value]="dialog.name"
-          [disabled]="busy()"
-          (input)="updateProjectName($event)"
+            id="project-name"
+            type="text"
+            maxlength="200"
+            required
+            autofocus
+            [value]="dialog.name"
+            [disabled]="busy()"
+            (input)="updateProjectName($event)"
         />
         <div class="dialog-actions">
           <button type="button" class="cancel" [disabled]="busy()" (click)="nameDialog.set(null)">
