@@ -13,8 +13,10 @@ import {
 } from '@angular/core';
 import { LucideRotateCcw, LucideTrophy, LucideX } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, LeaderboardEntry } from '../../core/api.service';
+import { ApiService, LeaderboardEntry, ZombieRead } from '../../core/api.service';
 import { GamePrefetchService } from '../../core/game-prefetch.service';
+import { ZombieService } from '../../core/zombie.service';
+import { GameAssetManifest } from '../../engine/gameProtocol';
 import { inlineGameAssets } from '../../engine/gameAssets';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameCustomData, GameResult } from '../../engine/gameProtocol';
@@ -128,6 +130,7 @@ function normalizeQuestions(raw: unknown[]): Record<string, unknown>[] {
     const options =
       Array.isArray(q['options']) && q['options'].length > 0 ? (q['options'] as string[]) : [];
     const answerIdx = typeof q['answer'] === 'number' ? q['answer'] : 0;
+    const answer = typeof q['answer'] === 'boolean' ? q['answer'] : answerIdx;
 
     const correctAns =
       (typeof q['correctAnswer'] === 'string' && q['correctAnswer'].trim()) ||
@@ -154,7 +157,7 @@ function normalizeQuestions(raw: unknown[]): Record<string, unknown>[] {
       right_option: q['right_option'] ?? wrongAns,
       correct: q['correct'] ?? 'left',
       options: options.length >= 2 ? options : [correctAns, wrongAns],
-      answer: answerIdx,
+      answer,
     };
   });
 }
@@ -182,6 +185,39 @@ export function resolveGameData(title: string, custom?: GameCustomData): GameCus
   };
 }
 
+const ZOMBIE_AVATARS: Readonly<Record<string, string>> = {
+  zombie: 'zombie.svg',
+  'half-human': 'half-human.svg',
+  human: 'human.svg',
+};
+
+const ZOMBIE_ACCESSORIES: Readonly<Record<string, string>> = {
+  hat: 'hat.svg',
+  sunglasses: 'sunglasses.svg',
+  'gold-chain': 'gold-chain.svg',
+  'red-sneakers': 'red-sneakers.svg',
+};
+
+export function zombieGameAssets(state: ZombieRead | null, baseUrl: string): GameAssetManifest {
+  const manifest: Record<string, GameAssetManifest[string]> = {};
+  const add = (id: string, filename: string): void => {
+    manifest[id] = {
+      kind: 'image',
+      url: new URL(`/assets/zombie/${filename}`, baseUrl).href,
+      maxBytes: 64 * 1024,
+    };
+  };
+
+  const avatar = state?.avatar ?? 'zombie';
+  add('player-zombie', ZOMBIE_AVATARS[avatar] ?? ZOMBIE_AVATARS['zombie']);
+  for (const accessory of Object.values(state?.equipped ?? {})) {
+    if (typeof accessory !== 'string') continue;
+    const filename = ZOMBIE_ACCESSORIES[accessory];
+    if (filename) add(`player-zombie-${accessory}`, filename);
+  }
+  return manifest;
+}
+
 @Component({
   imports: [LucideRotateCcw, LucideTrophy, LucideX],
   selector: 'app-game-player',
@@ -196,6 +232,7 @@ export class GamePlayer {
   private readonly api = inject(ApiService);
   private readonly prefetch = inject(GamePrefetchService);
   private readonly engine = inject(GameEngineService);
+  private readonly zombie = inject(ZombieService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
 
   readonly game = input<GamePlayable | null>(null);
@@ -333,6 +370,14 @@ export class GamePlayer {
         inlineGameAssets(resolveGameData(current.title, roundData), roundAssets),
         usernamePromise,
       ]);
+      if (!this.zombie.state()) {
+        try {
+          await this.zombie.refresh();
+        } catch (error) {
+          console.warn('Could not load the player zombie for the game', error);
+        }
+      }
+      const playerAssets = zombieGameAssets(this.zombie.state(), document.baseURI);
 
       const host = this.gameHost().nativeElement;
       const width = host.clientWidth > 0 ? host.clientWidth : 800;
@@ -344,6 +389,7 @@ export class GamePlayer {
         data,
         width,
         height,
+        assets: playerAssets,
       });
 
       this.syncLifecycle();

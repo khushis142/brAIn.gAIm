@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { GAME_RUNTIME_SOURCE } from '../../engine/gameRuntimeToken';
-import { GamePlayer, resolveGameData } from './game-player';
+import { GamePlayer, resolveGameData, zombieGameAssets } from './game-player';
 
 describe('GamePlayer', () => {
   let component: GamePlayer;
@@ -16,6 +16,16 @@ describe('GamePlayer', () => {
           provide: ApiService,
           useValue: {
             getMe: () => of({ username: 'tester' }),
+            getMyZombie: () =>
+              of({
+                unlocked: [],
+                equipped: { head: 'hat', eyes: 'sunglasses', neck: null, feet: null },
+                games_completed: 0,
+                progress: [],
+                avatar: 'half-human',
+                unlocked_avatars: [],
+                avatar_progress: [],
+              }),
             submitScore: () => of(undefined),
             getLeaderboard: () => of([{ username: 'top1', score: 100 }]),
             playGame: () =>
@@ -90,6 +100,44 @@ describe('GamePlayer', () => {
     expect(q.question).toBe('Capital of France?');
     expect(q.correctAnswer).toBe('Paris');
     expect(q.wrongAnswer).toBe('London');
+  });
+
+  it('preserves boolean answers for true-or-false games', () => {
+    const custom = {
+      context: 'Biology',
+      questions: [
+        { statement: 'Plants use photosynthesis.', answer: true, explanation: 'They use light.' },
+        { statement: 'Fish breathe air with lungs.', answer: false, explanation: 'Most use gills.' },
+      ],
+    };
+    const resolved = resolveGameData('Brainjack', custom);
+    const questions = resolved['questions'] as { answer: unknown }[];
+
+    expect(questions.map((question) => question.answer)).toEqual([true, false]);
+  });
+
+  it('builds a safe asset manifest for the selected zombie and equipped accessories', () => {
+    const assets = zombieGameAssets(
+      {
+        unlocked: [],
+        equipped: { head: 'hat', eyes: 'sunglasses', neck: null, feet: null },
+        games_completed: 0,
+        progress: [],
+        avatar: 'half-human',
+        unlocked_avatars: [],
+        avatar_progress: [],
+      },
+      'https://example.test/',
+    );
+
+    expect(assets['player-zombie'].url).toBe(
+      'https://example.test/assets/zombie/half-human.svg',
+    );
+    expect(assets['player-zombie-hat'].url).toBe('https://example.test/assets/zombie/hat.svg');
+    expect(assets['player-zombie-sunglasses'].url).toBe(
+      'https://example.test/assets/zombie/sunglasses.svg',
+    );
+    expect(Object.keys(assets)).toHaveLength(3);
   });
 
   it('fetches AI round when game data is not provided', async () => {
