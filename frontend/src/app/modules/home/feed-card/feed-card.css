@@ -59,6 +59,17 @@
   overflow-wrap: anywhere;
 }
 
+.actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+}
+
+/* The sound button's own padding already spaces the two */
+.actions .like {
+  padding-right: 2px;
+}
+
 .like {
   background: none;
   border: 0;

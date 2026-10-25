@@ -30,64 +30,67 @@
       <span class="kind">{{ item.type }}</span>
       <h2 class="title" [title]="item.title">{{ item.title }}</h2>
     </div>
-    @if (item.type === 'video') {
-      <button
-        class="like"
-        type="button"
-        [class.liked]="liked()"
-        [attr.aria-pressed]="liked()"
-        [attr.aria-label]="liked() ? 'Unlike' : 'Like'"
-        [attr.aria-busy]="likePending()"
-        [disabled]="likePending()"
-        (click)="setLiked(!liked())"
-      >
-        <svg lucideBrain></svg>
-        <span class="like-count">{{ likeCount() }}</span>
-      </button>
-      @if (likeError(); as message) {
-        <span class="like-error" role="alert">{{ message }}</span>
-      }
-    }
-    <!-- The slider pops up above the button on hover, keyboard focus, or a tap. Its touches
-         stay here, so dragging it does not swipe the feed. -->
-    <div
-      #soundControl
-      class="sound"
-      [class.open]="sliderOpen()"
-      (pointerdown)="onSoundPointerDown($event)"
-      (pointerup)="onSoundPointerUp($event)"
-      (pointercancel)="onSoundPointerUp($event)"
-      (touchstart)="$event.stopPropagation()"
-      (touchend)="$event.stopPropagation()"
-    >
-      <div class="volume">
-        <input
-          class="volume-input"
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          [value]="volume()"
-          [style.--volume.%]="volume() * 100"
-          aria-label="Volume"
-          (input)="onVolumeInput($event)"
-        />
-      </div>
-      <button
-        class="sound-toggle"
-        type="button"
-        [attr.aria-label]="sound.muted() ? 'Unmute' : 'Mute'"
-        [attr.title]="sound.muted() ? 'Unmute' : 'Mute'"
-        (click)="sound.toggle()"
-      >
-        @if (volume() === 0) {
-          <svg lucideVolumeX></svg>
-        } @else if (volume() < 0.5) {
-          <svg lucideVolume1></svg>
-        } @else {
-          <svg lucideVolume2></svg>
+    <!-- Like and sound sit together; the buttons' own padding spaces them -->
+    <div class="actions">
+      @if (item.type === 'video') {
+        <button
+          class="like"
+          type="button"
+          [class.liked]="liked()"
+          [attr.aria-pressed]="liked()"
+          [attr.aria-label]="liked() ? 'Unlike' : 'Like'"
+          [attr.aria-busy]="likePending()"
+          [disabled]="likePending()"
+          (click)="setLiked(!liked())"
+        >
+          <svg lucideBrain></svg>
+          <span class="like-count">{{ likeCount() }}</span>
+        </button>
+        @if (likeError(); as message) {
+          <span class="like-error" role="alert">{{ message }}</span>
         }
-      </button>
+      }
+      <!-- The slider pops up above the button on hover, keyboard focus, or a tap. Its touches
+           stay here, so dragging it does not swipe the feed. -->
+      <div
+        #soundControl
+        class="sound"
+        [class.open]="sliderOpen()"
+        (pointerdown)="onSoundPointerDown($event)"
+        (pointerup)="onSoundPointerUp($event)"
+        (pointercancel)="onSoundPointerUp($event)"
+        (touchstart)="$event.stopPropagation()"
+        (touchend)="$event.stopPropagation()"
+      >
+        <div class="volume">
+          <input
+            class="volume-input"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            [value]="volume()"
+            [style.--volume.%]="volume() * 100"
+            aria-label="Volume"
+            (input)="onVolumeInput($event)"
+          />
+        </div>
+        <button
+          class="sound-toggle"
+          type="button"
+          [attr.aria-label]="sound.muted() ? 'Unmute' : 'Mute'"
+          [attr.title]="sound.muted() ? 'Unmute' : 'Mute'"
+          (click)="sound.toggle()"
+        >
+          @if (volume() === 0) {
+            <svg lucideVolumeX></svg>
+          } @else if (volume() < 0.5) {
+            <svg lucideVolume1></svg>
+          } @else {
+            <svg lucideVolume2></svg>
+          }
+        </button>
+      </div>
     </div>
     <nav class="nav" aria-label="Feed">
       <button
