@@ -1,6 +1,6 @@
 services:
   s3:
-    image: rustfs/rustfs:1.0.3
+    image: rustfs/rustfs:1.0.4
     container_name: cdn-rustfs
     ports:
       - "9000:9000"
