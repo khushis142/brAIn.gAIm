@@ -1,5 +1,7 @@
 services:
   piper:
+    # Not published to a registry: always build on deploy instead of pulling.
+    pull_policy: build
     build:
       context: .
       args:
