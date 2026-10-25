@@ -416,6 +416,16 @@
   width: 40px;
 }
 
+/* During a game the button is the only way on, so it says so instead of bobbing */
+.next.skip {
+  animation: none;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  padding: 0 16px;
+  width: auto;
+}
+
 /* Transition: the card flies up and away, the next one rises in */
 .card.leaving {
   animation: card-leave 450ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;

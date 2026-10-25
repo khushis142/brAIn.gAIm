@@ -57,6 +57,29 @@ describe('Home', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves ArrowDown to a running game and moves on once it has finished', () => {
+    const home = component as unknown as {
+      item: WritableSignal<FeedItem | null>;
+      session: WritableSignal<{ result(): unknown; error(): unknown; destroy(): void } | null>;
+      next(): Promise<void>;
+      onKeydown(event: KeyboardEvent): void;
+    };
+    const next = vi.spyOn(home, 'next').mockResolvedValue();
+    const pressArrowDown = () =>
+      home.onKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    let result: unknown = null;
+    home.session.set({ result: () => result, error: () => null, destroy: vi.fn() });
+    home.item.set({ type: 'game', id: 'g', title: 'Quiz', url: 'quiz.js', round_id: 'r', data: { context: 'Quiz' } });
+
+    pressArrowDown();
+    expect(next).not.toHaveBeenCalled();
+
+    result = { score: 3 };
+    home.session.set({ result: () => result, error: () => null, destroy: vi.fn() });
+    pressArrowDown();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it('resumes a game automatically after the feed transition finishes', async () => {
     const home = component as unknown as {
       item: WritableSignal<FeedItem | null>;

@@ -167,9 +167,13 @@
           </button>
         }
       }
-      <button class="next" type="button" (click)="next()" aria-label="Next item">
-        <svg lucideChevronDown></svg>
-      </button>
+      @if (gameOwnsInput()) {
+        <button class="next skip" type="button" (click)="next()">Skip</button>
+      } @else {
+        <button class="next" type="button" (click)="next()" aria-label="Next item">
+          <svg lucideChevronDown></svg>
+        </button>
+      }
     </footer>
   </article>
 

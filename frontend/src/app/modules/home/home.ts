@@ -128,6 +128,14 @@ export class Home {
     return current !== null && this.likedIds().has(current.id);
   });
   protected readonly bursts = signal<Burst[]>([]);
+  /**
+   * While a game is being played, swipes and arrow keys belong to it; leaving takes the
+   * Skip button. A finished or broken game hands them back to the feed.
+   */
+  protected readonly gameOwnsInput = computed(() => {
+    const game = this.session();
+    return this.item()?.type === 'game' && game?.result() == null && !game?.error();
+  });
 
   private busy = false;
   private readonly username = signal<string | null>(null);
@@ -251,15 +259,13 @@ export class Home {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'ArrowDown') return;
+    if (event.key !== 'ArrowDown' || this.gameOwnsInput()) return;
     event.preventDefault(); // stop the page from scrolling
     this.next();
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    // Swipes during a game belong to the game; once it has finished they move on again
-    const gameRunning = this.item()?.type === 'game' && this.session()?.result() == null;
-    this.touchStartY = gameRunning ? null : event.touches[0].clientY;
+    this.touchStartY = this.gameOwnsInput() ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
