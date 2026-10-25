@@ -26,6 +26,8 @@ const SWIPE_MIN_PX = 60;
 const DOUBLE_TAP_MS = 300;
 const TAP_SLOP_PX = 10; // more movement than this is a swipe, not a tap
 const BURST_MS = 800; // keep in sync with the burst animation in home.css
+const LAYOUT_TIMEOUT_MS = 1000; // max wait for the game host to get a size
+const FALLBACK_GAME_SIZE = { width: 800, height: 600 };
 
 interface Burst {
   id: number;
@@ -34,6 +36,32 @@ interface Burst {
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Resolves with the element's size once layout gives it one. On mobile the host is
+ * often still 0×0 right after an item swap (address bar, keyboard, first render).
+ */
+function waitForSize(element: HTMLElement, timeoutMs: number): Promise<{ width: number; height: number }> {
+  const measure = () => ({ width: element.clientWidth, height: element.clientHeight });
+  const initial = measure();
+  const Observer = element.ownerDocument.defaultView?.ResizeObserver;
+  if ((initial.width > 0 && initial.height > 0) || !Observer) {
+    return Promise.resolve(initial.width > 0 && initial.height > 0 ? initial : FALLBACK_GAME_SIZE);
+  }
+  return new Promise((resolve) => {
+    const finish = (size: { width: number; height: number }) => {
+      observer.disconnect();
+      clearTimeout(timer);
+      resolve(size);
+    };
+    const observer = new Observer(() => {
+      const size = measure();
+      if (size.width > 0 && size.height > 0) finish(size);
+    });
+    const timer = setTimeout(() => finish(FALLBACK_GAME_SIZE), timeoutMs);
+    observer.observe(element);
+  });
+}
 
 @Component({
   imports: [LucideBrain, LucideChevronDown],
@@ -48,6 +76,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
@@ -119,10 +148,9 @@ export class Home {
       this.submittedRoundId = current.round_id;
       void this.submitScore(current.id, current.round_id, result.score);
     });
-    const destroyRef = inject(DestroyRef);
     const onVisibilityChange = () => this.syncGameLifecycle();
     document.addEventListener('visibilitychange', onVisibilityChange);
-    destroyRef.onDestroy(() => {
+    this.destroyRef.onDestroy(() => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       this.intersectionObserver?.disconnect();
       this.session()?.destroy();
@@ -384,14 +412,15 @@ export class Home {
     this.item.set(item);
 
     if (gameCode !== null && item.type === 'game') {
-      const host = this.gameHost().nativeElement;
+      const { width, height } = await waitForSize(this.gameHost().nativeElement, LAYOUT_TIMEOUT_MS);
+      if (this.destroyRef.destroyed || this.item() !== item) return;
       this.session()?.start(gameCode, {
         username: this.username() ?? '',
         data: gameItem?.data ?? {
           context: `"${item.title}", a short game in a learning feed.`,
         },
-        width: host.clientWidth,
-        height: host.clientHeight,
+        width,
+        height,
       });
       this.syncGameLifecycle();
     }
