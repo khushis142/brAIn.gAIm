@@ -1,8 +1,7 @@
 .preview-page {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 130px);
-  padding: 16px;
+  height: 100%;
 }
 
 .hint {
@@ -15,7 +14,7 @@
   background: #000;
   border-radius: 16px;
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }

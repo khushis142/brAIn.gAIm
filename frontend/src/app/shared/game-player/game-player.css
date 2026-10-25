@@ -14,6 +14,11 @@
   width: 100%;
 }
 
+/* The overlays size themselves to the stage (cqh / container queries), not the window */
+.game-player-container {
+  container-type: size;
+}
+
 .player-header {
   align-items: center;
   background: linear-gradient(180deg, rgb(0 0 0 / 0.75) 0%, transparent 100%);
@@ -89,7 +94,7 @@
   display: flex;
   inset: 0;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(12px, 5cqmin, 24px);
   position: absolute;
   z-index: 20;
 }
@@ -120,11 +125,22 @@
   border-radius: 16px;
   box-shadow: 0 20px 40px rgb(0 0 0 / 0.4);
   color: var(--text);
-  max-height: 85%;
+  max-height: 100%;
   max-width: 380px;
-  padding: 24px;
+  padding: clamp(16px, 5cqmin, 24px);
   text-align: center;
   width: 100%;
+}
+
+/* Scrolls only if even the compact layout below cannot fit */
+.result-card {
+  overflow-y: auto;
+}
+
+/* The list shrinks and scrolls, so the header stays put */
+.leaderboard-card {
+  display: flex;
+  flex-direction: column;
 }
 
 .trophy-icon {
@@ -219,6 +235,7 @@
 .leaderboard-body {
   margin-top: 14px;
   max-height: 260px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -259,4 +276,23 @@
 .score-row .score {
   color: var(--accent);
   font-weight: 700;
+}
+
+/* Short stages (phones held sideways): smaller trophy and score, buttons in a row */
+@container (max-height: 420px) {
+  .trophy-icon {
+    height: 40px;
+    margin-bottom: 4px;
+    width: 40px;
+  }
+
+  .score-display {
+    font-size: 2rem;
+    margin: 6px 0 12px;
+  }
+
+  .result-actions {
+    flex-flow: row wrap;
+    justify-content: center;
+  }
 }

@@ -2,7 +2,8 @@
   align-items: center;
   display: flex;
   justify-content: center;
-  min-height: calc(100dvh - 56px);
+  min-height: 100%;
+  padding: 20px;
 }
 
 .auth-card {
@@ -10,7 +11,7 @@
   border: 1px solid var(--border);
   border-radius: 24px;
   max-width: 420px;
-  padding: 32px;
+  padding: clamp(20px, 6vw, 32px);
   width: 100%;
 }
 

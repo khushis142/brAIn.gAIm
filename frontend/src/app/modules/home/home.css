@@ -1,8 +1,7 @@
 :host {
   display: block;
-  /* Fill the space between the header (60px), bottom nav (76px) and page padding (2 × 28px) */
-  height: calc(100dvh - 192px);
-  min-height: 360px;
+  /* The page area between the header and the nav (see app.css) */
+  height: 100%;
 }
 
 .feed {
@@ -136,10 +135,6 @@ app-feed-card.entering {
 }
 
 @media (max-width: 600px) {
-  :host {
-    height: calc(100dvh - 136px);
-  }
-
   .placeholder,
   .error,
   .warp {
