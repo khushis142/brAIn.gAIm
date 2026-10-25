@@ -1,6 +1,20 @@
 # Infra
 
-Docker Compose configurations for infrastructure services. All stacks attach to the shared `braingain` bridge network so application containers (`backend`, `litellm`, `cdn`, `frontend`) can reach them by container name.
+Docker Compose configurations for infrastructure and full local deployment. All stacks attach to the shared `braingain` bridge network so application containers (`backend`, `litellm`, `cdn`, `frontend`, `seed`) can reach them by container name.
+
+## Quick Start (Full Local Stack)
+
+Start the entire prototype (`postgres`, `rustfs`, `s3-init`, `piper`, `llama`, `glances`, `cdn`, `backend`, `frontend`, and the oneshot `seed` container that registers a default `braingain` user and seeds all games from `github.com/brAIn-gAIm/Backend`):
+
+```bash
+docker compose up -d
+```
+
+- **Frontend**: `http://localhost:8080` (default seeded user: `braingain` / `braingain`)
+- **Backend API / Docs**: `http://localhost:3000/docs`
+- **CDN**: `http://localhost:8081` (`https://localhost:8444`)
+- **RustFS Console**: `http://localhost:9001` (`braingain` / `braingain-secret`)
+- **Glances UI**: `http://localhost:61208`
 
 ## Services
 
