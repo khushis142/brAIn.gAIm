@@ -43,7 +43,7 @@
   padding: 8px 16px;
 }
 
-/* Over the game's top-left corner: 44px to hit with a thumb, dark so it shows on any game */
+/* Over the game's top-right corner: 44px to hit with a thumb, dark so it shows on any game */
 .pause-button {
   align-items: center;
   backdrop-filter: blur(4px);
@@ -55,10 +55,10 @@
   display: flex;
   height: 44px;
   justify-content: center;
-  left: 8px;
   padding: 0;
   position: absolute;
-  top: 8px;
+  right: 4px;
+  top: 4px;
   touch-action: manipulation;
   width: 44px;
 }
