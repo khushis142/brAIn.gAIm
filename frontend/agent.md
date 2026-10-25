@@ -21,6 +21,7 @@ npm test -- --watch=false  # run Vitest unit tests
   - Untrusted/LLM-seeded game JS runs inside `<iframe sandbox="allow-scripts">` via `GameEngineService` and `GameSession` (protocol v2, `docs/game-authoring.md`).
   - Never add `allow-same-origin` to the game iframe sandbox.
   - `input.keys[code]` provides `KeyState` objects (`{ held, justPressed, justReleased }`) for `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.
+  - `input.touches` lists every finger (oldest first, canvas pixels, `justStarted`/`justEnded`/`cancelled`); `input.pointer` follows the primary pointer only.
   - When a game round is served with TTS/media `assets` (JSON Pointers into `data`), `data` is passed into `session.start()`.
 - **Nginx reverse proxy (`nginx.conf`)**:
   - Serves the SPA (`try_files $uri $uri/ /index.html`) on port 80 and proxies `/api/` to `http://backend:8000` and `/cdn/` to `http://cdn:8080` using Docker's embedded DNS resolver (`127.0.0.11`).
