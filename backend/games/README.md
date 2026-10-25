@@ -80,6 +80,16 @@ ready. Rounds are prepared in the background ahead of time, so this never delays
   (the LLM does not produce it). Both are checked on publish.
 - In the game, the field holds a `data:` URL the host prepared (the iframe has no network
   access), e.g. `new Audio(api.data.questions[0].questionAudio).play()`. Audio is WAV.
+- **`random_file`**: writes one randomly chosen file of `files` (CDN `id` and `filename`)
+  into the top-level field `into`, again as a `data:` URL in the game. `story-run/` uses it
+  for its background clips: 30 s, muted, 288x640 H.264 MP4s of about 2 MB each, cut with
+  `ffmpeg -ss <start> -i <video> -t 30 -an -vf scale=288:640,fps=24 -c:v libx264 -crf 33
+  -pix_fmt yuv420p -movflags +faststart clip.mp4` and uploaded with `app.cdn.upload`.
+  Keep files small: the host downloads the chosen one with every round.
+
+```json
+{ "type": "random_file", "into": "backgroundVideo", "files": [{ "id": "<cdn id>", "filename": "clip.mp4" }] }
+```
 
 ## `game.js`
 

@@ -1,14 +1,17 @@
 """Server-side steps that run on a game's generated input before the round is ready.
 
-A game declares them in `config.json` under `preconditions`. Each step reads values from
+A game declares them in `config.json` under `preconditions`. A `tts` step reads values from
 the input by `path` (a JSON Pointer where `*` matches every array item) and writes its
-result into a sibling field `into`. Steps that produce files store them on the CDN and
-report the JSON Pointers of the URLs they wrote as assets, which the host must fetch (the
-game iframe has no network access) before starting the game.
+result into a sibling field `into`; a `random_file` step writes one of a fixed list of CDN
+files (e.g. background video clips) into the top-level field `into`. Steps report the JSON
+Pointers of the CDN URLs they wrote as assets, which the host must fetch (the game iframe
+has no network access) before starting the game.
 """
 
+import random
+import uuid
 from collections.abc import Iterator
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import httpx
 from pydantic import BaseModel, Field
@@ -46,6 +49,26 @@ class TtsStep(BaseModel):
             raise ValueError(f"precondition target {self.into!r} clashes with a schema property")
 
 
+class CdnFileRef(BaseModel):
+    id: uuid.UUID
+    filename: str = Field(pattern=r"^[A-Za-z0-9._-]+$")
+
+
+class RandomFileStep(BaseModel):
+    """Write the URL of one randomly chosen file of `files` into the top-level field `into`."""
+
+    type: Literal["random_file"]
+    files: list[CdnFileRef] = Field(min_length=1)
+    into: str = Field(pattern=_IDENTIFIER, examples=["backgroundVideo"])
+
+    def check_against(self, schema: dict[str, Any]) -> None:
+        if self.into in schema.get("properties", {}):
+            raise ValueError(f"precondition target {self.into!r} clashes with a schema property")
+
+
+PreconditionStep = Annotated[TtsStep | RandomFileStep, Field(discriminator="type")]
+
+
 def _property(node: dict[str, Any], name: str) -> dict[str, Any]:
     properties = node.get("properties", {})
     if name not in properties:
@@ -72,11 +95,16 @@ def _matches(data: Any, segments: list[str], pointer: str = "") -> Iterator[tupl
         yield from _matches(child, rest, f"{pointer}/{name}")
 
 
-async def run_preconditions(steps: list[TtsStep], data: dict[str, Any]) -> list[str]:
+async def run_preconditions(steps: list[PreconditionStep], data: dict[str, Any]) -> list[str]:
     """Apply `steps` to `data` in place; return JSON Pointers of the asset URLs written."""
     assets = []
     try:
         for step in steps:
+            if isinstance(step, RandomFileStep):
+                file = random.choice(step.files)
+                data[step.into] = cdn.file_url(file.id, file.filename)
+                assets.append(f"/{step.into}")
+                continue
             for parent, key, pointer in list(_matches(data, step.path.strip("/").split("/"))):
                 audio = await tts.synthesize(parent[key])
                 file_id, filename = await cdn.upload(audio, "speech.wav", "audio/wav")
