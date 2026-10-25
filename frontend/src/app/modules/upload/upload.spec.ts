@@ -94,7 +94,7 @@ describe('Upload', () => {
     expect(folders().length).toBe(2);
     expect(folders()[1].querySelector('.folder')?.classList.contains('selected')).toBe(true);
     expect(api['getProjectFlashcards']).toHaveBeenCalledWith('p1');
-    expect(el.textContent).toContain('Extrahiertes Wissen');
+    expect(el.textContent).toContain('Extracted knowledge');
     expect(el.textContent).not.toContain('Was ist Wissen?');
     expect(el.querySelector('app-upload-dropzone')).not.toBeNull();
   });
@@ -104,7 +104,7 @@ describe('Upload', () => {
     fixture.detectChanges();
 
     expect(el.querySelector('.knowledge-subview h2')?.textContent).toContain(
-      'Extrahiertes Wissen',
+      'Extracted knowledge',
     );
     expect(el.textContent).toContain('Was ist Wissen?');
     expect(el.textContent).toContain('Lernen.');
@@ -185,7 +185,7 @@ describe('Upload', () => {
     expect(api['addAttachment']).toHaveBeenCalledWith('p1', expect.objectContaining({ id: 'a3' }));
     expect(el.querySelectorAll('app-file-item').length).toBe(3);
 
-    (el.querySelectorAll('button[aria-label="Datei löschen"]')[2] as HTMLButtonElement).click();
+    (el.querySelectorAll('button[aria-label="Delete file"]')[2] as HTMLButtonElement).click();
     await fixture.whenStable();
     expect(api['deleteAttachment']).toHaveBeenCalledWith('p1', 'a3');
     expect(el.querySelectorAll('app-file-item').length).toBe(2);
@@ -227,9 +227,9 @@ describe('Upload', () => {
     fixture.detectChanges();
     expect(button.disabled).toBe(true);
     expect(button.classList.contains('processing')).toBe(true);
-    expect(button.getAttribute('aria-label')).toBe('Wissen wird extrahiert');
+    expect(button.getAttribute('aria-label')).toBe('Extracting knowledge');
     expect(el.querySelectorAll('.bouncing-label > span').length).toBe(
-      'Wissen wird extrahiert'.length,
+      'Extracting knowledge'.length,
     );
 
     response.next([
@@ -246,6 +246,6 @@ describe('Upload', () => {
     expect(button.disabled).toBe(true);
     expect(button.classList.contains('processing')).toBe(false);
     expect(button.classList.contains('requested')).toBe(true);
-    expect(button.textContent).toContain('Wissen extrahieren');
+    expect(button.textContent).toContain('Extract knowledge');
   });
 });

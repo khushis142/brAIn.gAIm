@@ -1,7 +1,6 @@
 .preview {
   display: grid;
   justify-items: center;
-  margin-top: 24px;
 }
 
 .preview-zombie {

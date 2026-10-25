@@ -7,6 +7,6 @@
   (drop)="onDrop($event)"
 >
   <span class="material-symbols-outlined" aria-hidden="true">upload</span>
-  <span>{{ disabled() ? 'Lädt hoch…' : 'Upload' }}</span>
+  <span>{{ disabled() ? 'Uploading…' : 'Upload' }}</span>
   <input type="file" multiple [disabled]="disabled()" (change)="onInput($event)" />
 </label>

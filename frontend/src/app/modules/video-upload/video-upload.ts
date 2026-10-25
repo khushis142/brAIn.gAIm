@@ -1,5 +1,5 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
-import { LucideUpload } from '@lucide/angular';
+import {LucideSkull, LucideUpload} from '@lucide/angular';
 import { VideoUploadService } from '../../core/video-upload.service';
 
 type Status = 'idle' | 'uploading' | 'success' | 'error';
@@ -68,7 +68,7 @@ export class VideoUpload {
       },
       error: () => {
         this.status.set('error');
-        this.error.set('Video konnte nicht hochgeladen werden.');
+        this.error.set('Video could not be uploaded.');
       },
     });
   }

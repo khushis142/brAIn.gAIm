@@ -1,12 +1,16 @@
-<section class="video-upload-page">
-  <div class="page-title">
-    <svg lucideUpload></svg>
-    <h1>Video hochladen</h1>
-  </div>
+<section>
+  <header class="page-header">
+    <div class="title-with-icon">
+      <span class="header-icon-bubble">
+        <svg lucideUpload></svg>
+      </span>
+      <h1>Upload Video</h1>
+    </div>
+  </header>
 
   <div class="card">
     <form (submit)="submit($event)">
-      <label for="video-file">Videodatei (.mp4)</label>
+      <label for="video-file">Video file (.mp4)</label>
       <input
         #fileInput
         id="video-file"
@@ -20,7 +24,7 @@
         <p class="hint">{{ selectedFile.name }} ({{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB)</p>
       }
 
-      <label for="video-title">Titel</label>
+      <label for="video-title">Title</label>
       <input
         id="video-title"
         type="text"
@@ -30,7 +34,7 @@
         (input)="onTitleInput($event)"
       />
 
-      <label for="video-tags">Tags (durch Komma getrennt)</label>
+      <label for="video-tags">Tags (comma-separated)</label>
       <input
         id="video-tags"
         type="text"
@@ -44,12 +48,12 @@
       }
 
       @if (status() === 'success') {
-        <p class="success" role="status">Video wurde erfolgreich hochgeladen.</p>
+        <p class="success" role="status">Video uploaded successfully.</p>
       }
 
       <button type="submit" [disabled]="!canSubmit()">
         <svg lucideUpload></svg>
-        {{ status() === 'uploading' ? 'Lädt hoch…' : 'Hochladen' }}
+        {{ status() === 'uploading' ? 'Uploading…' : 'Upload' }}
       </button>
     </form>
   </div>

@@ -12,10 +12,10 @@ export class VideoUploadService {
   validateFile(file: File): string | null {
     const isMp4 = file.type === ALLOWED_VIDEO_TYPE || file.name.toLowerCase().endsWith('.mp4');
     if (!isMp4) {
-      return 'Nur .mp4-Dateien werden unterstützt.';
+      return 'Only .mp4 files are supported.';
     }
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      return `Die Datei ist zu groß (max. ${MAX_VIDEO_SIZE_BYTES / 1024 / 1024} MB).`;
+      return `The file is too large (max. ${MAX_VIDEO_SIZE_BYTES / 1024 / 1024} MB).`;
     }
     return null;
   }

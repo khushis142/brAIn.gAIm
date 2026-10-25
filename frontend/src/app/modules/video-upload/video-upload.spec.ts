@@ -64,11 +64,11 @@ describe('VideoUpload', () => {
   });
 
   it('shows a client-side error and clears the selection when validation fails', () => {
-    uploadService.validateFile.mockReturnValue('Nur .mp4-Dateien werden unterstützt.');
+    uploadService.validateFile.mockReturnValue('Only .mp4 files are supported.');
     selectFile(el, new File(['x'], 'clip.mov', { type: 'video/quicktime' }));
     fixture.detectChanges();
 
-    expect(el.querySelector('.error')?.textContent).toContain('Nur .mp4-Dateien');
+    expect(el.querySelector('.error')?.textContent).toContain('Only .mp4 files');
     expect(el.querySelector('.hint')).toBeNull();
   });
 
@@ -111,7 +111,7 @@ describe('VideoUpload', () => {
     fixture.detectChanges();
 
     expect(submitButton().disabled).toBe(true);
-    expect(submitButton().textContent).toContain('Lädt hoch');
+    expect(submitButton().textContent).toContain('Uploading');
 
     pending.complete();
     await fixture.whenStable();

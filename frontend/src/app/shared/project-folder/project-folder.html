@@ -4,7 +4,7 @@
   [class.new]="isNew()"
   [class.selected]="selected()"
   [attr.aria-pressed]="isNew() ? null : selected()"
-  [attr.aria-label]="isNew() ? 'Neues Projekt' : name()"
+  [attr.aria-label]="isNew() ? 'New project' : name()"
   (click)="onClick()"
   (pointerdown)="startPress()"
   (pointerup)="cancelPress()"
@@ -27,7 +27,7 @@
 
 @if (menuOpen()) {
   <div class="backdrop" (click)="menuOpen.set(false)"></div>
-  <div class="menu" role="dialog" [attr.aria-label]="'Ordner ' + name()">
+  <div class="menu" role="dialog" [attr.aria-label]="'Folder ' + name()">
     <p class="menu-title">{{ name() }}</p>
     <div class="colors">
       @for (c of colors; track c) {
@@ -36,18 +36,18 @@
           class="swatch"
           [class.active]="c === color()"
           [style.background]="c"
-          [attr.aria-label]="'Farbe ' + c"
+          [attr.aria-label]="'Color ' + c"
           (click)="pickColor(c)"
         ></button>
       }
     </div>
     <button type="button" class="action" (click)="startRename()">
       <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-      Umbenennen
+      Rename
     </button>
     <button type="button" class="action delete" (click)="delete()">
       <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-      Ordner löschen
+      Delete folder
     </button>
   </div>
 }
