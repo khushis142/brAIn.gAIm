@@ -24,28 +24,36 @@
   align-items: center;
   background: var(--control);
   display: flex;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
 }
 
-.badge {
-  background: var(--accent);
-  border-radius: 999px;
-  color: #fff;
+/* The type is a small label over the title, so the title gets the whole width */
+.meta {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kind {
+  color: var(--accent);
   font-size: 0.65rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 3px 8px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .title {
-  flex: 1;
+  -webkit-box-orient: vertical;
+  display: -webkit-box;
   font-size: 0.95rem;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.25;
   margin: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .like {
@@ -76,42 +84,62 @@
   filter: drop-shadow(0 0 6px var(--like));
 }
 
+/* Back and next share one stacked pill: back is the quiet top half, next the accent bottom */
+.nav {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 16px;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Two halves together match the height of a two-line title, so the pill sets no extra height */
 .previous,
 .next {
   border: 0;
-  border-radius: 50%;
   cursor: pointer;
   display: grid;
-  flex: none;
-  height: 40px;
+  height: 26px;
+  min-width: 36px;
   place-items: center;
-  width: 40px;
 }
 
-/* Going back is the quieter action */
+.previous svg,
+.next svg {
+  height: 18px;
+  width: 18px;
+}
+
 .previous {
   background: none;
   color: inherit;
 }
 
+.previous:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
 .next {
-  animation: bob 1.6s ease-in-out infinite;
   background: var(--accent);
   color: #fff;
 }
 
-/* During a game the button is the only way on, so it says so instead of bobbing */
+.next svg {
+  animation: bob 1.6s ease-in-out infinite;
+}
+
+/* During a game the button is the only way on, so it says so */
 .next.skip {
-  animation: none;
-  border-radius: 999px;
   font: inherit;
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 0 16px;
-  width: auto;
+  padding: 0 10px;
 }
 
 @keyframes bob {
-  50% { transform: translateY(4px); }
+  50% { transform: translateY(2px); }
 }
 
 @keyframes like-pop {
@@ -119,7 +147,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .next,
+  .next svg,
   .like.liked svg {
     animation: none;
   }
