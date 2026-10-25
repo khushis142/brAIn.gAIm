@@ -41,7 +41,10 @@ export class Home {
   });
   protected readonly error = signal<string | null>(null);
   private readonly current = computed(() => this.entries()[this.index()] ?? null);
-  /** A game being played gets swipes and arrow keys; its card's buttons move the feed */
+  /**
+   * A game being played gets swipes and arrow keys, and has to be finished before the feed
+   * moves on. Going back is still allowed; coming forward again lands on the same game.
+   */
   protected readonly gameOwnsInput = computed(
     () => this.cards().find((card) => card.entry() === this.current())?.gameOwnsInput() ?? false,
   );
@@ -64,6 +67,7 @@ export class Home {
 
   /** Moves forward through the history, fetching a new item at its end */
   protected next(): Promise<void> {
+    if (this.gameOwnsInput()) return Promise.resolve();
     return this.move('forward', async () => {
       if (this.index() < this.entries().length - 1) return this.index() + 1;
       return this.append(await firstValueFrom(this.api.nextItem()));

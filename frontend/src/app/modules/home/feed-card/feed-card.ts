@@ -1,5 +1,5 @@
 import { Component, computed, input, output, signal, viewChild } from '@angular/core';
-import { LucideBrain, LucideChevronDown, LucideChevronUp } from '@lucide/angular';
+import { LucideBrain, LucideChevronDown, LucideChevronUp, LucideLock } from '@lucide/angular';
 import { GameResult } from '../../../engine/gameProtocol';
 import { CardTransition, FeedEntry, GameAllowance } from '../feed';
 import { FeedGame } from '../feed-game/feed-game';
@@ -10,7 +10,7 @@ import { FeedVideo } from '../feed-video/feed-video';
  * game only exists while it is `live`, and the card remembers where that was left off.
  */
 @Component({
-  imports: [FeedGame, FeedVideo, LucideBrain, LucideChevronDown, LucideChevronUp],
+  imports: [FeedGame, FeedVideo, LucideBrain, LucideChevronDown, LucideChevronUp, LucideLock],
   selector: 'app-feed-card',
   styleUrl: './feed-card.css',
   templateUrl: './feed-card.html',

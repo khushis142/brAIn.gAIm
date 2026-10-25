@@ -116,7 +116,8 @@
   color: inherit;
 }
 
-.previous:disabled {
+.previous:disabled,
+.next:disabled {
   cursor: default;
   opacity: 0.3;
 }
@@ -126,16 +127,8 @@
   color: #fff;
 }
 
-.next svg {
+.next:enabled svg {
   animation: bob 1.6s ease-in-out infinite;
-}
-
-/* During a game the button is the only way on, so it says so */
-.next.skip {
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0 10px;
 }
 
 @keyframes bob {

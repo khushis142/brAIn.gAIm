@@ -23,6 +23,16 @@
   text-align: center;
 }
 
+.error p {
+  margin: 0;
+  padding: 0 20px;
+}
+
+.time-up {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
 .error button {
   background: var(--accent);
   border: 0;

@@ -85,6 +85,10 @@ export class FeedGame {
   protected readonly session = signal<GameSession | null>(null);
   private readonly loadError = signal<string | null>(null);
   protected readonly error = computed(() => this.loadError() ?? this.session()?.error() ?? null);
+  /** The runtime ended the round after its play-time budget; see gameRuntime.ts */
+  protected readonly timedOut = computed(
+    () => this.session()?.error() === 'Execution time budget exceeded',
+  );
   protected readonly result = computed(() => this.session()?.result() ?? this.finishedResult());
   protected readonly loading = computed(
     () => this.result() === null && this.error() === null && this.session()?.status() !== 'running',

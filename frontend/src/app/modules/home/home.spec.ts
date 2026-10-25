@@ -116,6 +116,36 @@ describe('Home', () => {
     expect(home.index()).toBe(0);
   });
 
+  it('only moves past a game once it is finished, but lets you go back', async () => {
+    vi.useFakeTimers();
+    const nextItem = vi
+      .spyOn(api, 'nextItem')
+      .mockReturnValueOnce(of(video('a')))
+      .mockReturnValueOnce(of(video('game')))
+      .mockReturnValueOnce(of(video('b')));
+    const currentId = () => home.entries()[home.index()]?.item.id;
+    await settle(home.next());
+    await settle(home.next());
+
+    let gameOwnsInput = true;
+    home.gameOwnsInput = (() => gameOwnsInput) as Signal<boolean>;
+    await settle(home.next());
+    expect(currentId()).toBe('game');
+    expect(nextItem).toHaveBeenCalledTimes(2);
+
+    await settle(home.previous());
+    expect(currentId()).toBe('a');
+    gameOwnsInput = false;
+    await settle(home.next());
+    gameOwnsInput = true;
+    await settle(home.next());
+    expect(currentId()).toBe('game');
+
+    gameOwnsInput = false; // finished
+    await settle(home.next());
+    expect(currentId()).toBe('b');
+  });
+
   it('leaves swipes and arrow keys to a game being played', () => {
     let gameOwnsInput = true;
     home.gameOwnsInput = (() => gameOwnsInput) as Signal<boolean>;

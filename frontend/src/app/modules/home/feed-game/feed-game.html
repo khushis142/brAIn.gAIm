@@ -70,7 +70,12 @@
   </div>
 }
 
-@if (error(); as message) {
+@if (timedOut()) {
+  <div class="error" role="status">
+    <p class="time-up">Time's up!</p>
+    <p>This round ran out of time. Swipe up or tap the arrow to move on.</p>
+  </div>
+} @else if (error(); as message) {
   <div class="error" role="alert">
     <p>{{ message }}</p>
     <button type="button" (click)="retry()">Try again</button>
