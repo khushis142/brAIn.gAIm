@@ -206,7 +206,7 @@ async def publish_generated_game(
         kind="game",
         filename=filename,
         title=game.title,
-        config=game.config.model_dump(),
+        config=game.config.model_dump(mode="json"),
         owner_id=owner.id,
     )
     session.add(content)

@@ -294,6 +294,27 @@ async def test_seed_game(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -
             await seed_game(session, EXAMPLE_DIR, "Other", "nobody")
 
 
+async def test_seed_game_stores_config_as_json(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # story-run's random_file step holds UUIDs, which the JSONB column cannot take as is.
+    directory = Path(__file__).parents[1] / "games/story-run"
+
+    async def fake_upload(
+        content: bytes, filename: str, content_type: str
+    ) -> tuple[uuid.UUID, str]:
+        return uuid.uuid4(), filename
+
+    monkeypatch.setattr(cdn, "upload", fake_upload)
+    await _auth(client, "publisher")
+    async with SessionLocal() as session:
+        game = await seed_game(session, directory, "Story Time", "publisher")
+    async with SessionLocal() as session:
+        stored = await session.get(Content, game.id)
+        expected = GameConfig.model_validate_json((directory / "config.json").read_text())
+        assert GameConfig(**stored.config) == expected
+
+
 async def test_update_game_keeps_history(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
