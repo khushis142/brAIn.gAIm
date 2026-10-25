@@ -119,7 +119,13 @@
     } @else {
       <div class="games-grid">
         @for (game of filteredGames(); track game.id) {
-          <article class="game-card" (click)="selectGame(game)">
+          <article
+            class="game-card"
+            (click)="selectGame(game)"
+            (mouseenter)="onHoverGame(game.id)"
+            (touchstart)="onHoverGame(game.id)"
+            (focus)="onHoverGame(game.id)"
+          >
             <div class="game-card-banner" [style.background]="getGameColor(game.title)">
               <span class="banner-icon"><svg lucideGamepad2></svg></span>
               <button

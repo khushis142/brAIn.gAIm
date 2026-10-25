@@ -11,6 +11,7 @@ import {
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, ContentRead, LeaderboardEntry } from '../../core/api.service';
+import { GamePrefetchService } from '../../core/game-prefetch.service';
 import { GamePlayable, GamePlayer } from '../../shared/game-player/game-player';
 
 @Component({
@@ -30,6 +31,7 @@ import { GamePlayable, GamePlayer } from '../../shared/game-player/game-player';
 })
 export class Gamehub implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly prefetch = inject(GamePrefetchService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -96,6 +98,9 @@ export class Gamehub implements OnInit {
       const list = await firstValueFrom(this.api.listGames());
       this.games.set(list);
 
+      // Pre-warm the first few games in background
+      list.slice(0, 3).forEach((g) => this.prefetch.prefetch(g.id));
+
       // Check if URL specifies a game to play
       const playId = this.route.snapshot.queryParamMap.get('play');
       if (playId) {
@@ -109,12 +114,17 @@ export class Gamehub implements OnInit {
       try {
         const fallback = await firstValueFrom(this.api.listContent('game'));
         this.games.set(fallback);
+        fallback.slice(0, 3).forEach((g) => this.prefetch.prefetch(g.id));
       } catch {
         this.error.set('Failed to load games. Please check your connection.');
       }
     } finally {
       this.loading.set(false);
     }
+  }
+
+  onHoverGame(gameId: string): void {
+    this.prefetch.prefetch(gameId);
   }
 
   async selectGame(game: ContentRead): Promise<void> {

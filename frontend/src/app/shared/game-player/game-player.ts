@@ -14,6 +14,7 @@ import {
 import { LucideRotateCcw, LucideTrophy, LucideX } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, LeaderboardEntry } from '../../core/api.service';
+import { GamePrefetchService } from '../../core/game-prefetch.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameCustomData, GameResult } from '../../engine/gameProtocol';
 import { GameSession } from '../../engine/gameSession';
@@ -193,6 +194,7 @@ export function resolveGameData(title: string, custom?: GameCustomData): GameCus
 })
 export class GamePlayer {
   private readonly api = inject(ApiService);
+  private readonly prefetch = inject(GamePrefetchService);
   private readonly engine = inject(GameEngineService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
 
@@ -314,7 +316,8 @@ export class GamePlayer {
       let roundId = current.round_id;
       if (!roundData || Object.keys(roundData).length === 0 || forceNewRound) {
         try {
-          const item = await firstValueFrom(this.api.playGame(current.id));
+          const prefetched = await this.prefetch.consume(current.id);
+          const item = prefetched ?? (await firstValueFrom(this.api.playGame(current.id)));
           if (item?.data && Object.keys(item.data).length > 0) {
             roundData = item.data;
             roundId = item.round_id;
@@ -340,6 +343,9 @@ export class GamePlayer {
       });
 
       this.syncLifecycle();
+
+      // Pre-warm the NEXT round in background for seamless restart
+      this.prefetch.prefetch(current.id);
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : String(err));
     } finally {
