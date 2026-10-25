@@ -11,7 +11,7 @@ type TouchSnapshot = Pick<TouchPoint, 'id' | 'x' | 'y' | 'justStarted' | 'justEn
  * Runs the runtime script against a fake window so each test gets a fresh runtime
  * and drives frames by hand. Touches are given in canvas pixels (rect is 1:1).
  */
-function startRuntime() {
+function startRuntime(assets?: Record<string, unknown>) {
   const canvas = document.createElement('canvas');
   canvas.id = 'c';
   canvas.width = CANVAS_WIDTH;
@@ -27,7 +27,7 @@ function startRuntime() {
   const frames: FrameRequestCallback[] = [];
   const posted: { type: string; message?: string }[] = [];
   const fakeWindow: Record<string, unknown> = {
-    __GAME_INPUT__: { protocolVersion: GAME_PROTOCOL_VERSION, username: 'tester', data: { context: 'test' } },
+    __GAME_INPUT__: { protocolVersion: GAME_PROTOCOL_VERSION, username: 'tester', data: { context: 'test' }, assets },
     devicePixelRatio: 1,
     focus: noop,
   };
@@ -67,7 +67,8 @@ function startRuntime() {
     },
     render: noop,
   };
-  (fakeWindow['registerGame'] as (game: GameModule) => void)(game);
+  // Missing when the runtime rejected its input and stopped early
+  (fakeWindow['registerGame'] as ((game: GameModule) => void) | undefined)?.(game);
 
   const touch = (type: string, ...points: [id: number, x: number, y: number][]) => {
     const event = new Event(type, { cancelable: true });
@@ -342,5 +343,50 @@ describe('game runtime execution budget', () => {
     runtime.api()!.submitResult({ score: 1 });
     play(BUDGET_SECONDS);
     expect(errors()).toEqual([]);
+  });
+});
+
+describe('game runtime assets', () => {
+  const MIB = 1024 * 1024;
+  const model = (maxBytes?: number) => ({ kind: 'model', url: 'https://cdn.example.com/m.glb', maxBytes });
+  let runtime: ReturnType<typeof startRuntime>;
+  const errors = () => runtime.posted.filter((m) => m.type === 'error').map((m) => m.message);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    runtime.canvas.remove();
+  });
+
+  it('counts the last manifest entry toward the byte budget', () => {
+    vi.useFakeTimers();
+    runtime = startRuntime({ a: model(), b: model(), c: model() });
+    expect(errors()).toEqual(['Runtime: asset byte budget exceeded']);
+  });
+
+  it('accepts a manifest that fills the byte budget exactly', () => {
+    vi.useFakeTimers();
+    runtime = startRuntime({ a: model(15 * MIB), b: model(15 * MIB), c: model(2 * MIB) });
+    expect(errors()).toEqual([]);
+  });
+
+  it('registers a font under its manifest id', async () => {
+    vi.useFakeTimers();
+    const added: string[] = [];
+    vi.stubGlobal('fetch', async () => new Response(new Uint8Array(4)));
+    vi.stubGlobal('FontFace', class {
+      constructor(readonly family: string) {}
+      load = async () => this;
+    });
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { add: (font: { family: string }) => added.push(font.family) },
+    });
+    runtime = startRuntime({ titleFont: { kind: 'font', url: 'https://cdn.example.com/title.woff2' } });
+    runtime.frame();
+    expect(await runtime.api()!.assets.loadFont('titleFont')).toBe(true);
+    expect(added).toEqual(['titleFont']);
+    delete (document as { fonts?: unknown }).fonts;
   });
 });

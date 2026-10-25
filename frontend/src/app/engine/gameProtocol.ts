@@ -192,6 +192,7 @@ export interface GameAssetsApi {
   readonly progress: GameAssetsProgress;
   loadImage(id: string): Promise<HTMLImageElement | null>;
   loadAudio(id: string): Promise<HTMLAudioElement | null>;
+  /** Registers the font under its manifest id as the family name, e.g. ctx.font = '32px "titleFont"'. */
   loadFont(id: string): Promise<boolean>;
   loadModel(id: string): Promise<ArrayBuffer | null>;
   preload(ids?: readonly string[]): Promise<void>;

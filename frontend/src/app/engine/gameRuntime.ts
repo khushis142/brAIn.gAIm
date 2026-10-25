@@ -210,12 +210,8 @@ export function gameRuntime(config: GameRuntimeConfig): void {
   const assetProgress = { loaded: 0, total: 0, bytesLoaded: 0, bytesTotal: 0 };
   const assetEntries = new Map<string, AssetEntry>();
 
+  let totalAssetBytes = 0;
   for (const [id, entry] of Object.entries(assetManifest)) {
-    const totalAssetBytes = [...assetEntries.values()].reduce((total, item) => total + item.maxBytes, 0);
-    if (totalAssetBytes > MAX_TOTAL_ASSET_BYTES) {
-      post({ type: 'error', message: 'Runtime: asset byte budget exceeded' });
-      return;
-    }
     const definition = entry as { kind?: unknown; url?: unknown; maxBytes?: unknown; preload?: unknown } | null;
     if (!/^[a-zA-Z0-9._-]{1,64}$/.test(id) || definition === null ||
         typeof definition !== 'object' ||
@@ -232,6 +228,11 @@ export function gameRuntime(config: GameRuntimeConfig): void {
           definition.maxBytes > 0
           ? definition.maxBytes : hardLimit,
       );
+      totalAssetBytes += maxBytes;
+      if (totalAssetBytes > MAX_TOTAL_ASSET_BYTES) {
+        post({ type: 'error', message: 'Runtime: asset byte budget exceeded' });
+        return;
+      }
       assetEntries.set(id, Object.freeze({
         kind,
         url: url.href,
@@ -251,7 +252,7 @@ export function gameRuntime(config: GameRuntimeConfig): void {
     }
   };
 
-  const materializeAsset = async (definition: AssetEntry, bytes: ArrayBuffer): Promise<unknown> => {
+  const materializeAsset = async (id: string, definition: AssetEntry, bytes: ArrayBuffer): Promise<unknown> => {
     const blob = new Blob([bytes]);
     if (definition.kind === 'model') return bytes;
     const objectUrl = URL.createObjectURL(blob);
@@ -272,7 +273,8 @@ export function gameRuntime(config: GameRuntimeConfig): void {
         });
         return audio;
       }
-      const font = new FontFace(`game-asset-${definition.url}`, bytes);
+      // Registered under the manifest id so games can write ctx.font = '24px "titleFont"'
+      const font = new FontFace(id, bytes);
       await font.load();
       document.fonts.add(font);
       return true;
@@ -331,7 +333,7 @@ export function gameRuntime(config: GameRuntimeConfig): void {
       .then((bytes) => {
         if (bytes.byteLength > definition.maxBytes) throw new Error('asset is too large');
         assetProgress.bytesLoaded += bytes.byteLength;
-        return materializeAsset(definition, bytes);
+        return materializeAsset(id, definition, bytes);
       })
       .catch(() => expectedKind === 'font' ? false : null)
       .then((asset) => {

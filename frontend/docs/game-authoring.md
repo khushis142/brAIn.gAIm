@@ -311,6 +311,9 @@ const model = await api.assets.loadModel('scene');
 await api.assets.preload(['titleFont', 'scene']);
 ```
 
+A loaded font is registered under its manifest ID, so use the ID as the font
+family: `ctx.font = '32px "titleFont"'`.
+
 Loads are cached and concurrent requests share a promise. Missing or failed
 assets return `null` (`false` for fonts); provide a fallback. Progress is
 available as `api.assets.progress.loaded`, `total`, `bytesLoaded`, and
