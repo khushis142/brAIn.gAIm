@@ -19,7 +19,7 @@ All application routes (except `/login` and `/register`) are protected by the `r
 
 Games run inside an isolated `<iframe sandbox="allow-scripts">` (opaque origin, strict Content-Security-Policy, heartbeat watchdog). Games call `registerGame()` and implement `init(api)`, `update(dt, input)`, and `render(ctx)` (with optional `resize`, `contextLost`, `contextRestored`, and `destroy` hooks).
 
-See [`docs/game-authoring.md`](docs/game-authoring.md) for the complete protocol v2 contract, input state (`input.keys[code].{held, justPressed, justReleased}` and `input.pointer`), WebGL helpers, and UI design hooks.
+See [`docs/game-authoring.md`](docs/game-authoring.md) for the complete protocol v2 contract, input state (`input.keys[code].{held, justPressed, justReleased}`, `input.pointer`, and multi-touch `input.touches`), WebGL helpers, and UI design hooks.
 
 ## Development & Testing
 

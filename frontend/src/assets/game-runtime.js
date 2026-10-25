@@ -6,8 +6,8 @@
  *
  * Game contract (what the game passes to registerGame):
  *   init(api)            required   api = { width, height, username, data, submitResult, setUiDesign }
- *   update(dt, input)    required   dt in seconds, input = { keys, pointer }
- *                         touch gestures also press virtual keys
+ *   update(dt, input)    required   dt in seconds, input = { keys, pointer, touches }
+ *                         touches lists every finger; gestures also press virtual keys
  *   renderer             optional   '2d' (default) or 'webgl'
  *   api.performance      live frame metrics and adaptive quality state
  *   render(ctx)          required   CanvasRenderingContext2D or WebGLRenderingContext
@@ -128,7 +128,9 @@
   for (const code of GAME_KEYS) {
     keyStates[code] = { held: false, justPressed: false, justReleased: false };
   }
-  const input = { keys: keyStates, pointer };
+  // Every finger on the screen, oldest first; see the multi-touch section below.
+  const touches = [];
+  const input = { keys: keyStates, pointer, touches };
   const gameInput = window.__GAME_INPUT__;
   delete window.__GAME_INPUT__;
 
@@ -612,13 +614,20 @@
     }
   };
 
-  const updatePointer = (event) => {
+  // Converts client coordinates to logical canvas pixels, or null before layout.
+  const toCanvasPoint = (clientX, clientY) => {
     const rect = canvas.getBoundingClientRect();
-    if (!viewport || rect.width <= 0 || rect.height <= 0) return;
-    const x = Math.max(0, Math.min(viewport.width,
-      (event.clientX - rect.left) * viewport.width / rect.width));
-    const y = Math.max(0, Math.min(viewport.height,
-      (event.clientY - rect.top) * viewport.height / rect.height));
+    if (!viewport || rect.width <= 0 || rect.height <= 0) return null;
+    return {
+      x: Math.max(0, Math.min(viewport.width, (clientX - rect.left) * viewport.width / rect.width)),
+      y: Math.max(0, Math.min(viewport.height, (clientY - rect.top) * viewport.height / rect.height)),
+    };
+  };
+
+  const updatePointer = (event) => {
+    const point = toCanvasPoint(event.clientX, event.clientY);
+    if (!point) return;
+    const { x, y } = point;
     pointer.deltaX += x - pointer.x;
     pointer.deltaY += y - pointer.y;
     pointer.x = x;
@@ -627,9 +636,12 @@
     pointer.normalizedY = viewport.height ? y / viewport.height : 0;
   };
 
+  // input.pointer follows the primary pointer only, so a second finger cannot
+  // make it jump; games that want every finger read input.touches.
   canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     try { window.focus(); } catch (_) {}
+    if (!event.isPrimary) return;
     updatePointer(event);
     pointer.down = true;
     pointer.justPressed = true;
@@ -637,10 +649,11 @@
   });
   canvas.addEventListener('pointermove', (event) => {
     if (pointer.down) event.preventDefault();
-    updatePointer(event);
+    if (event.isPrimary) updatePointer(event);
   });
   const releasePointer = (event) => {
     event.preventDefault();
+    if (!event.isPrimary) return;
     updatePointer(event);
     pointer.down = false;
     pointer.justReleased = true;
@@ -659,9 +672,86 @@
   // Without this, a key held while focus is lost would stay "pressed" forever.
   addEventListener('blur', () => {
     clearKeys();
+    endAllTouches();
     if (pointer.down) pointer.justReleased = true;
     pointer.down = false;
   });
+
+  // ---------------------------------------------------------------- multi-touch
+  // input.touches holds one entry per finger, oldest first, in logical canvas
+  // pixels like input.pointer. A lifted finger stays for one more frame with
+  // justEnded, so a tap shorter than a frame is never lost. Entries are updated
+  // in place; the array is the same object for the whole game.
+  const MAX_TOUCHES = 10;
+
+  const activeTouch = (id) => touches.find((t) => t.id === id && !t.justEnded);
+
+  const moveTouchPoint = (t, clientX, clientY) => {
+    const point = toCanvasPoint(clientX, clientY);
+    if (!point) return;
+    t.deltaX += point.x - t.x;
+    t.deltaY += point.y - t.y;
+    t.x = point.x;
+    t.y = point.y;
+    t.normalizedX = viewport.width ? point.x / viewport.width : 0;
+    t.normalizedY = viewport.height ? point.y / viewport.height : 0;
+  };
+
+  const trackTouchStart = (id, clientX, clientY) => {
+    if (activeTouch(id) || touches.length >= MAX_TOUCHES) return;
+    const point = toCanvasPoint(clientX, clientY);
+    if (!point) return;
+    touches.push({
+      id,
+      x: point.x,
+      y: point.y,
+      normalizedX: viewport.width ? point.x / viewport.width : 0,
+      normalizedY: viewport.height ? point.y / viewport.height : 0,
+      startX: point.x,
+      startY: point.y,
+      deltaX: 0,
+      deltaY: 0,
+      justStarted: true,
+      justEnded: false,
+      cancelled: false,
+    });
+  };
+
+  const trackTouchMove = (id, clientX, clientY) => {
+    const t = activeTouch(id);
+    if (t) moveTouchPoint(t, clientX, clientY);
+  };
+
+  const trackTouchEnd = (id, clientX, clientY, cancelled) => {
+    const t = activeTouch(id);
+    if (!t) return;
+    moveTouchPoint(t, clientX, clientY);
+    t.justEnded = true;
+    t.cancelled = cancelled;
+  };
+
+  // Lost focus or a hidden page means touchend may never arrive.
+  function endAllTouches() {
+    for (const t of touches) {
+      if (t.justEnded) continue;
+      t.justEnded = true;
+      t.cancelled = true;
+    }
+  }
+
+  // Called after each update(): drop lifted fingers, reset per-frame fields.
+  const advanceTouches = () => {
+    for (let i = touches.length - 1; i >= 0; i -= 1) {
+      const t = touches[i];
+      if (t.justEnded) {
+        touches.splice(i, 1);
+      } else {
+        t.justStarted = false;
+        t.deltaX = 0;
+        t.deltaY = 0;
+      }
+    }
+  };
 
   // ---------------------------------------------------------------- touch
   // Phones have no keyboard, so touch gestures press the same virtual keys.
@@ -691,8 +781,10 @@
   };
 
   // Touches arrive here directly, or from the host as 'touch' commands (see below)
-  // when the browser delivered them to the host page instead.
+  // when the browser delivered them to the host page instead. Every finger goes
+  // into input.touches; only the first one drives the gesture keys.
   function touchStart(id, x, y) {
+    trackTouchStart(id, x, y);
     if (touch) return;
     const current = { id, startX: x, startY: y, x, y, holdKey: null, holdTimer: 0 };
     touch = current;
@@ -704,6 +796,7 @@
   }
 
   function touchMove(id, x, y) {
+    trackTouchMove(id, x, y);
     if (!touch || touch.id !== id) return;
     touch.x = x;
     touch.y = y;
@@ -711,6 +804,7 @@
   }
 
   function touchEnd(id, x, y, cancelled) {
+    trackTouchEnd(id, x, y, cancelled);
     if (!touch || touch.id !== id) return;
     clearTimeout(touch.holdTimer);
     const dx = x - touch.startX;
@@ -730,8 +824,7 @@
 
   addEventListener('touchstart', (e) => {
     e.preventDefault(); // no scrolling, zooming or emulated mouse clicks
-    const t = e.changedTouches[0];
-    touchStart(t.identifier, t.clientX, t.clientY);
+    for (const t of e.changedTouches) touchStart(t.identifier, t.clientX, t.clientY);
   }, { passive: false });
 
   addEventListener('touchmove', (e) => {
@@ -773,6 +866,7 @@
       pointer.justReleased = false;
       pointer.deltaX = 0;
       pointer.deltaY = 0;
+      advanceTouches();
 
       if (renderer === '2d') {
         ctx.setTransform(viewport.devicePixelRatio, 0, 0, viewport.devicePixelRatio, 0, 0);
@@ -822,6 +916,7 @@
 
   document.addEventListener('visibilitychange', () => {
     clearKeys();
+    endAllTouches();
     syncLoop();
   });
 
@@ -988,6 +1083,7 @@
       case 'pause':
         hostPaused = true;
         clearKeys();
+        endAllTouches(); // the host's pause overlay takes over the fingers
         syncLoop();
         break;
 

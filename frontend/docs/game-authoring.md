@@ -225,6 +225,10 @@ input.keys.Space
 input.pointer
 // x, y, normalizedX, normalizedY, down, justPressed, justReleased,
 // deltaX, deltaY
+input.touches
+// array, one entry per finger, oldest first:
+// id, x, y, normalizedX, normalizedY, startX, startY, deltaX, deltaY,
+// justStarted, justEnded, cancelled
 ```
 
 Use `justPressed` for one-shot actions and `held` for continuous movement. The
@@ -239,9 +243,47 @@ maps to arrows with a 0.5 deadzone. Touch gestures use the same keys:
 | Swipe | Matching arrow for about 100 ms |
 | Hold on left/right half | ArrowLeft/ArrowRight until release |
 
-Pointer Events support touch, pen, and mouse. The runtime tracks one active
-pointer. Design for touch; do not require hover, right-click, or multi-button
-mouse input.
+Gestures only follow the first finger, so they suit one-thumb games.
+
+Pointer Events support touch, pen, and mouse. `input.pointer` follows the
+primary pointer only (the mouse or the first finger). Design for touch; do not
+require hover, right-click, or multi-button mouse input.
+
+### Multi-touch
+
+For two-thumb controls (steer with one thumb, act with the other), read
+`input.touches`. Positions are logical canvas pixels, like `input.pointer`.
+
+- A finger appears with `justStarted: true` in its first frame.
+- After it lifts, it stays for exactly one more frame with `justEnded: true`,
+  then disappears. A quick tap between two frames shows up as one entry with
+  both flags set, so it is never lost.
+- `cancelled: true` (with `justEnded`) means the touch was interrupted by a
+  pause, focus loss, or a hidden page, not lifted. Do not treat it as a tap.
+- `deltaX`/`deltaY` are the movement since the previous frame; `startX`/
+  `startY` are where the finger first touched.
+- `id` stays the same while the finger is down; a later finger may reuse it.
+- Up to 10 fingers are tracked. The array object stays the same every frame,
+  but entries come and go, so look fingers up by `id` rather than by index.
+
+```js
+let width = 0;
+let steer = 0;
+
+function update(dt, input) {
+  steer = 0;
+  for (const t of input.touches) {
+    if (t.justEnded) continue;
+    if (t.startX < width / 2) {
+      steer = Math.max(-1, Math.min(1, (t.x - t.startX) / 60)); // left thumb drags
+    } else if (t.justStarted) {
+      jump(); // right thumb taps
+    }
+  }
+}
+```
+
+`width` is kept up to date in `init` and `resize` as shown above.
 
 ## Assets
 

@@ -242,7 +242,33 @@ export function isGameUiDesign(value: unknown): value is GameUiDesign {
 export interface InputState {
   /** Current key state, merged across keyboard, touch, and gamepad input. */
   keys: Record<string, KeyState>;
+  /** The primary pointer only (mouse or first finger). */
   readonly pointer: PointerInput;
+  /** Every finger on the screen, oldest first. Same array object every frame. */
+  readonly touches: readonly TouchPoint[];
+}
+
+export interface TouchPoint {
+  /** Stable while the finger is down; may be reused by a later finger. */
+  readonly id: number;
+  /** Position in logical canvas pixels. */
+  readonly x: number;
+  readonly y: number;
+  /** Position normalized to the range 0..1. */
+  readonly normalizedX: number;
+  readonly normalizedY: number;
+  /** Where the finger first touched, in logical canvas pixels. */
+  readonly startX: number;
+  readonly startY: number;
+  /** Movement since the previous frame. */
+  readonly deltaX: number;
+  readonly deltaY: number;
+  /** True in the first frame the finger appears. */
+  readonly justStarted: boolean;
+  /** True in the one frame after the finger lifted; the entry is then removed. */
+  readonly justEnded: boolean;
+  /** With justEnded: the touch was interrupted (pause, focus loss), not lifted. */
+  readonly cancelled: boolean;
 }
 
 export interface KeyState {
