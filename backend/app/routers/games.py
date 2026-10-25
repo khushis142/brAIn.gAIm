@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
@@ -76,7 +76,10 @@ async def get_game(game_id: uuid.UUID, session: SessionDep) -> ContentRead:
 
 @router.post("/{game_id}/play", response_model=GameItem)
 async def play_game(
-    game_id: uuid.UUID, user: CurrentUser, session: SessionDep
+    game_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+    background: BackgroundTasks,
 ) -> GameItem:
     game = await session.get(Content, game_id)
     if game is None or game.kind != "game":
@@ -96,10 +99,13 @@ async def play_game(
     )
     if ready_round is None:
         ready_round = await feed.prepare_round(session, user.id, game_id)
+        if ready_round is not None:
+            session.add(ready_round)
 
     if ready_round is not None:
         ready_round.served_at = func.now()
         await session.commit()
+        background.add_task(feed.top_up, user.id)
         return GameItem(
             id=game.id,
             title=game.title,
@@ -109,6 +115,7 @@ async def play_game(
             assets=ready_round.assets,
         )
 
+    background.add_task(feed.top_up, user.id)
     return GameItem(
         id=game.id,
         title=game.title,
