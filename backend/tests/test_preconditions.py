@@ -6,7 +6,12 @@ from pydantic import ValidationError
 
 from app.generator import preconditions, tts
 from app.generator.inputs import GameConfig
-from app.generator.preconditions import PreconditionError, TtsStep, run_preconditions
+from app.generator.preconditions import (
+    PreconditionError,
+    RandomFileStep,
+    TtsStep,
+    run_preconditions,
+)
 
 SCHEMA = {
     "type": "object",
@@ -82,6 +87,36 @@ async def test_tts_writes_audio_urls_and_reports_assets(fake_audio: list) -> Non
     assert [content for _, content in fake_audio] == [b"RIFFOne?", b"RIFFTwo?", b"RIFFWelcome"]
     assert data["questions"][1]["questionAudio"].startswith("https://cdn.test/files/")
     assert data["questions"][1]["question"] == "Two?"  # source text stays
+
+
+CLIPS = [
+    {"id": "11111111-1111-1111-1111-111111111111", "filename": "clip-1.mp4"},
+    {"id": "22222222-2222-2222-2222-222222222222", "filename": "clip-2.mp4"},
+]
+
+
+def test_random_file_step_must_fit_the_schema() -> None:
+    step = {"type": "random_file", "files": CLIPS, "into": "backgroundVideo"}
+    assert GameConfig(input_schema=SCHEMA, context="x", preconditions=[step]).preconditions
+    for bad, error in [
+        ({"into": "intro"}, "clashes"),
+        ({"files": []}, "at least 1 item"),
+        ({"files": [{"id": CLIPS[0]["id"], "filename": "../x.mp4"}]}, "String should match"),
+    ]:
+        with pytest.raises(ValidationError, match=error):
+            GameConfig(input_schema=SCHEMA, context="x", preconditions=[{**step, **bad}])
+
+
+async def test_random_file_writes_one_of_the_files_and_reports_it() -> None:
+    data = {"context": "c"}
+    step = RandomFileStep(type="random_file", files=CLIPS, into="backgroundVideo")
+
+    assets = await run_preconditions([step], data)
+
+    assert assets == ["/backgroundVideo"]
+    assert data["backgroundVideo"] in {
+        f"https://cdn.test/files/{clip['id']}/{clip['filename']}" for clip in CLIPS
+    }
 
 
 async def test_missing_values_are_skipped(fake_audio: list) -> None:

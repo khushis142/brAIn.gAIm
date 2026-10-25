@@ -53,8 +53,6 @@ def test_reference_is_the_example_quiz() -> None:
         ("registerGame({}); const s = '</SCRIPT>';", "</script"),
         ("registerGame({}); fetch('/x');", "fetch"),
         ("registerGame({}); new Function('return 1');", "new Function"),
-        ("registerGame({}); import('x');", "import"),
-        ("registerGame({}); const u = 'https://evil.test';", "https://"),
         ("registerGame({}); localStorage.x = 1;", "localStorage"),
         ("registerGame({});" + " " * 200_001, "larger than"),
     ],

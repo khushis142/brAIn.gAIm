@@ -14,7 +14,7 @@ from jsonschema import Draft202012Validator, SchemaError
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.generator.llm import LLM, Message
-from app.generator.preconditions import TtsStep
+from app.generator.preconditions import PreconditionStep
 
 MAX_ATTEMPTS = 2
 _MAX_TOKENS = 4000
@@ -36,7 +36,7 @@ class GameConfig(BaseModel):
     input: list[str] = Field(default_factory=lambda: ["touch", "keyboard"])
     assets: list[str] = Field(default_factory=list)
     # Run on the generated input before a round is ready; see app/generator/preconditions.py.
-    preconditions: list[TtsStep] = Field(default_factory=list)
+    preconditions: list[PreconditionStep] = Field(default_factory=list)
 
     @field_validator("renderer")
     @classmethod

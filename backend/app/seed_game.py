@@ -47,7 +47,7 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
         kind="game",
         filename=filename,
         title=title,
-        config=config.model_dump(),
+        config=config.model_dump(mode="json"),
         owner_id=owner_id,
     )
     session.add(game)
@@ -77,7 +77,7 @@ async def update_game(session: AsyncSession, directory: Path, title: str) -> Con
         filename=filename,
         title=title,
         tags=old.tags,
-        config=config.model_dump(),
+        config=config.model_dump(mode="json"),
         owner_id=old.owner_id,
         created_at=old.created_at,
     )
