@@ -15,6 +15,7 @@ import { LucideRotateCcw, LucideTrophy, LucideX } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, LeaderboardEntry } from '../../core/api.service';
 import { GamePrefetchService } from '../../core/game-prefetch.service';
+import { inlineGameAssets } from '../../engine/gameAssets';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameCustomData, GameResult } from '../../engine/gameProtocol';
 import { GameSession } from '../../engine/gameSession';
@@ -25,6 +26,7 @@ export interface GamePlayable {
   url: string;
   round_id?: string;
   data?: GameCustomData;
+  assets?: string[];
 }
 
 export function defaultGameData(title: string): GameCustomData {
@@ -124,9 +126,7 @@ function normalizeQuestions(raw: unknown[]): Record<string, unknown>[] {
         ? q['question'].trim()
         : `Question ${idx + 1}`;
     const options =
-      Array.isArray(q['options']) && q['options'].length > 0
-        ? (q['options'] as string[])
-        : [];
+      Array.isArray(q['options']) && q['options'].length > 0 ? (q['options'] as string[]) : [];
     const answerIdx = typeof q['answer'] === 'number' ? q['answer'] : 0;
 
     const correctAns =
@@ -217,9 +217,7 @@ export class GamePlayer {
   protected readonly showLeaderboard = signal(false);
   protected readonly isSubmitting = signal(false);
 
-  protected readonly error = computed(
-    () => this.loadError() ?? this.session()?.error() ?? null,
-  );
+  protected readonly error = computed(() => this.loadError() ?? this.session()?.error() ?? null);
 
   private cachedGameCode: { url: string; code: string } | null = null;
   private username: string | null = null;
@@ -314,6 +312,7 @@ export class GamePlayer {
 
       let roundData = current.data;
       let roundId = current.round_id;
+      let roundAssets = current.assets;
       if (!roundData || Object.keys(roundData).length === 0 || forceNewRound) {
         try {
           const prefetched = await this.prefetch.consume(current.id);
@@ -321,6 +320,7 @@ export class GamePlayer {
           if (item?.data && Object.keys(item.data).length > 0) {
             roundData = item.data;
             roundId = item.round_id;
+            roundAssets = item.assets;
           }
         } catch (err) {
           console.warn('Could not fetch AI game round, using fallback data', err);
@@ -328,7 +328,11 @@ export class GamePlayer {
       }
 
       this.currentRoundId = roundId ?? current.round_id ?? null;
-      const [code] = await Promise.all([codePromise, usernamePromise]);
+      const [code, data] = await Promise.all([
+        codePromise,
+        inlineGameAssets(resolveGameData(current.title, roundData), roundAssets),
+        usernamePromise,
+      ]);
 
       const host = this.gameHost().nativeElement;
       const width = host.clientWidth > 0 ? host.clientWidth : 800;
@@ -337,7 +341,7 @@ export class GamePlayer {
       this.session()?.stop();
       this.session()?.start(code, {
         username: this.username ?? 'Player',
-        data: resolveGameData(current.title, roundData),
+        data,
         width,
         height,
       });

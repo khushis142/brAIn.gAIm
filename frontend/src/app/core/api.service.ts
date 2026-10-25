@@ -46,6 +46,8 @@ export interface GameItem {
   round_id: string;
   /** Generated input for this round; pass it to GameSession.start as `data` */
   data?: GameCustomData;
+  /** JSON Pointers into `data` holding media URLs (e.g. TTS audio); see inlineGameAssets */
+  assets?: string[];
 }
 
 export type FeedItem = VideoItem | GameItem;
