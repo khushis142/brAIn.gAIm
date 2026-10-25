@@ -1,0 +1,174 @@
+:host {
+  display: block;
+  inset: 0;
+  position: absolute;
+}
+
+.game-host,
+.placeholder,
+.error,
+.result {
+  inset: 0;
+  position: absolute;
+}
+
+.placeholder,
+.error {
+  background: rgb(0 0 0 / 0.75);
+  color: #fff;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  place-content: center;
+  text-align: center;
+}
+
+.error button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 16px;
+}
+
+/* Sizes follow the card height (cqh), so short phones get a smaller zombie and type */
+.result {
+  background: rgb(0 0 0 / 0.8);
+  color: #fff;
+  container-type: size;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* min-height + auto margins center the content but let it scroll instead of clipping */
+.result-content {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 3cqh, 18px);
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 340px;
+  min-height: 100%;
+  padding: clamp(16px, 5cqh, 32px) 20px;
+}
+
+.result-content p {
+  margin: 0;
+}
+
+.result-hero {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  width: 100%;
+}
+
+.result-zombie {
+  flex: none;
+  width: clamp(64px, 20cqh, 112px);
+}
+
+.result-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.result-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.result-score {
+  color: var(--accent);
+  font-size: clamp(2rem, 9cqh, 3rem);
+  font-weight: 800;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.result-status {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.unlock {
+  background: rgb(242 193 78 / 0.15);
+  border: 1px solid rgb(242 193 78 / 0.4);
+  border-radius: 999px;
+  color: #f2c14e;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  text-align: center;
+}
+
+.leaderboard {
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 14px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.leaderboard-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.leaderboard-divider {
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+  padding-top: 8px;
+}
+
+.leaderboard-row {
+  align-items: baseline;
+  display: grid;
+  font-size: 0.9rem;
+  gap: 10px;
+  grid-template-columns: 1.5ch minmax(0, 1fr) auto;
+}
+
+.leaderboard-rank {
+  opacity: 0.6;
+  text-align: right;
+}
+
+.leaderboard-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-player {
+  color: var(--accent);
+}
+
+.wardrobe-link {
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.85rem;
+  padding: 7px 16px;
+  text-decoration: none;
+}
+
+/* Very short cards: drop the zombie so the score and leaderboard still fit */
+@container (max-height: 320px) {
+  .result-zombie {
+    display: none;
+  }
+}

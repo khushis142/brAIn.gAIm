@@ -1,0 +1,52 @@
+@let item = entry().item;
+<article class="card">
+  <div class="stage">
+    @if (live()) {
+      @if (item.type === 'video') {
+        <app-feed-video
+          [item]="item"
+          [active]="allowance() !== 'paused'"
+          [startAt]="videoTime"
+          (timeChange)="videoTime = $event"
+          (doubleTapped)="liked.set(true)"
+        />
+      } @else {
+        <app-feed-game
+          [item]="item"
+          [allowance]="allowance()"
+          [finishedResult]="gameResult()"
+          (finished)="gameResult.set($event)"
+        />
+      }
+    }
+  </div>
+
+  <footer class="info">
+    <span class="badge">{{ item.type }}</span>
+    <h2 class="title">{{ item.title }}</h2>
+    @if (item.type === 'video') {
+      <button
+        class="like"
+        type="button"
+        [class.liked]="liked()"
+        [attr.aria-pressed]="liked()"
+        aria-label="Like"
+        (click)="liked.set(!liked())"
+      >
+        <svg lucideBrain></svg>
+      </button>
+    }
+    @if (hasPrevious()) {
+      <button class="previous" type="button" (click)="previous.emit()" aria-label="Previous item">
+        <svg lucideChevronUp></svg>
+      </button>
+    }
+    @if (gameOwnsInput()) {
+      <button class="next skip" type="button" (click)="next.emit()">Skip</button>
+    } @else {
+      <button class="next" type="button" (click)="next.emit()" aria-label="Next item">
+        <svg lucideChevronDown></svg>
+      </button>
+    }
+  </footer>
+</article>

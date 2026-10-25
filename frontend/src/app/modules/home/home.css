@@ -12,158 +12,23 @@
   touch-action: none; /* vertical swipes are handled in home.ts */
 }
 
-.card {
-  --like: #ff5fa2;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: 0 18px 50px -20px color-mix(in srgb, var(--accent) 45%, transparent);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.stage {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-}
-
-.game-host,
-.video,
+/* Cards are stacked; only the current one shows. Hidden ones keep their size, so a
+   paused game does not get resized to nothing. */
+app-feed-card,
 .placeholder,
-.error,
-.result {
+.error {
   inset: 0;
   position: absolute;
 }
 
-.video {
-  height: 100%;
-  object-fit: contain;
-  width: 100%;
-}
-
-.player-controls {
-  align-items: center;
-  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
-  bottom: 0;
-  display: flex;
-  gap: 10px;
-  left: 0;
-  padding: 38px 18px 14px;
-  position: absolute;
-  right: 0;
-  z-index: 2;
-  transition: opacity 200ms ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.player-controls.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.seek-input:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-}
-
-.playback-bubble svg {
-  fill: currentColor;
-  height: 22px;
-  width: 22px;
-}
-
-.timeline {
-  flex: 1;
-  height: 28px;
-  position: relative;
-}
-
-.seek-input {
-  appearance: none;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0 var(--seek-progress),
-    rgb(255 255 255 / 0.38) var(--seek-progress) 100%
-  );
-  border-radius: 999px;
-  cursor: pointer;
-  height: 4px;
-  margin: 12px 0;
-  width: 100%;
-}
-
-.seek-input::-webkit-slider-thumb {
-  appearance: none;
-  height: 28px;
-  width: 28px;
-}
-
-.seek-input::-moz-range-thumb {
-  background: transparent;
-  border: 0;
-  height: 28px;
-  width: 28px;
-}
-
-.brain-playhead {
-  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.55));
-  height: 24px;
-  pointer-events: none;
-  position: absolute;
-  top: 2px;
-  transform: translateX(-50%);
-  width: 24px;
-}
-
-.brain-playhead .material-symbols-outlined {
-  color: #5985e1;
-  font-size: 24px;
-}
-
-.seek-timestamp {
-  background: rgb(0 0 0 / 0.55);
-  border-radius: 999px;
-  color: #fff;
-  font-size: clamp(1.5rem, 5vw, 2.5rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  left: 50%;
-  padding: 8px 18px;
-  position: absolute;
-  top: 24px;
-  transform: translateX(-50%);
-}
-
-.playback-bubble {
-  align-items: center;
-  animation: playback-bubble 500ms ease-out forwards;
-  background: rgb(0 0 0 / 0.55);
-  border-radius: 50%;
-  color: #fff;
-  display: flex;
-  height: 86px;
-  justify-content: center;
-  left: 50%;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 86px;
-}
-
-@keyframes playback-bubble {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-  30% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  to { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+app-feed-card:not(.current) {
+  visibility: hidden;
 }
 
 .placeholder,
 .error {
   background: rgb(0 0 0 / 0.75);
+  border-radius: 20px;
   color: #fff;
   display: grid;
   gap: 12px;
@@ -172,267 +37,30 @@
   text-align: center;
 }
 
-.error button,
-.next {
+.error button {
   background: var(--accent);
   border: 0;
+  border-radius: 999px;
   color: #fff;
   cursor: pointer;
-}
-
-.error button {
-  border-radius: 999px;
   padding: 8px 16px;
 }
 
-/* Sizes follow the card height (cqh), so short phones get a smaller zombie and type */
-.result {
-  background: rgb(0 0 0 / 0.8);
-  color: #fff;
-  container-type: size;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/* min-height + auto margins center the content but let it scroll instead of clipping */
-.result-content {
-  align-items: center;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(10px, 3cqh, 18px);
-  justify-content: center;
-  margin: 0 auto;
-  max-width: 340px;
-  min-height: 100%;
-  padding: clamp(16px, 5cqh, 32px) 20px;
-}
-
-.result-content p {
-  margin: 0;
-}
-
-.result-hero {
-  align-items: center;
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  width: 100%;
-}
-
-.result-zombie {
-  flex: none;
-  width: clamp(64px, 20cqh, 112px);
-}
-
-.result-summary {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  text-align: left;
-}
-
-.result-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  opacity: 0.75;
-  text-transform: uppercase;
-}
-
-.result-score {
-  color: var(--accent);
-  font-size: clamp(2rem, 9cqh, 3rem);
-  font-weight: 800;
-  line-height: 1;
-  overflow-wrap: anywhere;
-}
-
-.result-status {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
-
-.unlock {
-  background: rgb(242 193 78 / 0.15);
-  border: 1px solid rgb(242 193 78 / 0.4);
-  border-radius: 999px;
-  color: #f2c14e;
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 6px 14px;
-  text-align: center;
-}
-
-.leaderboard {
-  background: rgb(255 255 255 / 0.08);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 14px;
-  box-sizing: border-box;
-  display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  width: 100%;
-}
-
-.leaderboard-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  opacity: 0.6;
-  text-transform: uppercase;
-}
-
-.leaderboard-divider {
-  border-top: 1px solid rgb(255 255 255 / 0.12);
-  padding-top: 8px;
-}
-
-.leaderboard-row {
-  align-items: baseline;
-  display: grid;
-  font-size: 0.9rem;
-  gap: 10px;
-  grid-template-columns: 1.5ch minmax(0, 1fr) auto;
-}
-
-.leaderboard-rank {
-  opacity: 0.6;
-  text-align: right;
-}
-
-.leaderboard-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.current-player {
-  color: var(--accent);
-}
-
-.wardrobe-link {
-  border: 1px solid rgb(255 255 255 / 0.3);
-  border-radius: 999px;
-  color: #fff;
-  font-size: 0.85rem;
-  padding: 7px 16px;
-  text-decoration: none;
-}
-
-/* Very short cards: drop the zombie so the score and leaderboard still fit */
-@container (max-height: 320px) {
-  .result-zombie {
-    display: none;
-  }
-}
-
-.info {
-  align-items: center;
-  background: var(--control);
-  display: flex;
-  gap: 10px;
-  padding: 12px 14px;
-}
-
-.badge {
-  background: var(--accent);
-  border-radius: 999px;
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 3px 8px;
-  text-transform: uppercase;
-}
-
-.title {
-  flex: 1;
-  font-size: 0.95rem;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Double-tap target sits below the custom timeline. */
-.tap-layer {
-  bottom: 0;
-  left: 0;
-  overflow: hidden;
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 1;
-}
-
-/* Big brain that pops where the video was double tapped */
-.burst {
-  animation: burst 800ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  color: #fff;
-  fill: var(--like);
-  filter: drop-shadow(0 0 18px var(--like));
-  height: 110px;
-  pointer-events: none;
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 110px;
-}
-
-.like {
-  background: none;
-  border: 0;
-  border-radius: 50%;
-  color: inherit;
-  cursor: pointer;
-  display: grid;
-  height: 40px;
-  place-items: center;
-  transition: color 200ms ease;
-  width: 40px;
-}
-
-.like svg {
-  fill: transparent;
-  transition: fill 200ms ease;
-}
-
-.like.liked {
-  color: var(--like);
-}
-
-.like.liked svg {
-  animation: like-pop 400ms cubic-bezier(0.3, 1.6, 0.5, 1);
-  fill: color-mix(in srgb, var(--like) 35%, transparent);
-  filter: drop-shadow(0 0 6px var(--like));
-}
-
-.next {
-  animation: bob 1.6s ease-in-out infinite;
-  border-radius: 50%;
-  display: grid;
-  height: 40px;
-  margin-left: auto;
-  place-items: center;
-  width: 40px;
-}
-
-/* During a game the button is the only way on, so it says so instead of bobbing */
-.next.skip {
-  animation: none;
-  border-radius: 999px;
-  font: inherit;
-  font-weight: 700;
-  padding: 0 16px;
-  width: auto;
-}
-
-/* Transition: the card flies up and away, the next one rises in */
-.card.leaving {
+/* Transition: the card flies up and away, the next one rises in; backwards it is mirrored */
+app-feed-card.leaving {
   animation: card-leave 450ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
 }
 
-.card.entering {
+app-feed-card.entering {
   animation: card-enter 450ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.back app-feed-card.leaving {
+  animation-name: card-leave-back;
+}
+
+.back app-feed-card.entering {
+  animation-name: card-enter-back;
 }
 
 /* "Neural pulse" overlay shown while switching */
@@ -455,7 +83,7 @@
   position: absolute;
 }
 
-/* Light band sweeping upwards */
+/* Light band sweeping upwards, or downwards when going back */
 .warp.active::before {
   animation: sweep 700ms ease-in forwards;
   background: linear-gradient(to top, transparent, color-mix(in srgb, var(--accent) 70%, white), transparent);
@@ -463,6 +91,11 @@
   left: 0;
   right: 0;
   top: 100%;
+}
+
+.back .warp.active::before {
+  animation-name: sweep-back;
+  top: -35%;
 }
 
 @keyframes card-leave {
@@ -473,47 +106,32 @@
   from { filter: blur(8px); opacity: 0; transform: translateY(35%) scale(0.9) rotateX(-12deg); }
 }
 
+@keyframes card-leave-back {
+  to { filter: blur(8px); opacity: 0; transform: translateY(35%) scale(0.85) rotateX(-20deg); }
+}
+
+@keyframes card-enter-back {
+  from { filter: blur(8px); opacity: 0; transform: translateY(-35%) scale(0.9) rotateX(12deg); }
+}
+
 @keyframes sweep {
   to { transform: translateY(-400%); }
 }
 
-@keyframes bob {
-  50% { transform: translateY(4px); }
-}
-
-@keyframes like-pop {
-  50% { transform: scale(1.35) rotate(-8deg); }
-}
-
-@keyframes burst {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(-15deg); }
-  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
-  45% { transform: translate(-50%, -50%) scale(0.95) rotate(-4deg); }
-  65% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
-  100% { opacity: 0; transform: translate(-50%, -160%) scale(0.7); }
+@keyframes sweep-back {
+  to { transform: translateY(400%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card.leaving,
-  .card.entering,
-  .next,
-  .like.liked svg,
-  .burst,
+  app-feed-card.leaving,
+  app-feed-card.entering,
   .warp.active::before,
   .warp.active::after {
     animation: none;
   }
 
-  .card.leaving {
+  app-feed-card.leaving {
     opacity: 0;
-  }
-
-  .playback-bubble {
-    animation: none;
-  }
-
-  .player-controls {
-    transition: none;
   }
 }
 
@@ -522,7 +140,8 @@
     height: calc(100dvh - 136px);
   }
 
-  .card,
+  .placeholder,
+  .error,
   .warp {
     border-radius: 0;
   }

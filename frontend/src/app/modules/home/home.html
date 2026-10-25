@@ -1,181 +1,35 @@
-<section class="feed" (touchstart)="onTouchStart($event)" (touchend)="onTouchEnd($event)">
-  <article
-    #card
-    class="card"
-    [class.leaving]="phase() === 'leaving'"
-    [class.entering]="phase() === 'entering'"
-  >
-    <div class="stage">
-      <div #gameHost class="game-host"></div>
+<section
+  class="feed"
+  [class.back]="direction() === 'back'"
+  (touchstart)="onTouchStart($event)"
+  (touchend)="onTouchEnd($event)"
+>
+  @for (entry of entries(); track entry.key; let i = $index) {
+    <app-feed-card
+      [class.current]="i === index()"
+      [class.leaving]="i === index() && phase() === 'leaving'"
+      [class.entering]="i === index() && phase() === 'entering'"
+      [attr.inert]="i === index() ? null : ''"
+      [entry]="entry"
+      [live]="isLive(i)"
+      [active]="i === index()"
+      [transition]="i === index() ? transition() : null"
+      [hasPrevious]="i > 0"
+      (next)="next()"
+      (previous)="previous()"
+    />
+  }
 
-      @if (item(); as current) {
-        @if (current.type === 'video') {
-          <video
-            #video
-            class="video"
-            [src]="current.url"
-            autoplay
-            muted
-            loop
-            playsinline
-            (loadedmetadata)="onVideoLoadedMetadata($event)"
-            (timeupdate)="onVideoTimeUpdate($event)"
-            (play)="onVideoPlay()"
-            (pause)="onVideoPause()"
-          ></video>
+  @if (entries().length === 0 && !error()) {
+    <p class="placeholder">Loading your feed…</p>
+  }
 
-          @if (isSeeking()) {
-            <output class="seek-timestamp" aria-live="polite">{{ seekTimestamp() }}</output>
-          }
-
-          @if (playbackBubble(); as action) {
-            <span class="playback-bubble" aria-hidden="true">
-              @if (action === 'play') {
-                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-              } @else {
-                <svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z" /></svg>
-              }
-            </span>
-          }
-
-          <div class="player-controls" [class.visible]="arePlayerControlsVisible()">
-            <div class="timeline">
-              <input
-                class="seek-input"
-                type="range"
-                min="0"
-                [max]="duration()"
-                step="0.1"
-                [value]="currentTime()"
-                [style.--seek-progress.%]="playheadPercent()"
-                aria-label="Video progress"
-                (pointerdown)="onSeekStart($event)"
-                (input)="onSeekInput($event)"
-                (pointerup)="onSeekEnd($event)"
-                (pointercancel)="onSeekEnd($event)"
-                (change)="onSeekEnd($event)"
-              />
-              <span
-                class="brain-playhead"
-                [style.left.%]="playheadPercent()"
-                aria-hidden="true"
-              >
-                <span class="material-symbols-outlined">network_intelligence</span>
-              </span>
-            </div>
-          </div>
-
-          <div class="tap-layer" (pointerdown)="onTapStart($event)" (pointerup)="onTapEnd($event)">
-            @for (burst of bursts(); track burst.id) {
-              <svg lucideBrain class="burst" [style.left.px]="burst.x" [style.top.px]="burst.y"></svg>
-            }
-          </div>
-        }
-      } @else if (!error()) {
-        <p class="placeholder">Loading your feed…</p>
-      }
-
-      @if (item()?.type === 'game' ? session()?.result() : null; as result) {
-        <div class="result">
-          <div class="result-content">
-            <div class="result-hero">
-              <app-zombie
-                class="result-zombie"
-                [avatar]="zombie.avatar()"
-                [equipped]="zombie.equipped()"
-                walkIn
-              />
-              <div class="result-summary">
-                <p class="result-label">{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
-                <p class="result-score">{{ result.score }}</p>
-                @switch (scoreSubmissionStatus()) {
-                  @case ('uploading') {
-                    <p class="result-status" role="status">Saving score…</p>
-                  }
-                  @case ('saved') {
-                    <p class="result-status" role="status">Score saved</p>
-                  }
-                  @case ('failed') {
-                    <p class="result-status" role="status">Score could not be saved</p>
-                  }
-                }
-              </div>
-            </div>
-
-            @if (unlockedNames().length > 0) {
-              <p class="unlock" role="status">Unlocked: {{ unlockedNames().join(', ') }}!</p>
-            }
-
-            @if (leaderboardStatus() === 'loading') {
-              <p class="result-status" role="status">Loading leaderboard…</p>
-            } @else if (leaderboardStatus() === 'failed') {
-              <p class="result-status" role="status">Leaderboard unavailable</p>
-            } @else if (leaderboardStatus() === 'loaded') {
-              <section class="leaderboard" aria-label="Game leaderboard">
-                <p class="leaderboard-title">Top results</p>
-                @for (entry of topLeaderboard(); track $index) {
-                  <p class="leaderboard-row">
-                    <span class="leaderboard-rank">{{ $index + 1 }}</span>
-                    <span class="leaderboard-name">{{ entry.username }}</span>
-                    <strong>{{ entry.score }}</strong>
-                  </p>
-                }
-                <p class="leaderboard-title leaderboard-divider">You</p>
-                @if (playerBest(); as best) {
-                  <p class="leaderboard-row current-player">
-                    <span class="leaderboard-rank"></span>
-                    <span class="leaderboard-name">Best</span>
-                    <strong>{{ best.score }}</strong>
-                  </p>
-                }
-                <p class="leaderboard-row current-player">
-                  <span class="leaderboard-rank"></span>
-                  <span class="leaderboard-name">This game</span>
-                  <strong>{{ result.score }}</strong>
-                </p>
-              </section>
-            }
-
-            <a class="wardrobe-link" routerLink="/wardrobe">Dress up your avatar</a>
-          </div>
-        </div>
-      }
-
-
-      @if (error(); as message) {
-        <div class="error" role="alert">
-          <p>{{ message }}</p>
-          <button type="button" (click)="next()">Try again</button>
-        </div>
-      }
+  @if (error(); as message) {
+    <div class="error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" (click)="next()">Try again</button>
     </div>
-
-    <footer class="info">
-      @if (item(); as current) {
-        <span class="badge">{{ current.type }}</span>
-        <h2 class="title">{{ current.title }}</h2>
-        @if (current.type === 'video') {
-          <button
-            class="like"
-            type="button"
-            [class.liked]="liked()"
-            [attr.aria-pressed]="liked()"
-            aria-label="Like"
-            (click)="toggleLike()"
-          >
-            <svg lucideBrain></svg>
-          </button>
-        }
-      }
-      @if (gameOwnsInput()) {
-        <button class="next skip" type="button" (click)="next()">Skip</button>
-      } @else {
-        <button class="next" type="button" (click)="next()" aria-label="Next item">
-          <svg lucideChevronDown></svg>
-        </button>
-      }
-    </footer>
-  </article>
+  }
 
   <div class="warp" [class.active]="phase() === 'leaving'" aria-hidden="true"></div>
 </section>

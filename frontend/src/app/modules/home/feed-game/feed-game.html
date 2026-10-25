@@ -1,0 +1,78 @@
+<div #gameHost class="game-host"></div>
+
+@if (loading()) {
+  <p class="placeholder">Loading game…</p>
+}
+
+@if (result(); as result) {
+  <div class="result">
+    <div class="result-content">
+      <div class="result-hero">
+        <app-zombie
+          class="result-zombie"
+          [avatar]="zombie.avatar()"
+          [equipped]="zombie.equipped()"
+          walkIn
+        />
+        <div class="result-summary">
+          <p class="result-label">{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
+          <p class="result-score">{{ result.score }}</p>
+          @switch (scoreSubmissionStatus()) {
+            @case ('uploading') {
+              <p class="result-status" role="status">Saving score…</p>
+            }
+            @case ('saved') {
+              <p class="result-status" role="status">Score saved</p>
+            }
+            @case ('failed') {
+              <p class="result-status" role="status">Score could not be saved</p>
+            }
+          }
+        </div>
+      </div>
+
+      @if (unlockedNames().length > 0) {
+        <p class="unlock" role="status">Unlocked: {{ unlockedNames().join(', ') }}!</p>
+      }
+
+      @if (leaderboardStatus() === 'loading') {
+        <p class="result-status" role="status">Loading leaderboard…</p>
+      } @else if (leaderboardStatus() === 'failed') {
+        <p class="result-status" role="status">Leaderboard unavailable</p>
+      } @else if (leaderboardStatus() === 'loaded') {
+        <section class="leaderboard" aria-label="Game leaderboard">
+          <p class="leaderboard-title">Top results</p>
+          @for (entry of topLeaderboard(); track $index) {
+            <p class="leaderboard-row">
+              <span class="leaderboard-rank">{{ $index + 1 }}</span>
+              <span class="leaderboard-name">{{ entry.username }}</span>
+              <strong>{{ entry.score }}</strong>
+            </p>
+          }
+          <p class="leaderboard-title leaderboard-divider">You</p>
+          @if (playerBest(); as best) {
+            <p class="leaderboard-row current-player">
+              <span class="leaderboard-rank"></span>
+              <span class="leaderboard-name">Best</span>
+              <strong>{{ best.score }}</strong>
+            </p>
+          }
+          <p class="leaderboard-row current-player">
+            <span class="leaderboard-rank"></span>
+            <span class="leaderboard-name">This game</span>
+            <strong>{{ result.score }}</strong>
+          </p>
+        </section>
+      }
+
+      <a class="wardrobe-link" routerLink="/wardrobe">Dress up your avatar</a>
+    </div>
+  </div>
+}
+
+@if (error(); as message) {
+  <div class="error" role="alert">
+    <p>{{ message }}</p>
+    <button type="button" (click)="retry()">Try again</button>
+  </div>
+}
