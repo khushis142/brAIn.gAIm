@@ -467,9 +467,13 @@ const limitations = [
 }
 
 .examples-grid--single .example-card {
-  width: min(100%, 860px);
+  width: min(100%, 68vh);
   justify-self: center;
   padding: 10px;
+}
+
+.examples-content {
+  gap: clamp(36px, 5.5vh, 52px);
 }
 
 .examples-content .section-heading h1 {
@@ -500,7 +504,7 @@ const limitations = [
 
 .examples-grid--single .example-image {
   height: auto;
-  max-height: 42vh;
+  max-height: 25vh;
   aspect-ratio: auto;
 }
 
