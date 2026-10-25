@@ -70,7 +70,7 @@ Follow the frontend guide. In addition:
 Hand the directory to the backend team. They publish it with:
 
 ```sh
-python -m app.seed_game my-game --title "My game" --owner <username>
+python -m app.seed_game my-game --title "My game" --owner <username> [--tags word,puzzle]
 ```
 
 This checks the config and the code (schema valid and requiring `context`, `registerGame(`

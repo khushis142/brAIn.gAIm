@@ -1,6 +1,6 @@
 """Publish a game: upload its JS to the CDN and register it with its config.
 
-Usage: python -m app.seed_game <dir> --title "Quiz" --owner <username>
+Usage: python -m app.seed_game <dir> --title "Quiz" --owner <username> [--tags word,puzzle]
 
 <dir> holds `game.js` and `config.json` ({"input_schema": <JSON Schema>, "context": "..."});
 see games/README.md.
@@ -46,7 +46,9 @@ async def upload_to_cdn(path: Path) -> tuple[uuid.UUID, str]:
     return uuid.UUID(body["id"]), body["filename"]
 
 
-async def seed_game(session: AsyncSession, directory: Path, title: str, owner: str) -> Content:
+async def seed_game(
+    session: AsyncSession, directory: Path, title: str, owner: str, tags: list[str] | None = None
+) -> Content:
     config = GameConfig.model_validate_json((directory / "config.json").read_text())
     game_js = directory / "game.js"
     _check_game_code(game_js)
@@ -63,6 +65,7 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
         kind="game",
         filename=filename,
         title=title,
+        tags=tags or [],
         config=config.model_dump(),
         owner_id=owner_id,
     )
@@ -71,9 +74,9 @@ async def seed_game(session: AsyncSession, directory: Path, title: str, owner: s
     return game
 
 
-async def _main(directory: Path, title: str, owner: str) -> None:
+async def _main(directory: Path, title: str, owner: str, tags: list[str] | None) -> None:
     async with SessionLocal() as session:
-        game = await seed_game(session, directory, title, owner)
+        game = await seed_game(session, directory, title, owner, tags)
     await engine.dispose()
     print(json.dumps({"id": str(game.id), "title": game.title, "filename": game.filename}))
 
@@ -83,8 +86,10 @@ def main() -> None:
     parser.add_argument("dir", type=Path)
     parser.add_argument("--title", required=True)
     parser.add_argument("--owner", required=True, help="Username of the publishing user")
+    parser.add_argument("--tags", default="", help="Comma-separated tags")
     args = parser.parse_args()
-    asyncio.run(_main(args.dir, args.title, args.owner))
+    tags = [tag.strip() for tag in args.tags.split(",") if tag.strip()]
+    asyncio.run(_main(args.dir, args.title, args.owner, tags))
 
 
 if __name__ == "__main__":
