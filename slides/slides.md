@@ -9,26 +9,20 @@ info: |
 drawings:
   persist: false
 title: brAIn.gAIn - Hackathon Fulda 2026
+layout: none
 ---
 
 <div class="title-slide">
-  <img class="brand-logo" src="/assets/brAIngAIm.webp" alt="brAIn.gAIm" />
-  <h1>Hackathon Fulda 2026</h1>
+  <h1>brAIn.gAIn</h1>
+  <p>Hackathon Fulda 2026</p>
+  <img class="brand-logo" src="/assets/brAIngAIm.webp" alt="brAIn.gAIn" />
 </div>
 
 ---
-layout: center
+layout: none
 ---
 
-# Hand aufs Herz...
-
-<!--
-Wer von euch hat sich schon mal völlig in Social Media verloren?
-
-Wer hat diese Woche schon gefühlt 2 Stunden (oder mehr) auf TikTok verbracht?
-
-Und wer hätte diese Zeit rückblickend lieber mit wichtigeren Dingen – wie dem Lernen für eine Klausur – verbracht?
--->
+<BrandMeaningSlide />
 
 ---
 layout: none
@@ -37,25 +31,10 @@ layout: none
 <StudyEvidenceSlide />
 
 ---
-layout: two-cols
+layout: none
 ---
 
-# Die Lösung: Micro-Learning im Doomscroll-Format
-
-Wir präsentieren eine Plattform, die das Endlos-Scrollen durchbricht.
-
-* Wir verurteilen Social Media nicht, wir **nutzen** die Mechanik.
-* Zwischen den typischen Feed-Inhalten bauen wir "Microlearnings" in Form von Minigames ein.
-* Die Zeit wird nicht mehr verschwendet, sondern mit wertvollem Wissen aufgewertet.
-
-::right::
-
-<video
-  class="solution-demo-video"
-  src="/assets/Aufzeichnung%202026-10-24%20193138.mp4"
-  controls
-  playsinline
-/>
+<SolutionSlide />
 
 ---
 layout: none

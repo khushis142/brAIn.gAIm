@@ -182,32 +182,42 @@
 }
 
 .title-slide {
+  position: absolute;
+  inset: 0;
   box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   height: 100%;
-  padding: 2rem;
+  padding: 2rem 2rem 7rem;
   background: #ffffff;
 }
 
 .brand-logo {
-  width: min(38vw, 30rem);
-  max-height: 100%;
-  height: auto;
+  position: absolute;
+  right: clamp(24px, 4vw, 60px);
+  bottom: clamp(20px, 3vh, 36px);
+  width: min(15vw, 180px);
   object-fit: contain;
 }
 
 .title-slide h1 {
   margin: 0;
-  font-size: clamp(1.6rem, 3.5vw, 2.65rem);
+  font-size: clamp(4rem, 11vw, 9rem);
+  font-weight: 800;
+  letter-spacing: -.08em;
+  line-height: 1;
   text-align: center;
 }
 
-.title-slide h1::after {
-  margin-right: auto;
-  margin-left: auto;
+.title-slide p {
+  margin: 1.25rem 0 0;
+  color: var(--brand-muted);
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .mobile-preview {
