@@ -10,7 +10,7 @@ describe('game protocol validation', () => {
       minDurationSeconds: 20,
       maxDurationSeconds: 60,
       input: ['touch', 'keyboard'],
-      assets: ['player'],
+      assets: { player: { kind: 'image', url: 'https://cdn.example.test/player.png' } },
     };
 
     expect(metadata.maxDurationSeconds).toBeGreaterThanOrEqual(metadata.minDurationSeconds);

@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { GameCustomData } from '../engine/gameProtocol';
+import { GameAssetManifest, GameCustomData } from '../engine/gameProtocol';
 
 export interface UserCreate {
   username: string;
@@ -55,6 +55,8 @@ export interface GameItem {
   data?: GameCustomData;
   /** JSON Pointers into `data` holding media URLs (e.g. TTS audio); see inlineGameAssets */
   assets?: string[];
+  /** The game's asset manifest from its config; pass it to GameSession.start as `assets` */
+  asset_manifest?: GameAssetManifest;
 }
 
 export type FeedItem = VideoItem | GameItem;

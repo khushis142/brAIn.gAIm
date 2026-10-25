@@ -16,10 +16,9 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService, LeaderboardEntry, ZombieRead } from '../../core/api.service';
 import { GamePrefetchService } from '../../core/game-prefetch.service';
 import { ZombieService } from '../../core/zombie.service';
-import { GameAssetManifest } from '../../engine/gameProtocol';
 import { inlineGameAssets, toDataUrl } from '../../engine/gameAssets';
 import { GameEngineService } from '../../engine/gameEngineService';
-import { GameCustomData, GameResult } from '../../engine/gameProtocol';
+import { GameAssetManifest, GameCustomData, GameResult } from '../../engine/gameProtocol';
 import { GameSession } from '../../engine/gameSession';
 
 export interface GamePlayable {
@@ -29,6 +28,7 @@ export interface GamePlayable {
   round_id?: string;
   data?: GameCustomData;
   assets?: string[];
+  asset_manifest?: GameAssetManifest;
 }
 
 export function defaultGameData(title: string): GameCustomData {
@@ -365,6 +365,7 @@ export class GamePlayer {
       let roundData = current.data;
       let roundId = current.round_id;
       let roundAssets = current.assets;
+      let assetManifest = current.asset_manifest;
       if (!roundData || Object.keys(roundData).length === 0 || forceNewRound) {
         try {
           const prefetched = await this.prefetch.consume(current.id);
@@ -373,6 +374,7 @@ export class GamePlayer {
             roundData = item.data;
             roundId = item.round_id;
             roundAssets = item.assets;
+            assetManifest = item.asset_manifest;
           }
         } catch (err) {
           console.warn('Could not fetch AI game round, using fallback data', err);
@@ -406,7 +408,8 @@ export class GamePlayer {
         data,
         width,
         height,
-        assets: playerAssets,
+        // The game's own assets plus the player's zombie
+        assets: { ...assetManifest, ...playerAssets },
       });
 
       this.syncLifecycle();

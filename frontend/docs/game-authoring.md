@@ -27,7 +27,7 @@ Example configuration:
   "minDurationSeconds": 20,
   "maxDurationSeconds": 60,
   "input": ["touch", "keyboard"],
-  "assets": [],
+  "assets": {},
   "input_schema": {
     "type": "object",
     "required": ["context", "questions"],
@@ -72,7 +72,9 @@ Metadata rules:
   minimum no greater than maximum. Finish within this range when practical.
 - `input`: supported values from `touch`, `keyboard`, and `gamepad`. Include
   `touch` for phone-first games.
-- `assets`: approved asset IDs, not URLs. Every ID must exist in the manifest.
+- `assets`: the asset manifest, `{}` when the game needs none. See
+  [Assets](#assets) for its format. The backend validates it on publish and
+  serves it with every round as `asset_manifest`.
 
 ## Registering a game
 
@@ -298,18 +300,23 @@ function update(dt, input) {
 
 ## Assets
 
-The host provides an approved manifest. Games use IDs, never arbitrary URLs:
+The asset manifest is the `assets` object in `config.json`. Upload the files
+to the CDN first, then list them by ID. Game code uses only the IDs, never URLs:
 
-```js
-assets: {
-  player: {
-    kind: 'image',
-    url: 'https://cdn.example.com/player.png',
-    maxBytes: 500000,
-    preload: true
+```json
+"assets": {
+  "player": {
+    "kind": "image",
+    "url": "https://cdn.example.com/player.png",
+    "maxBytes": 500000,
+    "preload": true
   }
 }
 ```
+
+`maxBytes` and `preload` are optional. The backend rejects a manifest over the
+limits in [Budgets and security](#budgets-and-security) when the game is
+published.
 
 Kinds are `image`, `audio`, `font`, and `model`. URLs must be approved HTTPS
 origins. The iframe's Content Security Policy allows exactly the URLs listed in

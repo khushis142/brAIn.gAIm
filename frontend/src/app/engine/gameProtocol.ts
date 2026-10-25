@@ -41,8 +41,8 @@ export interface GamePackageMetadata {
   readonly minDurationSeconds: number;
   readonly maxDurationSeconds: number;
   readonly input: readonly GameInputKind[];
-  /** Asset IDs used by the package; URLs remain in the approved asset manifest. */
-  readonly assets: readonly string[];
+  /** The package's asset manifest; the backend serves it with every round as `asset_manifest`. */
+  readonly assets: GameAssetManifest;
 }
 
 export interface WebGlCapabilities {

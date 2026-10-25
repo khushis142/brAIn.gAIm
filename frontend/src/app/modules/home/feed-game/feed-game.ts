@@ -245,6 +245,7 @@ export class FeedGame {
       data: round.data,
       width,
       height,
+      assets: this.item().asset_manifest,
     });
     this.syncLifecycle();
   }

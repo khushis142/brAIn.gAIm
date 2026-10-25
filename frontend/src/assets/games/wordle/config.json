@@ -5,7 +5,7 @@
   "minDurationSeconds": 30,
   "maxDurationSeconds": 180,
   "input": ["touch"],
-  "assets": [],
+  "assets": {},
   "input_schema": {
     "type": "object",
     "required": ["context"],
