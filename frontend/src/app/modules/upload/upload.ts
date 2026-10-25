@@ -10,6 +10,7 @@ import { FileItem, FileKind, UploadedFile } from '../../shared/file-item/file-it
 import { DEFAULT_FOLDER_COLOR, ProjectFolder } from '../../shared/project-folder/project-folder';
 import { UploadDropzone } from '../../shared/upload-dropzone/upload-dropzone';
 import { UserService } from '../user/service/user-service';
+import {LucideBrain} from '@lucide/angular';
 
 interface Project {
   id: string;
@@ -43,7 +44,7 @@ function toFile(attachment: AttachmentRead): UploadedFile {
 }
 
 @Component({
-  imports: [FileItem, ProjectFolder, UploadDropzone],
+  imports: [FileItem, ProjectFolder, UploadDropzone, LucideBrain],
   selector: 'app-upload',
   styleUrl: './upload.css',
   templateUrl: './upload.html',

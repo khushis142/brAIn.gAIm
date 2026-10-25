@@ -1,11 +1,3 @@
-.card {
-  background: var(--control);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  margin-top: 24px;
-  padding: 20px;
-}
-
 .card h3 {
   border-bottom: 1px solid var(--border);
   font-size: 1rem;

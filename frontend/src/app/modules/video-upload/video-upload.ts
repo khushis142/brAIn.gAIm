@@ -1,11 +1,11 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
-import { LucideUpload } from '@lucide/angular';
+import {LucideSkull, LucideUpload} from '@lucide/angular';
 import { VideoUploadService } from '../../core/video-upload.service';
 
 type Status = 'idle' | 'uploading' | 'success' | 'error';
 
 @Component({
-  imports: [LucideUpload],
+  imports: [LucideUpload, LucideSkull],
   selector: 'app-video-upload',
   styleUrl: './video-upload.css',
   templateUrl: './video-upload.html',

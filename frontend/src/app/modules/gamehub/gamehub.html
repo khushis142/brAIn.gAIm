@@ -5,7 +5,7 @@
       <div class="active-game-toolbar">
         <button type="button" class="back-button" (click)="closeGame()" aria-label="Back to Game Hub">
           <svg lucideArrowLeft></svg>
-          <span>Game Hub</span>
+          <h2>Game Hub</h2>
         </button>
         <div class="active-game-info">
           <h2>{{ activeGame.title }}</h2>
@@ -24,16 +24,14 @@
     </div>
   } @else {
     <!-- Game Hub Catalog View -->
-    <header class="hub-header">
-      <div class="hub-title-row">
-        <div class="title-with-icon">
-          <span class="hub-icon-bubble">
-            <svg lucideGamepad2></svg>
-          </span>
-          <div>
-            <h1>Game Hub</h1>
-            <p class="subtitle">Choose a game to play and level up your knowledge</p>
-          </div>
+    <header class="page-header">
+      <div class="title-with-icon">
+        <span class="header-icon-bubble">
+          <svg lucideGamepad2></svg>
+        </span>
+        <div>
+          <h1>Game Hub</h1>
+          <p class="subtitle">Choose a game to play and level up your knowledge</p>
         </div>
       </div>
 

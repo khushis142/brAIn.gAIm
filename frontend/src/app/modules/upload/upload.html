@@ -25,7 +25,14 @@
       }
     </div>
   } @else {
-    <h2>Knowledge</h2>
+    <header class="page-header">
+      <div class="title-with-icon">
+        <span class="header-icon-bubble">
+          <svg lucideBrain></svg>
+        </span>
+        <h1>Knowledge</h1>
+      </div>
+    </header>
 
     <div class="projects" role="list" aria-label="Projekte">
       <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
