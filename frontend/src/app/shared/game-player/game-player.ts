@@ -223,6 +223,7 @@ export class GamePlayer {
   private username: string | null = null;
   private submittedResult: GameResult | null = null;
   private currentGameId: string | null = null;
+  private currentRoundId: string | null = null;
   private busy = false;
 
   constructor() {
@@ -270,11 +271,12 @@ export class GamePlayer {
     });
   }
 
-  async loadAndStart(): Promise<void> {
+  async loadAndStart(forceNewRound = false): Promise<void> {
     const current = this.game();
     if (!current) {
       this.session()?.stop();
       this.currentGameId = null;
+      this.currentRoundId = null;
       return;
     }
 
@@ -288,29 +290,51 @@ export class GamePlayer {
     this.submittedResult = null;
 
     try {
-      if (!this.cachedGameCode || this.cachedGameCode.url !== current.url) {
-        const res = await fetch(current.url);
-        if (!res.ok) throw new Error(`Could not load game (${res.status})`);
-        const code = await res.text();
-        this.cachedGameCode = { url: current.url, code };
-      }
+      const codePromise =
+        !this.cachedGameCode || this.cachedGameCode.url !== current.url
+          ? fetch(current.url).then(async (res) => {
+              if (!res.ok) throw new Error(`Could not load game (${res.status})`);
+              const code = await res.text();
+              this.cachedGameCode = { url: current.url, code };
+              return code;
+            })
+          : Promise.resolve(this.cachedGameCode.code);
 
-      if (!this.username) {
+      const usernamePromise = !this.username
+        ? firstValueFrom(this.api.getMe())
+            .then((me) => {
+              this.username = me.username;
+            })
+            .catch(() => {
+              this.username = 'Player';
+            })
+        : Promise.resolve();
+
+      let roundData = current.data;
+      let roundId = current.round_id;
+      if (!roundData || Object.keys(roundData).length === 0 || forceNewRound) {
         try {
-          this.username = (await firstValueFrom(this.api.getMe())).username;
-        } catch {
-          this.username = 'Player';
+          const item = await firstValueFrom(this.api.playGame(current.id));
+          if (item?.data && Object.keys(item.data).length > 0) {
+            roundData = item.data;
+            roundId = item.round_id;
+          }
+        } catch (err) {
+          console.warn('Could not fetch AI game round, using fallback data', err);
         }
       }
+
+      this.currentRoundId = roundId ?? current.round_id ?? null;
+      const [code] = await Promise.all([codePromise, usernamePromise]);
 
       const host = this.gameHost().nativeElement;
       const width = host.clientWidth > 0 ? host.clientWidth : 800;
       const height = host.clientHeight > 0 ? host.clientHeight : 600;
 
       this.session()?.stop();
-      this.session()?.start(this.cachedGameCode.code, {
+      this.session()?.start(code, {
         username: this.username ?? 'Player',
-        data: resolveGameData(current.title, current.data),
+        data: resolveGameData(current.title, roundData),
         width,
         height,
       });
@@ -329,7 +353,7 @@ export class GamePlayer {
   }
 
   restart(): void {
-    void this.loadAndStart();
+    void this.loadAndStart(true);
   }
 
   async toggleLeaderboard(): Promise<void> {
@@ -359,7 +383,7 @@ export class GamePlayer {
       await firstValueFrom(
         this.api.submitScore(current.id, {
           score: Math.max(0, score),
-          round_id: current.round_id,
+          round_id: this.currentRoundId ?? current.round_id,
         }),
       );
       this.scoreSubmitted.emit(score);
