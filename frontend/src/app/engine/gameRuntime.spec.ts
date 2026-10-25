@@ -1,6 +1,6 @@
 // @ts-ignore -- Node built-in, available in the test runner; @types/node is not installed
 import { readFileSync } from 'node:fs';
-import { GameModule, InputState, TouchPoint } from './gameProtocol';
+import { GameModule, InputState, TouchPhase, TouchPoint } from './gameProtocol';
 
 const RUNTIME_SOURCE: string = readFileSync('src/assets/game-runtime.js', 'utf8');
 const CANVAS_WIDTH = 200;
@@ -33,13 +33,15 @@ function startRuntime() {
     focus: noop,
   };
 
+  const fakeParent = { postMessage: (message: { type: string }) => posted.push(message) };
+
   new Function(
     'window', 'addEventListener', 'parent', 'requestAnimationFrame', 'cancelAnimationFrame', 'innerWidth',
     RUNTIME_SOURCE,
   )(
     fakeWindow,
     events.addEventListener.bind(events),
-    { postMessage: (message: { type: string }) => posted.push(message) },
+    fakeParent,
     (callback: FrameRequestCallback) => frames.push(callback),
     noop,
     CANVAS_WIDTH,
@@ -73,6 +75,13 @@ function startRuntime() {
     events.dispatchEvent(event);
   };
 
+  /** A touch the host page received and forwarded as a 'touch' command. */
+  const hostTouch = (phase: TouchPhase, id: number, x: number, y: number) => {
+    const event = new Event('message');
+    Object.assign(event, { source: fakeParent, data: { type: 'touch', phase, id, x, y } });
+    events.dispatchEvent(event);
+  };
+
   let clock = performance.now();
 
   return {
@@ -82,6 +91,7 @@ function startRuntime() {
     motion,
     input: () => lastInput,
     touch,
+    hostTouch,
     /** Runs one animation frame, far enough after the last one to pass the FPS cap. */
     frame: () => {
       const callback = frames.shift();
@@ -200,5 +210,61 @@ describe('game runtime multi-touch', () => {
     runtime.frame();
 
     expect(runtime.input()!.keys['Space'].justPressed).toBe(true);
+  });
+});
+
+describe('game runtime touches forwarded by the host', () => {
+  let runtime: ReturnType<typeof startRuntime>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    runtime = startRuntime();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    runtime.canvas.remove();
+  });
+
+  it('uses forwarded touches while none arrive directly', () => {
+    runtime.hostTouch('start', 1, 20, 80);
+    runtime.hostTouch('end', 1, 20, 80);
+    runtime.frame();
+
+    expect(runtime.seen.at(-1)?.map((t) => t.id)).toEqual([1]);
+    expect(runtime.input()!.keys['Space'].justPressed).toBe(true);
+  });
+
+  it('ignores forwarded touches once one arrived directly', () => {
+    runtime.touch('touchstart', [1, 20, 80]);
+    // The same finger reported again by the host, under the host's own id
+    runtime.hostTouch('start', 7, 20, 80);
+    runtime.frame();
+
+    expect(runtime.seen.at(-1)?.map((t) => t.id)).toEqual([1]);
+
+    runtime.touch('touchend', [1, 20, 80]);
+    runtime.hostTouch('end', 7, 20, 80);
+    runtime.frame();
+    runtime.frame();
+
+    expect(runtime.seen.at(-1)).toEqual([]);
+  });
+
+  it('releases a forwarded finger that is still down when direct touches start', () => {
+    runtime.hostTouch('start', 7, 20, 50);
+    vi.advanceTimersByTime(250); // long enough to become a hold on the left half
+    runtime.frame();
+    expect(runtime.input()!.keys['ArrowLeft'].held).toBe(true);
+
+    runtime.touch('touchstart', [1, 180, 50]);
+    runtime.frame();
+
+    expect(runtime.seen.at(-1)).toEqual([
+      { id: 7, x: 20, y: 50, justStarted: false, justEnded: true, cancelled: true },
+      { id: 1, x: 180, y: 50, justStarted: true, justEnded: false, cancelled: false },
+    ]);
+    expect(runtime.input()!.keys['ArrowLeft'].held).toBe(false);
   });
 });

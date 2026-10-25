@@ -822,8 +822,26 @@
     }
   }
 
+  // The host forwards touches the browser delivered to its page instead. Once a
+  // touch arrives here directly, this browser delivers them to us, so forwarded
+  // ones are ignored: a browser sending both would otherwise count each twice.
+  let directTouches = false;
+
+  const preferDirectTouches = () => {
+    if (directTouches) return;
+    directTouches = true;
+    // A forwarded finger still down would never see its end; let it go now
+    endAllTouches();
+    if (touch) {
+      clearTimeout(touch.holdTimer);
+      setHoldKey(null);
+      touch = null;
+    }
+  };
+
   addEventListener('touchstart', (e) => {
     e.preventDefault(); // no scrolling, zooming or emulated mouse clicks
+    preferDirectTouches();
     for (const t of e.changedTouches) touchStart(t.identifier, t.clientX, t.clientY);
   }, { passive: false });
 
@@ -1107,7 +1125,7 @@
 
       case 'touch': {
         const { phase, id, x, y } = cmd;
-        if (![id, x, y].every(Number.isFinite)) return;
+        if (directTouches || ![id, x, y].every(Number.isFinite)) return;
         if (phase === 'start') touchStart(id, x, y);
         else if (phase === 'move') touchMove(id, x, y);
         else if (phase === 'end' || phase === 'cancel') touchEnd(id, x, y, phase === 'cancel');
