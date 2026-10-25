@@ -191,33 +191,54 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 2rem 2rem 7rem;
-  background: #ffffff;
+  padding: 2rem;
+  background: radial-gradient(ellipse at 51% 51%, #e9f4ef 0, #f7f9f7 46%, #fff 80%);
 }
 
 .brand-logo {
-  position: absolute;
-  right: clamp(24px, 4vw, 60px);
-  bottom: clamp(20px, 3vh, 36px);
-  width: min(15vw, 180px);
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: clamp(125px, 15vw, 190px);
+  max-height: 100px;
+  margin-bottom: clamp(34px, 7vh, 72px);
   object-fit: contain;
 }
 
-.title-slide h1 {
-  margin: 0;
-  font-size: clamp(4rem, 11vw, 9rem);
+.title-eyebrow {
+  color: var(--brand-green-dark);
+  font-size: clamp(10px, 1vw, 13px);
   font-weight: 800;
-  letter-spacing: -.08em;
+  letter-spacing: .16em;
+}
+
+.title-slide h1 {
+  margin: 18px 0 0;
+  color: #000000;
+  font-size: clamp(4.5rem, 10vw, 8.2rem);
+  font-weight: 800;
+  letter-spacing: -.065em;
   line-height: 1;
   text-align: center;
 }
 
+.title-slide h1::after {
+  display: none;
+}
+
 .title-slide p {
-  margin: 1.25rem 0 0;
+  margin: 20px 0 0;
   color: var(--brand-muted);
   font-size: clamp(1rem, 2vw, 1.5rem);
-  font-weight: 700;
-  letter-spacing: .04em;
+  font-weight: 600;
+}
+
+.title-accent {
+  width: 70px;
+  height: 6px;
+  margin-top: 42px;
+  border-radius: 99px;
+  background: var(--brand-green);
 }
 
 .mobile-preview {

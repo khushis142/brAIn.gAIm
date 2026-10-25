@@ -2,7 +2,12 @@
   <div class="team-slide">
     <h1>Unser Team</h1>
 
-    <div class="members">
+    <TransitionGroup
+      name="team-member"
+      tag="div"
+      class="members"
+      :class="{ 'has-ai-member': $clicks >= 1 }"
+    >
       <article
         v-for="(member, index) in displayMembers"
         :key="`${member.name}-${index}`"
@@ -13,12 +18,22 @@
         <p>{{ member.role }}</p>
         <p class="location">📍 {{ member.city }}</p>
       </article>
-    </div>
+      <article v-if="$clicks >= 1" class="member ai-member">
+        <div class="ai-avatar" aria-hidden="true">
+          <span>KI</span>
+          <i></i>
+        </div>
+        <h2>KI</h2>
+        <p>MVP</p>
+      </article>
+    </TransitionGroup>
+    <span v-click class="team-click-anchor" aria-hidden="true"></span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useSlideContext } from '@slidev/client'
 
 interface TeamMember {
   name: string
@@ -30,6 +45,8 @@ interface TeamMember {
 const props = defineProps<{
   members?: TeamMember[]
 }>()
+
+const { $clicks } = useSlideContext()
 
 const teamMembers: TeamMember[] = [
   { name: 'Joachim Kern', role: 'Backend', city: 'Altenstadt', photo: '/team-assets/Joachim_Kern_Altenstadt_Backend.png' },
@@ -53,6 +70,7 @@ const displayMembers = computed(() =>
 
 <style scoped>
 .team-slide {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -64,6 +82,12 @@ const displayMembers = computed(() =>
   color: #191a2a;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-weight: 700;
+}
+
+.team-click-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
 }
 
 h1 {
@@ -92,8 +116,32 @@ h1 {
   text-align: center;
 }
 
+.team-member-move {
+  transition: transform 700ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.team-member-enter-active {
+  transition:
+    opacity 550ms ease-out,
+    transform 700ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.team-member-enter-from {
+  opacity: 0;
+  transform: translateX(72px);
+}
+
+.team-member-enter-to {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .member:nth-child(7) {
   grid-column: 2 / span 2;
+}
+
+.members.has-ai-member .member:nth-child(7) {
+  grid-column: 1 / span 2;
 }
 
 .member img {
@@ -101,6 +149,38 @@ h1 {
   width: 100%;
   height: 7.6rem;
   object-fit: contain;
+}
+
+.ai-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 7.6rem;
+  color: #218768;
+}
+
+.ai-avatar span {
+  display: grid;
+  place-items: center;
+  width: 5.2rem;
+  height: 5.2rem;
+  border: 2px solid #35b48d;
+  border-radius: 50%;
+  background: #eaf7f1;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.ai-avatar i {
+  position: absolute;
+  top: 1rem;
+  right: calc(50% - 3rem);
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #35b48d;
+  box-shadow: 0 0 0 4px #ffffff;
 }
 
 .member h2 {
@@ -129,7 +209,9 @@ h1 {
   .members { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.5rem 1%; }
   .member:nth-child(7) { grid-column: auto / span 2; }
   .member:nth-child(9) { grid-column: 2 / span 2; }
+  .members.has-ai-member .member:nth-child(9) { grid-column: auto / span 2; }
   .member img { height: 6.4rem; }
+  .ai-avatar { height: 6.4rem; }
   .member h2 { font-size: 0.78rem; }
   .member p { font-size: 0.66rem; }
 }

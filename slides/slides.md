@@ -13,9 +13,11 @@ layout: none
 ---
 
 <div class="title-slide">
+  <img class="brand-logo" src="/assets/brAIngAIm.webp" alt="brAIn.gAIn" />
+  <span class="title-eyebrow">UNSER PROJEKT</span>
   <h1>brAIn.gAIn</h1>
   <p>Hackathon Fulda 2026</p>
-  <img class="brand-logo" src="/assets/brAIngAIm.webp" alt="brAIn.gAIn" />
+  <span class="title-accent" aria-hidden="true"></span>
 </div>
 
 ---
@@ -23,6 +25,12 @@ layout: none
 ---
 
 <BrandMeaningSlide />
+
+---
+layout: none
+---
+
+<HandAufsHerzSlide />
 
 ---
 layout: none
@@ -98,3 +106,51 @@ class: team-slide
 ---
 
 <TeamMap />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="title" />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="tools" />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="usage" />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="limitations" />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="bad" />
+
+---
+layout: none
+---
+
+<AIReflectionSlide slide="good" />
+
+---
+layout: none
+---
+
+<div class="title-slide">
+  <img class="brand-logo" src="/assets/brAIngAIm.webp" alt="brAIn.gAIn" />
+  <span class="title-eyebrow">UNSER PROJEKT</span>
+  <h1>brAIn.gAIn</h1>
+  <p>Hackathon Fulda 2026</p>
+  <span class="title-accent" aria-hidden="true"></span>
+</div>
