@@ -77,46 +77,67 @@
 
       @if (item()?.type === 'game' ? session()?.result() : null; as result) {
         <div class="result">
-          <p>{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
-          <p class="result-score">{{ result.score }}</p>
-          @switch (scoreSubmissionStatus()) {
-            @case ('uploading') {
-              <p role="status">Saving score…</p>
-            }
-            @case ('saved') {
-              <p role="status">Score saved</p>
-            }
-            @case ('failed') {
-              <p role="status">Score could not be saved</p>
-            }
-          }
-          @if (leaderboardStatus() === 'loading') {
-            <p role="status">Loading leaderboard…</p>
-          } @else if (leaderboardStatus() === 'failed') {
-            <p role="status">Leaderboard unavailable</p>
-          } @else if (leaderboardStatus() === 'loaded') {
-            <div class="leaderboard" aria-label="Game leaderboard">
-              <p class="leaderboard-title">Top results</p>
-              @for (entry of topLeaderboard(); track $index) {
-                <p class="leaderboard-row">
-                  <span>{{ $index + 1 }}. {{ entry.username }}</span>
-                  <strong>{{ entry.score }}</strong>
-                </p>
-              }
-              @if (playerBest(); as best) {
-                <p class="leaderboard-title">Your results</p>
-                <p class="leaderboard-row current-player">
-                  <span>{{ best.username }} · Best</span>
-                  <strong>{{ best.score }}</strong>
-                </p>
-              }
-              <p class="leaderboard-row current-player">
-                <span>{{ playerBest()?.username || 'You' }} · This game</span>
-                <strong>{{ result.score }}</strong>
-              </p>
+          <div class="result-content">
+            <div class="result-hero">
+              <app-zombie
+                class="result-zombie"
+                [avatar]="zombie.avatar()"
+                [equipped]="zombie.equipped()"
+                walkIn
+              />
+              <div class="result-summary">
+                <p class="result-label">{{ session()?.uiDesign()?.leaderboard?.scoreLabel || 'Your score' }}</p>
+                <p class="result-score">{{ result.score }}</p>
+                @switch (scoreSubmissionStatus()) {
+                  @case ('uploading') {
+                    <p class="result-status" role="status">Saving score…</p>
+                  }
+                  @case ('saved') {
+                    <p class="result-status" role="status">Score saved</p>
+                  }
+                  @case ('failed') {
+                    <p class="result-status" role="status">Score could not be saved</p>
+                  }
+                }
+              </div>
             </div>
-          }
-          <button type="button" (click)="next()">Next</button>
+
+            @if (unlockedNames().length > 0) {
+              <p class="unlock" role="status">Unlocked: {{ unlockedNames().join(', ') }}!</p>
+            }
+
+            @if (leaderboardStatus() === 'loading') {
+              <p class="result-status" role="status">Loading leaderboard…</p>
+            } @else if (leaderboardStatus() === 'failed') {
+              <p class="result-status" role="status">Leaderboard unavailable</p>
+            } @else if (leaderboardStatus() === 'loaded') {
+              <section class="leaderboard" aria-label="Game leaderboard">
+                <p class="leaderboard-title">Top results</p>
+                @for (entry of topLeaderboard(); track $index) {
+                  <p class="leaderboard-row">
+                    <span class="leaderboard-rank">{{ $index + 1 }}</span>
+                    <span class="leaderboard-name">{{ entry.username }}</span>
+                    <strong>{{ entry.score }}</strong>
+                  </p>
+                }
+                <p class="leaderboard-title leaderboard-divider">You</p>
+                @if (playerBest(); as best) {
+                  <p class="leaderboard-row current-player">
+                    <span class="leaderboard-rank"></span>
+                    <span class="leaderboard-name">Best</span>
+                    <strong>{{ best.score }}</strong>
+                  </p>
+                }
+                <p class="leaderboard-row current-player">
+                  <span class="leaderboard-rank"></span>
+                  <span class="leaderboard-name">This game</span>
+                  <strong>{{ result.score }}</strong>
+                </p>
+              </section>
+            }
+
+            <a class="wardrobe-link" routerLink="/wardrobe">Dress up your avatar</a>
+          </div>
         </div>
       }
 

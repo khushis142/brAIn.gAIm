@@ -11,10 +11,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { LucideBrain, LucideChevronDown } from '@lucide/angular';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, FeedItem, LeaderboardEntry } from '../../core/api.service';
+import { ApiService, FeedItem, LeaderboardEntry, ScoreRead } from '../../core/api.service';
+import { ZombieService } from '../../core/zombie.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
+import { Zombie } from '../../shared/zombie/zombie';
 
 type Phase = 'idle' | 'leaving' | 'entering';
 type PlaybackBubble = 'play' | 'pause';
@@ -64,7 +67,7 @@ function waitForSize(element: HTMLElement, timeoutMs: number): Promise<{ width: 
 }
 
 @Component({
-  imports: [LucideBrain, LucideChevronDown],
+  imports: [LucideBrain, LucideChevronDown, RouterLink, Zombie],
   selector: 'app-home',
   styleUrl: './home.css',
   templateUrl: './home.html',
@@ -77,6 +80,7 @@ export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly zombie = inject(ZombieService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
@@ -91,6 +95,8 @@ export class Home {
   protected readonly arePlayerControlsVisible = signal(false);
   protected readonly playbackBubble = signal<PlaybackBubble | null>(null);
   protected readonly scoreSubmissionStatus = signal<ScoreSubmissionStatus>('idle');
+  /** Accessories and avatars unlocked by the game on screen */
+  protected readonly unlockedNames = signal<string[]>([]);
   protected readonly leaderboard = signal<LeaderboardEntry[] | null>(null);
   protected readonly leaderboardStatus = signal<'idle' | 'loading' | 'loaded' | 'failed'>('idle');
   protected readonly topLeaderboard = computed(() => this.leaderboard()?.slice(0, 3) ?? []);
@@ -139,6 +145,8 @@ export class Home {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
       this.observeCardLifecycle();
       this.next();
+      // The mascot is decoration; without it the result screen still works
+      this.zombie.load().catch(() => {});
     });
     effect(() => {
       const result = this.session()?.result();
@@ -240,8 +248,9 @@ export class Home {
   }
 
   protected onTouchStart(event: TouchEvent): void {
-    // Swipes during a game belong to the game; the ↓ button still moves on
-    this.touchStartY = this.item()?.type === 'game' ? null : event.touches[0].clientY;
+    // Swipes during a game belong to the game; once it has finished they move on again
+    const gameRunning = this.item()?.type === 'game' && this.session()?.result() == null;
+    this.touchStartY = gameRunning ? null : event.touches[0].clientY;
   }
 
   protected onTouchEnd(event: TouchEvent): void {
@@ -298,16 +307,33 @@ export class Home {
   private async submitScore(gameId: string, roundId: string, score: number): Promise<void> {
     this.scoreSubmissionStatus.set('uploading');
     try {
-      await firstValueFrom(this.api.submitScore(gameId, {
+      const saved = await firstValueFrom(this.api.submitScore(gameId, {
         score: Math.max(0, score),
         round_id: roundId,
       }));
       this.scoreSubmissionStatus.set('saved');
-      await this.loadLeaderboard(gameId);
+      await Promise.all([this.loadLeaderboard(gameId), this.showUnlocks(roundId, saved)]);
     } catch (error) {
       console.warn('Could not save game score', error);
       this.scoreSubmissionStatus.set('failed');
     }
+  }
+
+  private async showUnlocks(roundId: string, saved: ScoreRead): Promise<void> {
+    const { newly_unlocked, newly_unlocked_avatars } = saved;
+    if (newly_unlocked.length === 0 && newly_unlocked_avatars.length === 0) return;
+    try {
+      // Refresh so the zombie wears what was just unlocked and names resolve
+      await this.zombie.load();
+    } catch (error) {
+      console.warn('Could not refresh avatar', error);
+    }
+    const current = this.item();
+    if (current?.type !== 'game' || current.round_id !== roundId) return;
+    this.unlockedNames.set([
+      ...newly_unlocked_avatars.map((id) => `${this.zombie.avatarName(id)} avatar`),
+      ...newly_unlocked.map((id) => this.zombie.accessoryName(id)),
+    ]);
   }
 
   private async loadLeaderboard(gameId: string): Promise<void> {
@@ -408,6 +434,7 @@ export class Home {
     this.scoreSubmissionStatus.set('idle');
     this.leaderboard.set(null);
     this.leaderboardStatus.set('idle');
+    this.unlockedNames.set([]);
     this.submittedRoundId = null;
     this.item.set(item);
 
