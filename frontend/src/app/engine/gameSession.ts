@@ -48,6 +48,8 @@ export class GameSession {
   private resultSubmissions = 0;
   private runtimeReady = false;
   private requestedLifecycle: Exclude<GameLifecycleState, 'disposed'> = 'preloading';
+  private muted = false;
+  private volume = 1;
 
   private readonly _status = signal<SessionStatus>('idle');
   private readonly _error = signal<string | null>(null);
@@ -178,6 +180,13 @@ export class GameSession {
     this.send({ type: 'resume' });
   }
 
+  /** Kept across rounds; a round starts with the current setting */
+  setSound(muted: boolean, volume: number): void {
+    this.muted = muted;
+    this.volume = volume;
+    this.send({ type: 'sound', muted, volume });
+  }
+
   focus(): void {
     this.iframe?.focus();
     try {
@@ -274,6 +283,8 @@ export class GameSession {
         this.runtimeReady = true;
         this._status.set('running');
         this.applyRequestedLifecycle();
+        // A change made while the iframe was still loading never reached the runtime
+        this.send({ type: 'sound', muted: this.muted, volume: this.volume });
         break;
       case 'heartbeat':
         this.beatSinceLastCheck = true;
@@ -363,6 +374,8 @@ export class GameSession {
         reducedEffects: options.performance?.reducedEffects ?? false,
       },
       assets: options.assets ?? {},
+      muted: this.muted,
+      volume: this.volume,
     })
       .replace(/</g, '\\u003c')
       .replace(/\u2028/g, '\\u2028')

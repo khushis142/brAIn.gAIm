@@ -87,6 +87,8 @@ export class FeedGame {
   readonly allowance = input<GameAllowance>('paused');
   /** Result of an earlier visit: the round is not played again and its score not resubmitted */
   readonly finishedResult = input<GameResult | null>(null);
+  readonly muted = input(true);
+  readonly volume = input(1);
   readonly finished = output<GameResult>();
 
   protected readonly session = signal<GameSession | null>(null);
@@ -162,6 +164,8 @@ export class FeedGame {
         void this.submitScore(result.score);
       });
     });
+    // Also runs once the session exists, so the first round starts with the setting
+    effect(() => this.session()?.setSound(this.muted(), this.volume()));
     effect(() => {
       this.session();
       this.allowance();

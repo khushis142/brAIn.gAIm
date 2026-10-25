@@ -37,6 +37,29 @@ export class FeedHistory {
   }
 }
 
+/**
+ * Whether the feed's videos and games play sound, and how loud (0..1). Starts muted because
+ * browsers only allow autoplay with sound after the user has interacted with the page.
+ * Kept for the visit.
+ */
+@Injectable({ providedIn: 'root' })
+export class FeedSound {
+  readonly muted = signal(true);
+  readonly volume = signal(1);
+
+  toggle(): void {
+    // Unmuting at zero volume would still be silent
+    if (this.muted() && this.volume() === 0) this.volume.set(1);
+    this.muted.update((muted) => !muted);
+  }
+
+  /** Moving the slider unmutes; sliding to zero mutes */
+  setVolume(volume: number): void {
+    this.volume.set(volume);
+    this.muted.set(volume === 0);
+  }
+}
+
 /** Where a card stands in the feed transition, if it is the one on screen */
 export type CardTransition = 'leaving' | 'entering' | null;
 

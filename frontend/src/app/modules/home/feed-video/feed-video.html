@@ -2,7 +2,8 @@
   #video
   class="video"
   [src]="item().url"
-  muted
+  [muted]="muted()"
+  [volume]="volume()"
   loop
   playsinline
   (loadedmetadata)="onLoadedMetadata($event)"

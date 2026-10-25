@@ -230,6 +230,25 @@ describe('GameSession', () => {
     session.destroy();
   });
 
+  it('starts a round with the current sound setting and resends it once the runtime starts', () => {
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
+    session.setSound(true, 0.4);
+    session.start(gameCode, options);
+    const iframe = container.querySelector('iframe') as HTMLIFrameElement;
+    const send = vi.spyOn(session as never, 'send');
+
+    expect(iframe.srcdoc).toContain('"muted":true,"volume":0.4');
+
+    window.dispatchEvent(new MessageEvent('message', {
+      source: iframe.contentWindow,
+      data: { type: 'started' },
+    }));
+
+    expect(send).toHaveBeenCalledWith({ type: 'sound', muted: true, volume: 0.4 });
+    session.destroy();
+  });
+
   it('forwards touches on the iframe element to the game', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

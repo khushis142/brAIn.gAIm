@@ -211,6 +211,17 @@ A valid result moves the game to `completed`. Treat that as the end of the
 attempt. `destroy()` is for permanent teardown and is the only transition to
 `disposed`.
 
+## Sound
+
+The feed has one mute button with a volume slider for its videos and games,
+and it starts muted. The runtime applies both for you: audio elements are muted
+and scaled while they play, and Web Audio goes through a gain node that
+`audioContext.destination` returns in place of the real destination. Connect
+to `destination` as usual. Setting `volume` on an audio element still works
+for your own mix: it reads back what you set and plays at that times the
+player's volume. Do not set `muted` yourself; the runtime overrides it. Offline
+contexts are not affected.
+
 ## Input
 
 `update(dt, input)` receives clamped elapsed seconds and this input shape:

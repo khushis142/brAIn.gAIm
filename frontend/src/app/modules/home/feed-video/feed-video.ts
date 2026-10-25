@@ -38,6 +38,8 @@ export class FeedVideo {
   readonly active = input(false);
   /** Where to resume when the card comes back into the live window */
   readonly startAt = input(0);
+  readonly muted = input(true);
+  readonly volume = input(1);
   readonly doubleTapped = output<void>();
   readonly timeChange = output<number>();
 

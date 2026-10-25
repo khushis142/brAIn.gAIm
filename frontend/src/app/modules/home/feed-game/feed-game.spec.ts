@@ -65,6 +65,7 @@ describe('FeedGame', () => {
         status(): string;
         focus(): void;
         setLifecycle(state: string): void;
+        setSound(muted: boolean, volume: number): void;
         destroy(): void;
       } | null>;
     };
@@ -75,6 +76,7 @@ describe('FeedGame', () => {
       status: () => 'running',
       focus: vi.fn(),
       setLifecycle,
+      setSound: vi.fn(),
       destroy: vi.fn(),
     });
 

@@ -17,6 +17,8 @@
 
 .stage {
   flex: 1;
+  /* Keeps the video's and game's layers inside, so the volume popup can overlap them */
+  isolation: isolate;
   min-height: 0;
   position: relative;
 }
@@ -83,6 +85,108 @@
   height: 20px;
   transition: fill 200ms ease;
   width: 20px;
+}
+
+.sound {
+  flex: none;
+  position: relative;
+}
+
+.sound-toggle {
+  background: none;
+  border: 0;
+  border-radius: 20px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  height: 40px;
+  place-items: center;
+  width: 40px;
+}
+
+.sound-toggle svg {
+  height: 20px;
+  width: 20px;
+}
+
+/* Sits right on top of the button, so moving the pointer up to it keeps the hover */
+.volume {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  bottom: 100%;
+  display: grid;
+  left: 50%;
+  opacity: 0;
+  padding: 12px 0;
+  place-items: center;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, 6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  width: 40px;
+}
+
+.sound.open .volume,
+.sound:has(:focus-visible) .volume {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+/* Only real hover: a tap fires a sticky :hover on phones, which .open handles instead */
+@media (hover: hover) {
+  .sound:hover .volume {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Vertical, loudest at the top. Wide enough for a finger; the track is drawn 6px wide. */
+.volume-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(
+      to top,
+      var(--accent) var(--volume),
+      color-mix(in srgb, currentColor 20%, transparent) var(--volume)
+    )
+    center / 6px 100% no-repeat;
+  cursor: pointer;
+  direction: rtl;
+  height: 100px;
+  margin: 0;
+  width: 32px;
+  writing-mode: vertical-lr;
+}
+
+.volume-input::-moz-range-track {
+  background: transparent;
+}
+
+.volume-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--accent);
+  border: 2px solid var(--control);
+  border-radius: 50%;
+  height: 16px;
+  width: 16px;
+}
+
+.volume-input::-moz-range-thumb {
+  background: var(--accent);
+  border: 2px solid var(--control);
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .volume {
+    transition: none;
+  }
 }
 
 .like-count {

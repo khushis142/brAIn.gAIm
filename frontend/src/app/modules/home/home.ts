@@ -127,6 +127,7 @@ export class Home {
 
   protected onKeydown(event: KeyboardEvent): void {
     if ((event.key !== 'ArrowDown' && event.key !== 'ArrowUp') || this.gameOwnsInput()) return;
+    if (event.target instanceof HTMLInputElement) return; // e.g. the volume slider
     event.preventDefault(); // stop the page from scrolling
     void (event.key === 'ArrowDown' ? this.next() : this.previous());
   }

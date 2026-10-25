@@ -328,6 +328,8 @@ export type HostCommand =
   | { type: 'resume' }
   | { type: 'stop' }
   | { type: 'resize'; width: number; height: number }
+  /** The host's mute button and volume (0..1); covers media elements and Web Audio, see gameRuntime.ts */
+  | { type: 'sound'; muted: boolean; volume: number }
   /** A touch the host received on the iframe element; x/y are relative to the iframe. */
   | { type: 'touch'; phase: TouchPhase; id: number; x: number; y: number }
   | { type: 'key'; code: string; pressed: boolean };

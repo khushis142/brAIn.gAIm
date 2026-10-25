@@ -7,6 +7,8 @@
           [item]="item"
           [active]="allowance() !== 'paused'"
           [startAt]="videoTime"
+          [muted]="sound.muted()"
+          [volume]="sound.volume()"
           (timeChange)="setVideoTime($event)"
           (doubleTapped)="setLiked(true)"
         />
@@ -15,6 +17,8 @@
           [item]="item"
           [allowance]="allowance()"
           [finishedResult]="gameResult()"
+          [muted]="sound.muted()"
+          [volume]="sound.volume()"
           (finished)="setGameResult($event)"
         />
       }
@@ -44,6 +48,47 @@
         <span class="like-error" role="alert">{{ message }}</span>
       }
     }
+    <!-- The slider pops up above the button on hover, keyboard focus, or a tap. Its touches
+         stay here, so dragging it does not swipe the feed. -->
+    <div
+      #soundControl
+      class="sound"
+      [class.open]="sliderOpen()"
+      (pointerdown)="onSoundPointerDown($event)"
+      (pointerup)="onSoundPointerUp($event)"
+      (pointercancel)="onSoundPointerUp($event)"
+      (touchstart)="$event.stopPropagation()"
+      (touchend)="$event.stopPropagation()"
+    >
+      <div class="volume">
+        <input
+          class="volume-input"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          [value]="volume()"
+          [style.--volume.%]="volume() * 100"
+          aria-label="Volume"
+          (input)="onVolumeInput($event)"
+        />
+      </div>
+      <button
+        class="sound-toggle"
+        type="button"
+        [attr.aria-label]="sound.muted() ? 'Unmute' : 'Mute'"
+        [attr.title]="sound.muted() ? 'Unmute' : 'Mute'"
+        (click)="sound.toggle()"
+      >
+        @if (volume() === 0) {
+          <svg lucideVolumeX></svg>
+        } @else if (volume() < 0.5) {
+          <svg lucideVolume1></svg>
+        } @else {
+          <svg lucideVolume2></svg>
+        }
+      </button>
+    </div>
     <nav class="nav" aria-label="Feed">
       <button
         class="previous"

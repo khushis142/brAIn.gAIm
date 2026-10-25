@@ -11,7 +11,10 @@ type TouchSnapshot = Pick<TouchPoint, 'id' | 'x' | 'y' | 'justStarted' | 'justEn
  * Runs the runtime script against a fake window so each test gets a fresh runtime
  * and drives frames by hand. Touches are given in canvas pixels (rect is 1:1).
  */
-function startRuntime(assets?: Record<string, unknown>) {
+function startRuntime(
+  assets?: Record<string, unknown>,
+  { globals = {}, input = {} }: { globals?: Record<string, unknown>; input?: Record<string, unknown> } = {},
+) {
   const canvas = document.createElement('canvas');
   canvas.id = 'c';
   canvas.width = CANVAS_WIDTH;
@@ -27,9 +30,10 @@ function startRuntime(assets?: Record<string, unknown>) {
   const frames: FrameRequestCallback[] = [];
   const posted: { type: string; message?: string }[] = [];
   const fakeWindow: Record<string, unknown> = {
-    __GAME_INPUT__: { protocolVersion: GAME_PROTOCOL_VERSION, username: 'tester', data: { context: 'test' }, assets },
+    __GAME_INPUT__: { protocolVersion: GAME_PROTOCOL_VERSION, username: 'tester', data: { context: 'test' }, assets, ...input },
     devicePixelRatio: 1,
     focus: noop,
+    ...globals,
   };
 
   const fakeParent = { postMessage: (message: { type: string }) => posted.push(message) };
@@ -278,6 +282,138 @@ describe('game runtime touches forwarded by the host', () => {
       { id: 1, x: 180, y: 50, justStarted: true, justEnded: false, cancelled: false },
     ]);
     expect(runtime.input()!.keys['ArrowLeft'].held).toBe(false);
+  });
+});
+
+describe('game runtime sound', () => {
+  // Stand-ins for the browser classes the runtime patches, fresh for each runtime
+  function audioGlobals() {
+    class FakeMedia extends EventTarget {
+      muted = false;
+      /** What the element actually plays at */
+      realVolume = 1;
+      get volume(): number {
+        return this.realVolume;
+      }
+      set volume(value: number) {
+        if (value < 0 || value > 1) throw new RangeError('volume out of range');
+        this.realVolume = value;
+      }
+      play(): Promise<void> {
+        return Promise.resolve();
+      }
+      pause(): void {
+        this.dispatchEvent(new Event('pause'));
+      }
+    }
+    class FakeGain {
+      readonly gain = { value: 1 };
+      connectedTo: unknown = null;
+      connect(node: unknown): void {
+        this.connectedTo = node;
+      }
+    }
+    const realDestination = { real: true };
+    class FakeContext {
+      get destination(): unknown {
+        return realDestination;
+      }
+      createGain(): FakeGain {
+        return new FakeGain();
+      }
+    }
+    class FakeOfflineContext extends FakeContext {}
+    return {
+      globals: {
+        HTMLMediaElement: FakeMedia,
+        BaseAudioContext: FakeContext,
+        OfflineAudioContext: FakeOfflineContext,
+      },
+      FakeMedia,
+      FakeContext,
+      FakeOfflineContext,
+      realDestination,
+    };
+  }
+
+  function startWithAudio(muted = false, volume = 1) {
+    const audio = audioGlobals();
+    const runtime = startRuntime(undefined, { globals: audio.globals, input: { muted, volume } });
+    return { audio, runtime };
+  }
+
+  it('mutes media that starts playing while muted, and media already playing', async () => {
+    const { audio, runtime } = startWithAudio();
+    const playing = new audio.FakeMedia();
+    await playing.play();
+    expect(playing.muted).toBe(false);
+
+    runtime.hostCommand({ type: 'sound', muted: true, volume: 1 });
+    expect(playing.muted).toBe(true);
+
+    const later = new audio.FakeMedia();
+    await later.play();
+    expect(later.muted).toBe(true);
+  });
+
+  it('leaves paused media alone until it plays again', async () => {
+    const { audio, runtime } = startWithAudio();
+    const media = new audio.FakeMedia();
+    await media.play();
+    media.pause();
+
+    runtime.hostCommand({ type: 'sound', muted: true, volume: 1 });
+    expect(media.muted).toBe(false);
+    await media.play();
+    expect(media.muted).toBe(true);
+  });
+
+  it('routes Web Audio through a gain node the host can silence', () => {
+    const { audio, runtime } = startWithAudio();
+    const context = new audio.FakeContext();
+    const gain = context.destination as { gain: { value: number }; connectedTo: unknown };
+
+    expect(gain.connectedTo).toBe(audio.realDestination);
+    expect(context.destination).toBe(gain);
+    runtime.hostCommand({ type: 'sound', muted: true, volume: 1 });
+    expect(gain.gain.value).toBe(0);
+    runtime.hostCommand({ type: 'sound', muted: false, volume: 1 });
+    expect(gain.gain.value).toBe(1);
+  });
+
+  it('keeps offline rendering audible', () => {
+    const { audio, runtime } = startWithAudio();
+    runtime.hostCommand({ type: 'sound', muted: true, volume: 1 });
+    expect(new audio.FakeOfflineContext().destination).toBe(audio.realDestination);
+  });
+
+  it('scales each element by the host volume and keeps the game\'s own level', async () => {
+    const { audio, runtime } = startWithAudio(false, 0.5);
+    const music = new audio.FakeMedia();
+    music.volume = 0.4;
+    await music.play();
+    expect(music.volume).toBe(0.4);
+    expect(music.realVolume).toBeCloseTo(0.2);
+
+    runtime.hostCommand({ type: 'sound', muted: false, volume: 1 });
+    expect(music.realVolume).toBeCloseTo(0.4);
+    expect(() => (music.volume = 2)).toThrow(RangeError);
+  });
+
+  it('sets the Web Audio gain to the host volume', () => {
+    const { audio, runtime } = startWithAudio(false, 0.3);
+    const gain = new audio.FakeContext().destination as { gain: { value: number } };
+    expect(gain.gain.value).toBeCloseTo(0.3);
+    runtime.hostCommand({ type: 'sound', muted: false, volume: 0.8 });
+    expect(gain.gain.value).toBeCloseTo(0.8);
+    runtime.hostCommand({ type: 'sound', muted: false, volume: 7 });
+    expect(gain.gain.value).toBe(1);
+  });
+
+  it('starts muted when the host asks for it', () => {
+    const { audio } = startWithAudio(true);
+    const gain = new audio.FakeContext().destination as { gain: { value: number } };
+    expect(gain.gain.value).toBe(0);
   });
 });
 
