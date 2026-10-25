@@ -1,0 +1,21 @@
+.preview-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 130px);
+  padding: 16px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+
+.player-stage {
+  background: #000;
+  border-radius: 16px;
+  flex: 1;
+  min-height: 400px;
+  overflow: hidden;
+  position: relative;
+}

@@ -8,6 +8,7 @@ import { Login } from './modules/user/login/login';
 import { Register } from './modules/user/register/register';
 import { UserService } from './modules/user/service/user-service';
 import { VideoUpload } from './modules/video-upload/video-upload';
+import { PreviewWordle } from './modules/preview-wordle/preview-wordle';
 import { Wardrobe } from './modules/wardrobe/wardrobe';
 
 const requireAuth = () => {
@@ -23,6 +24,7 @@ export const routes: Routes = [
   { path: 'upload', redirectTo: 'knowledge', pathMatch: 'full' },
   { path: 'settings', component: Settings, canActivate: [requireAuth] },
   { path: 'video-upload', component: VideoUpload, canActivate: [requireAuth] },
+  { path: 'preview/wordle', component: PreviewWordle, canActivate: [requireAuth] },
   { path: 'wardrobe', component: Wardrobe, canActivate: [requireAuth] },
   { path: 'login', component: Login },
   { path: 'register', component: Register },

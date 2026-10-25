@@ -1,0 +1,17 @@
+{
+  "context": "No personalized data is generated for this game; the target word is picked by the fixed game code from its own built-in list.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 30,
+  "maxDurationSeconds": 180,
+  "input": ["touch"],
+  "assets": [],
+  "input_schema": {
+    "type": "object",
+    "required": ["context"],
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 }
+    },
+    "additionalProperties": false
+  }
+}
