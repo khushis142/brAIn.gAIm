@@ -95,7 +95,7 @@ describe('VideoUpload', () => {
     fixture.detectChanges();
 
     expect(uploadService.upload).toHaveBeenCalledWith(file, 'My clip', ['bio', 'exam']);
-    expect(el.querySelector('.success')?.textContent).toContain('erfolgreich');
+    expect(el.querySelector('.success')?.textContent).toContain('uploaded successfully');
     expect(el.querySelector('.error')).toBeNull();
   });
 
@@ -128,7 +128,7 @@ describe('VideoUpload', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(el.querySelector('.error')?.textContent).toContain('konnte nicht hochgeladen werden');
+    expect(el.querySelector('.error')?.textContent).toContain('could not be uploaded');
     expect(el.querySelector('.success')).toBeNull();
   });
 
@@ -143,6 +143,6 @@ describe('VideoUpload', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(el.querySelector('.error')?.textContent).toContain('konnte nicht hochgeladen werden');
+    expect(el.querySelector('.error')?.textContent).toContain('could not be uploaded');
   });
 });
