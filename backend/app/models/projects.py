@@ -17,11 +17,14 @@ class Project(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(200))
+    color: Mapped[str] = mapped_column(String(7), default="#ffc800", server_default="#ffc800")
     body: Mapped[str] = mapped_column(Text, default="", server_default="")  # Markdown
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    # SHA-256 of the name and body the current flashcards were generated from.
+    flashcards_hash: Mapped[str | None] = mapped_column(String(64))
 
     attachments: Mapped[list["ProjectAttachment"]] = relationship(
         lazy="selectin",
@@ -42,4 +45,18 @@ class ProjectAttachment(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     filename: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Flashcard(Base):
+    """A short, self-contained snippet of a project; game rounds are built from a few of them."""
+
+    __tablename__ = "flashcards"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(80))
+    body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

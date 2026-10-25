@@ -1,6 +1,6 @@
 [project]
 name = "braingain-backend"
-version = "0.1.0"
+version = "0.0.29"
 description = "Backend for the brAIn.gAIn short-video learning feed"
 requires-python = ">=3.13"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
     "pwdlib[argon2]>=0.2",
     "jsonschema>=4.26.0",
     "httpx>=0.28.1",
+    "pypdf>=6.21.2",
 ]
 
 [dependency-groups]

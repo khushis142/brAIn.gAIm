@@ -3,7 +3,7 @@
 services:
   backend:
     # Deployed version, updated by hand after CI has published it (see README).
-    image: ghcr.io/brain-gaim/backend:0.0.11
+    image: ghcr.io/brain-gaim/backend:0.0.29
     container_name: backend
     restart: unless-stopped
     ports: ["3000:8000"]
@@ -12,6 +12,62 @@ services:
       JWT_SECRET: ${JWT_SECRET:?at least 32 characters}
       CDN_BASE_URL: ${CDN_BASE_URL:?public CDN URL, e.g. https://cdn.example.com}
       LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      # Defaults to the proxy below; for LLM_PROVIDER=ollama, the model server's /v1 URL.
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://litellm:4000}
+      LLM_MODEL: ${LLM_MODEL:-smart}
+      # litellm only: a budgeted LiteLLM virtual key (see README), not the Anthropic key.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      TTS_URL: ${TTS_URL:-}
+    depends_on: [litellm]
+
+  # LLM proxy (#44): routes model aliases to Anthropic and enforces spend budgets.
+  # Reachable only inside the stack network, at http://litellm:4000.
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.106.3
+    container_name: litellm
+    restart: unless-stopped
+    # The config lives in LITELLM_CONFIG below, not in a mounted file: Portainer GitOps keeps
+    # the repo inside its own container, so a relative bind mount would find no file on the
+    # host (Docker then mounts an empty directory).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - printf '%s\n' "$$LITELLM_CONFIG" > /tmp/config.yaml && exec litellm --config /tmp/config.yaml --port 4000
+    environment:
+      LITELLM_CONFIG: |
+        # LiteLLM proxy (#44): the backend asks for an alias, the proxy picks the Anthropic model,
+        # tracks spend per key and stops at the budgets below. Secrets come from the environment.
+        model_list:
+          - model_name: smart # writes games and round inputs
+            litellm_params:
+              model: anthropic/claude-haiku-5-5
+              api_key: os.environ/ANTHROPIC_API_KEY
+          - model_name: fast # cheaper fallback
+            litellm_params:
+              model: anthropic/claude-haiku-5-5
+              api_key: os.environ/ANTHROPIC_API_KEY
+
+        router_settings:
+          fallbacks: [{ "smart": ["fast"] }]
+          num_retries: 1
+
+        litellm_settings:
+          # Drop request parameters a model does not support instead of failing.
+          drop_params: true
+          # Prompts contain users' documents: keep spend and token counts, never message content.
+          turn_off_message_logging: true
+          # Hard cap for the whole proxy, on top of each key's own budget.
+          max_budget: 50 # USD
+          budget_duration: 30d
+
+        general_settings:
+          master_key: os.environ/LITELLM_MASTER_KEY
+          database_url: os.environ/DATABASE_URL
+          store_prompts_in_spend_logs: false
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Anthropic API key of the production workspace}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?admin key for the proxy, starts with sk-}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?encrypts stored keys; never change it after first start}
+      DATABASE_URL: ${LITELLM_DATABASE_URL:?postgresql://user:pass@host:5432/litellm}
 
 networks:
   default:

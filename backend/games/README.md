@@ -6,8 +6,14 @@ projects, the backend validates it, and the frontend starts the game with it.
 
 How games run (lifecycle, `registerGame`, canvas, UI design) is defined by the frontend in
 [`Frontend/docs/game-authoring.md`](https://github.com/brAIn-gAIm/Frontend/blob/main/docs/game-authoring.md)
-(protocol v2). This page adds what the backend needs. `example-quiz/` is a complete,
-working reference; copy it to start.
+(protocol v2). This page adds what the backend needs. Besides reviewed games, the backend's
+generator can write games itself (`app/generator/games.py`); they follow the same rules and
+pass the same checks. `example-quiz/` is a complete,
+working reference; copy it to start. `chain-snake/` is a larger one: an action game on
+ordered sequences with a bitmap font, effects, touch controls and per-item results.
+`glass-bridge/` is a touch-first quiz with a perspective bridge and a jumping robot, drawn
+with the 2D canvas. Three.js cannot be loaded from a CDN in the sandbox; a bundled copy
+would have to fit the 200 KB game limit. Native WebGL is available for custom 3D rendering.
 
 ## What you deliver
 
@@ -24,6 +30,12 @@ my-game/
 ```json
 {
   "context": "Instructions for the LLM: what the game is and what good data looks like.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
   "input_schema": {
     "type": "object",
     "required": ["context", "..."],
@@ -48,6 +60,36 @@ my-game/
   what each field means, the difficulty, and the rules a schema cannot express (e.g.
   "`answer` is the index of the correct option; exactly one option is correct"). The LLM
   also gets the player's own notes as "study material", so don't hard-code a topic.
+
+## Preconditions (optional)
+
+Some games need more than text, e.g. spoken audio. List server-side steps under
+`preconditions` in `config.json`; they run on the generated data before the round is
+ready. Rounds are prepared in the background ahead of time, so this never delays the feed.
+
+```json
+"preconditions": [
+  { "type": "tts", "path": "/questions/*/question", "into": "questionAudio" }
+]
+```
+
+- **`tts`**: speaks every string `path` selects (a JSON Pointer; `*` matches every array
+  item) and writes the audio URL into the sibling field `into`. Here, every question gets a
+  `questionAudio` next to its `question`.
+- `path` must point to a string in `input_schema`, and `into` must *not* be in the schema
+  (the LLM does not produce it). Both are checked on publish.
+- In the game, the field holds a `data:` URL the host prepared (the iframe has no network
+  access), e.g. `new Audio(api.data.questions[0].questionAudio).play()`. Audio is WAV.
+- **`random_file`**: writes one randomly chosen file of `files` (CDN `id` and `filename`)
+  into the top-level field `into`, again as a `data:` URL in the game. `story-run/` uses it
+  for its background clips: 30 s, muted, 288x640 H.264 MP4s of about 2 MB each, cut with
+  `ffmpeg -ss <start> -i <video> -t 30 -an -vf scale=288:640,fps=24 -c:v libx264 -crf 33
+  -pix_fmt yuv420p -movflags +faststart clip.mp4` and uploaded with `app.cdn.upload`.
+  Keep files small: the host downloads the chosen one with every round.
+
+```json
+{ "type": "random_file", "into": "backgroundVideo", "files": [{ "id": "<cdn id>", "filename": "clip.mp4" }] }
+```
 
 ## `game.js`
 
@@ -76,3 +118,13 @@ python -m app.seed_game my-game --title "My game" --owner <username> [--tags wor
 This checks the config and the code (schema valid and requiring `context`, `registerGame(`
 present, no `</script`, size), uploads `game.js` to the CDN and registers the game. Titles
 must be unique.
+
+To publish a new version of a game, run the same command with `--update` instead of
+`--owner`:
+
+```sh
+python -m app.seed_game my-game --title "My game" --update
+```
+
+The CDN id is the game's id, so the new `game.js` gets a new id. The game keeps its title
+and owner, and its scores, rounds and impressions move to the new id.

@@ -21,16 +21,28 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 
 - Files live on the CDN service (github.com/brAIn-gAIm/CDN); clients upload there
   directly. The backend owns all metadata (`content` table, keyed by the CDN file id)
-  and never handles file bytes or S3.
+  and never proxies uploads or touches S3; it only downloads text/PDF attachments to
+  read them for flashcards (`app/generator/attachments.py`).
 - Delivery URLs are always built by `app/cdn.py` from `CDN_BASE_URL`; never store or
   return a client-supplied URL (games are JS that runs in the app).
 - Users' free-text `interests` are the input for feed personalization (not built yet).
 - Projects (`app/models/projects.py`) are private to their owner and replace the planned
   decks and documents; their attachments are CDN files like content.
+- The user's active project (`users.active_project_id`) is the only material game
+  rounds are generated from: a few random flashcards of it (`feed._project_materials`),
+  which `app/generator/flashcards.py` regenerates only when the user asks (never
+  automatically, to keep LLM calls down). Switching, editing, or deleting the active
+  project (or regenerating its flashcards) discards any prepared game round so the next
+  round reflects the updated material.
 - Users can register only videos via the API. Games (JS that runs in the app) enter only
-  through `app/seed_game.py`; never add an API path that accepts game code or files.
-- Games are fixed templates; the LLM only produces their `input` (data, validated against
-  the game's `config.input_schema` in `app/generator/inputs.py`), never code.
+  through `app/seed_game.py` (or the offline generator `app/generator/games.py`); never
+  add an API path that accepts client-supplied game code or files.
+- Seeded games are fixed templates; per round, the LLM only produces their `input` (data,
+  validated against the game's `config.input_schema` in `app/generator/inputs.py`), never
+  per-round code. (`app/generator/games.py` can also generate whole new game templates,
+  checked by `check_game_code`.)
+- Game rounds are prepared in the background (`feed.top_up`) and served from the ready
+  pool; never put LLM, TTS or other slow calls on the `/feed/next` request path.
 - Feed decisions live in `app/feed.py`; routers stay thin.
 - Settings come from env via `app/config.py`; add a variable only when the value
   really differs between environments, and update `.env.example` and
@@ -49,6 +61,23 @@ review the generated file (add data conversion where needed), `alembic upgrade h
 2. After CI succeeds, set that tag in `docker-compose.yaml`; Portainer redeploys.
 
 Never use `:latest`. The container runs migrations on start.
+
+## Publishing & Updating Games on Server
+
+Games are stored on the CDN and registered in the `content` table. Deploying backend code does NOT automatically update game templates; publish or update them via `app/seed_game.py`:
+
+```sh
+# Update existing game on the team server (192.168.188.67):
+DATABASE_URL="postgresql+asyncpg://braingain:braingain@192.168.188.67:5432/braingain" \
+CDN_BASE_URL="http://192.168.188.67:8081" \
+JWT_SECRET="01234567890123456789012345678901" \
+python -m app.seed_game games/<dir> --title "<Title>" --update
+
+# Register a brand new game on the server:
+... python -m app.seed_game games/<dir> --title "<Title>" --owner <username>
+```
+
+`--update` uploads new JS to CDN, creates a new CDN-backed Content entry, re-links scores/history, and purges stale prepared rounds. Titles can be listed via `GET /games`.
 
 ## Pitfalls
 

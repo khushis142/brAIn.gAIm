@@ -1,0 +1,37 @@
+{
+  "context": "Mini golf quiz with 3 to 5 holes. Each hole shows one question at the top of the screen and has 2 to 4 cups on the green, one per answer option; the player putts the ball into the cup of the answer they think is right. Sinking the ball in the wrong cup loses the hole. `question` is a concise question (at most 80 characters). `options` are 2 to 4 short answers (1 to 4 words, at most 24 characters each), all distinct and plausible, with exactly one correct. `answer` is the index of the only correct option in `options` and must be smaller than the number of options. The game shuffles the cups, so the correct option may be at any index. `context` is a short phrase naming the topic; it is shown to the player. Use only facts from the study material and prefer questions about different parts of it.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "holes"],
+    "additionalProperties": false,
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "holes": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "required": ["question", "options", "answer"],
+          "additionalProperties": false,
+          "properties": {
+            "question": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": { "type": "string", "minLength": 1, "maxLength": 24 }
+            },
+            "answer": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Set active project
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{api}}/users/me
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "active_project_id": "{{projectId}}"
+  }
+}
+
+docs {
+  The mini games are generated from this project. `null` deactivates it. Run
+  **projects/Create** first.
+}

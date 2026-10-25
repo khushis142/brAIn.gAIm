@@ -5,6 +5,8 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
+from app.zombie import ACCESSORIES, AVATARS, Slot
+
 Kind = Literal["video", "game"]
 
 # Videos the frontend can play (the CDN accepts more).
@@ -32,6 +34,9 @@ def _blank_to_none(text: str | None) -> str | None:
 class UserUpdate(BaseModel):
     # Omitted = unchanged, null or blank = cleared.
     interests: Annotated[str | None, Field(max_length=2000), AfterValidator(_blank_to_none)] = None
+    active_project_id: uuid.UUID | None = Field(
+        None, description="Own project the mini games are generated from"
+    )
 
 
 class UserRead(BaseModel):
@@ -40,6 +45,7 @@ class UserRead(BaseModel):
     id: uuid.UUID
     username: str
     interests: str | None
+    active_project_id: uuid.UUID | None
 
 
 class Token(BaseModel):
@@ -100,6 +106,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     body: str | None = Field(None, max_length=100_000, description="Markdown")
+    color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class AttachmentCreate(BaseModel):
@@ -124,10 +131,20 @@ class AttachmentRead(BaseModel):
 class ProjectRead(BaseModel):
     id: uuid.UUID
     name: str
+    color: str
     body: str
     attachments: list[AttachmentRead]
     created_at: datetime
     updated_at: datetime
+
+
+class FlashcardRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    body: str
+    created_at: datetime
 
 
 class VideoItem(BaseModel):
@@ -146,6 +163,10 @@ class GameItem(BaseModel):
     data: dict[str, Any] = Field(
         description="Generated game input; pass it as `data` to the game runtime's session.start"
     )
+    assets: list[str] = Field(
+        description="JSON Pointers into `data` holding CDN URLs (e.g. TTS audio). The game "
+        "iframe has no network access: fetch each and replace it with a data: URL first."
+    )
 
 
 FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]
@@ -153,8 +174,85 @@ FeedItem = Annotated[VideoItem | GameItem, Field(discriminator="type")]
 
 class ScoreCreate(BaseModel):
     score: int = Field(ge=0)
+    round_id: uuid.UUID | None = Field(
+        None, description="The feed item's round_id; a round is scored once, repeats are ignored"
+    )
+
+
+class ScoreResult(BaseModel):
+    newly_unlocked: list[str] = Field(description="Accessory ids this score unlocked")
+    newly_unlocked_avatars: list[str] = Field(description="Avatar ids this score unlocked")
+    games_completed: int
 
 
 class LeaderboardEntry(BaseModel):
     username: str
     score: int
+
+
+class AccessoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    slot: Slot
+    unlock_description: str
+
+
+class Equipped(BaseModel):
+    # In updates: omitted = unchanged, null = unequipped.
+    model_config = ConfigDict(extra="forbid")
+
+    head: str | None = None
+    eyes: str | None = None
+    neck: str | None = None
+    feet: str | None = None
+
+    @model_validator(mode="after")
+    def _check_slots(self) -> Self:
+        for slot in self.model_fields_set:
+            accessory_id = getattr(self, slot)
+            if accessory_id is None:
+                continue
+            accessory = ACCESSORIES.get(accessory_id)
+            if accessory is None:
+                raise ValueError(f"unknown accessory {accessory_id!r}")
+            if accessory.slot != slot:
+                raise ValueError(f"{accessory_id!r} is worn on {accessory.slot}, not {slot}")
+        return self
+
+
+class AccessoryProgress(BaseModel):
+    id: str
+    current: int
+    target: int
+
+
+class AvatarRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    unlock_description: str
+
+
+class AvatarSelect(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    avatar: str
+
+    @model_validator(mode="after")
+    def _check_avatar(self) -> Self:
+        if self.avatar not in AVATARS:
+            raise ValueError(f"unknown avatar {self.avatar!r}")
+        return self
+
+
+class ZombieRead(BaseModel):
+    unlocked: list[str]
+    equipped: Equipped
+    games_completed: int
+    progress: list[AccessoryProgress] = Field(description="Locked accessories with a count goal")
+    avatar: str = Field(description="The selected avatar")
+    unlocked_avatars: list[str]
+    avatar_progress: list[AccessoryProgress] = Field(description="Locked avatars with a count goal")

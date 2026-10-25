@@ -1,0 +1,32 @@
+{
+  "context": "Create five short multiple-choice questions from the learner's study material for a glass-bridge game. Each question has one concise correct answer and one plausible but clearly incorrect answer. Vary the correct-answer position; the game also randomizes the sides. Keep questions under 100 characters and answers under 55 characters.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "questions"],
+    "additionalProperties": false,
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "questions": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "required": ["question", "correctAnswer", "wrongAnswer"],
+          "additionalProperties": false,
+          "properties": {
+            "question": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "correctAnswer": { "type": "string", "minLength": 1, "maxLength": 55 },
+            "wrongAnswer": { "type": "string", "minLength": 1, "maxLength": 55 }
+          }
+        }
+      }
+    }
+  }
+}

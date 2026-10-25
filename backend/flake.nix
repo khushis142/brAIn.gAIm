@@ -19,6 +19,7 @@
           packages = [
             python
             pkgs.uv
+            pkgs.ruff
             pkgs.postgresql # psql client + local server for tests
           ];
 
@@ -32,6 +33,7 @@
           shellHook = ''
             uv sync --quiet
             source .venv/bin/activate
+            export PATH="${pkgs.ruff}/bin:$PATH"
           '';
         };
       }
