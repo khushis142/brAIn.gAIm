@@ -20,6 +20,7 @@ const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destr
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
 const GAME_ASSET_CDN_ORIGIN = 'https://192.168.188.67:8444';
+const GAME_MODULE_ORIGIN = 'https://esm.sh';
 const GAME_KEYS = new Set([
   'ArrowLeft',
   'ArrowRight',
@@ -272,7 +273,7 @@ export class GameSession {
     if (
       e.data?.type === 'asset-request' &&
       typeof e.data.path === 'string' &&
-      e.data.path.startsWith('/assets/')
+      this.isAllowedAssetPath(e.data.path)
     ) {
       void this.sendAsset(e.data.path);
       return;
@@ -367,7 +368,7 @@ export class GameSession {
       `img-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
       `media-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
       `font-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
-      `connect-src ${this.assetOrigins(options.assets).join(' ') || "'none'"}`,
+      `connect-src ${[...this.assetOrigins(options.assets), GAME_MODULE_ORIGIN].join(' ')}`,
     ].join('; ');
 
     // Stop generated code from closing the script tag or opening an HTML comment
@@ -407,7 +408,7 @@ export class GameSession {
   }
 
   private assetOrigins(assets: GameAssetManifest | undefined): string[] {
-    const origins = new Set<string>();
+    const origins = new Set<string>([GAME_ASSET_CDN_ORIGIN]);
     for (const asset of Object.values(assets ?? {})) {
       try {
         const url = new URL(asset.url);
@@ -417,5 +418,14 @@ export class GameSession {
       }
     }
     return [...origins];
+  }
+
+  private isAllowedAssetPath(path: string): boolean {
+    if (path.startsWith('/assets/')) return true;
+    try {
+      return new URL(path).origin === GAME_ASSET_CDN_ORIGIN;
+    } catch {
+      return false;
+    }
   }
 }
