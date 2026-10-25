@@ -15,6 +15,7 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService, FeedItem, LeaderboardEntry, ScoreRead } from '../../core/api.service';
 import { ZombieService } from '../../core/zombie.service';
+import { inlineGameAssets } from '../../engine/gameAssets';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
 import { Zombie } from '../../shared/zombie/zombie';
@@ -44,7 +45,10 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
  * Resolves with the element's size once layout gives it one. On mobile the host is
  * often still 0×0 right after an item swap (address bar, keyboard, first render).
  */
-function waitForSize(element: HTMLElement, timeoutMs: number): Promise<{ width: number; height: number }> {
+function waitForSize(
+  element: HTMLElement,
+  timeoutMs: number,
+): Promise<{ width: number; height: number }> {
   const measure = () => ({ width: element.clientWidth, height: element.clientHeight });
   const initial = measure();
   const Observer = element.ownerDocument.defaultView?.ResizeObserver;
@@ -151,8 +155,13 @@ export class Home {
     effect(() => {
       const result = this.session()?.result();
       const current = this.item();
-        if (result === null || result === undefined || current?.type !== 'game' ||
-          this.submittedRoundId === current.round_id) return;
+      if (
+        result === null ||
+        result === undefined ||
+        current?.type !== 'game' ||
+        this.submittedRoundId === current.round_id
+      )
+        return;
       this.submittedRoundId = current.round_id;
       void this.submitScore(current.id, current.round_id, result.score);
     });
@@ -307,10 +316,12 @@ export class Home {
   private async submitScore(gameId: string, roundId: string, score: number): Promise<void> {
     this.scoreSubmissionStatus.set('uploading');
     try {
-      const saved = await firstValueFrom(this.api.submitScore(gameId, {
-        score: Math.max(0, score),
-        round_id: roundId,
-      }));
+      const saved = await firstValueFrom(
+        this.api.submitScore(gameId, {
+          score: Math.max(0, score),
+          round_id: roundId,
+        }),
+      );
       this.scoreSubmissionStatus.set('saved');
       await Promise.all([this.loadLeaderboard(gameId), this.showUnlocks(roundId, saved)]);
     } catch (error) {
@@ -417,7 +428,16 @@ export class Home {
   private async show(item: FeedItem): Promise<void> {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
-    const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
+    const [gameCode, gameData] =
+      gameItem === null
+        ? [null, null]
+        : await Promise.all([
+            loadGameCode(gameItem.url),
+            inlineGameAssets(
+              gameItem.data ?? { context: `"${gameItem.title}", a short game in a learning feed.` },
+              gameItem.assets,
+            ),
+          ]);
     if (gameItem !== null && this.username() === null) {
       this.username.set((await firstValueFrom(this.api.getMe())).username);
     }
@@ -443,9 +463,7 @@ export class Home {
       if (this.destroyRef.destroyed || this.item() !== item) return;
       this.session()?.start(gameCode, {
         username: this.username() ?? '',
-        data: gameItem?.data ?? {
-          context: `"${item.title}", a short game in a learning feed.`,
-        },
+        data: gameData ?? { context: `"${item.title}", a short game in a learning feed.` },
         width,
         height,
       });
