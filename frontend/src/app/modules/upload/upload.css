@@ -1,6 +1,6 @@
 .dropzone-bar {
   align-items: stretch;
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  bottom: 0; /* of the page area, which ends above the nav */
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -203,7 +203,9 @@ hr {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 100%;
   max-width: 420px;
+  overflow-y: auto; /* only with the keyboard up on a phone held sideways */
   padding: 24px;
   width: 100%;
 }

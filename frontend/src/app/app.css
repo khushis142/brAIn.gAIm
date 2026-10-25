@@ -2,30 +2,35 @@
   display: block;
 }
 
+/* Exactly one screen tall: header, page, nav. Only the page scrolls, and only when its
+   content is longer than the space left, so pages that fill it can use height: 100%. */
 .app-shell {
-  min-height: 100dvh;
-  padding-bottom: 76px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
 }
 
+.page-content,
+.public-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The side padding centers a 680px column, so the scrollbar stays at the window's edge */
 .page-content {
-  margin: 0 auto;
-  max-width: 720px;
-  padding: 28px 20px;
+  padding: 28px max(20px, calc((100% - 680px) / 2));
 }
 
 .bottom-nav {
   align-items: center;
-  backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--surface);
   border-top: 1px solid var(--border);
-  bottom: 0;
   display: flex;
+  flex: none;
   justify-content: space-around;
-  left: 0;
-  padding: 8px max(12px, calc((100vw - 560px) / 2)) max(8px, env(safe-area-inset-bottom));
-  position: fixed;
-  right: 0;
-  z-index: 10;
+  padding: 8px max(12px, calc((100% - 560px) / 2)) max(8px, env(safe-area-inset-bottom));
 }
 
 .nav-item {
@@ -39,9 +44,17 @@
   font-weight: 600;
   gap: 4px;
   max-width: 120px;
-  padding: 5px 10px;
+  min-width: 0; /* six items share a 320px phone */
+  padding: 5px 4px;
   text-decoration: none;
   transition: color 150ms ease, background 150ms ease;
+}
+
+.nav-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-item:hover,
@@ -61,5 +74,23 @@
   .page-content:has(app-home),
   .page-content:has(app-gamehub .active-game-view) {
     padding: 0;
+  }
+}
+
+/* Phones held sideways: icon and label side by side, so the nav takes less height */
+@media (max-height: 500px) {
+  .bottom-nav {
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    padding-top: 4px;
+  }
+
+  .nav-item {
+    flex-direction: row;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .page-content {
+    padding-block: 16px;
   }
 }

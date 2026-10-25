@@ -1,12 +1,17 @@
 :host {
   display: block;
-  min-height: 100%;
 }
 
 .gamehub-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* A running game fills the page area instead of scrolling it */
+:host:has(.active-game-view),
+.gamehub-container:has(.active-game-view) {
+  height: 100%;
 }
 
 .search-filter-section {
@@ -248,12 +253,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  height: calc(100dvh - 130px);
+  height: 100%;
 }
 
 .active-game-toolbar {
   align-items: center;
   display: flex;
+  gap: 8px;
   justify-content: space-between;
 }
 
@@ -280,11 +286,15 @@
   align-items: center;
   display: flex;
   gap: 10px;
+  min-width: 0;
 }
 
 .active-game-info h2 {
   font-size: 1.1rem;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .owner-pill {
@@ -327,7 +337,7 @@
   box-shadow: 0 20px 48px rgb(0 0 0 / 0.3);
   display: flex;
   flex-direction: column;
-  max-height: 80vh;
+  max-height: 100%;
   max-width: 400px;
   padding: 20px;
   width: 100%;
@@ -377,9 +387,11 @@
   font-size: 1.1rem;
 }
 
+/* Long lists scroll here; on short screens the body shrinks so the footer stays visible */
 .modal-body {
   margin: 16px 0;
   max-height: 320px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -458,6 +470,13 @@
 
 @media (max-width: 600px) {
   .games-grid { grid-template-columns: 1fr; }
-  .active-game-view { height: calc(100dvh - 120px); }
-  .active-game-toolbar { flex-wrap: wrap; gap: 8px; }
+  /* The page has no padding here, so the toolbar brings its own and the stage goes edge to edge */
+  .active-game-view { gap: 8px; }
+  .active-game-toolbar { padding: 8px 12px 0; }
+  .active-game-toolbar .back-button h2 { display: none; }
+  .player-stage { border-radius: 0; }
+}
+
+@media (max-height: 500px) {
+  .active-game-view { gap: 8px; }
 }
