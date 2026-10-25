@@ -4,24 +4,21 @@ import {
   Component,
   computed,
   DestroyRef,
-  effect,
   ElementRef,
+  effect,
   inject,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideBrain, LucideChevronDown } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
-import { ApiService, FeedItem, GameItem } from '../../core/api.service';
-import { ZombieService } from '../../core/zombie.service';
+import { ApiService, FeedItem, LeaderboardEntry } from '../../core/api.service';
 import { GameEngineService } from '../../engine/gameEngineService';
 import { GameSession } from '../../engine/gameSession';
-import { Zombie } from '../../shared/zombie/zombie';
 
 type Phase = 'idle' | 'leaving' | 'entering';
 type PlaybackBubble = 'play' | 'pause';
+type ScoreSubmissionStatus = 'idle' | 'uploading' | 'saved' | 'failed';
 
 const LEAVE_MS = 450; // keep in sync with the animations in home.css
 const ENTER_MS = 450;
@@ -39,7 +36,7 @@ interface Burst {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 @Component({
-  imports: [LucideBrain, LucideChevronDown, RouterLink, Zombie],
+  imports: [LucideBrain, LucideChevronDown],
   selector: 'app-home',
   styleUrl: './home.css',
   templateUrl: './home.html',
@@ -51,7 +48,6 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 export class Home {
   private readonly api = inject(ApiService);
   private readonly engine = inject(GameEngineService);
-  protected readonly zombie = inject(ZombieService);
   private readonly gameHost = viewChild.required<ElementRef<HTMLElement>>('gameHost');
   private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
@@ -65,6 +61,16 @@ export class Home {
   protected readonly isSeeking = signal(false);
   protected readonly arePlayerControlsVisible = signal(false);
   protected readonly playbackBubble = signal<PlaybackBubble | null>(null);
+  protected readonly scoreSubmissionStatus = signal<ScoreSubmissionStatus>('idle');
+  protected readonly leaderboard = signal<LeaderboardEntry[] | null>(null);
+  protected readonly leaderboardStatus = signal<'idle' | 'loading' | 'loaded' | 'failed'>('idle');
+  protected readonly topLeaderboard = computed(() => this.leaderboard()?.slice(0, 3) ?? []);
+  protected readonly playerBest = computed(() => {
+    const name = this.username();
+    const entries = this.leaderboard();
+    if (!name || !entries) return null;
+    return entries.find((entry) => entry.username === name) ?? null;
+  });
   protected readonly playheadPercent = computed(() => {
     const duration = this.duration();
     return duration > 0 ? (this.currentTime() / duration) * 100 : 0;
@@ -83,11 +89,9 @@ export class Home {
     return current !== null && this.likedIds().has(current.id);
   });
   protected readonly bursts = signal<Burst[]>([]);
-  /** Accessories unlocked by the game on screen */
-  protected readonly unlockedNames = signal<string[]>([]);
 
   private busy = false;
-  private username: string | null = null;
+  private readonly username = signal<string | null>(null);
   private touchStartY: number | null = null;
   private seekTimestampTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackBubbleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -98,6 +102,7 @@ export class Home {
   private singleTapTimer: ReturnType<typeof setTimeout> | null = null;
   private intersectionObserver?: IntersectionObserver;
   private visibleRatio = 1;
+  private submittedRoundId: string | null = null;
 
   constructor() {
     // Runs in the browser after the first render, when #gameHost exists
@@ -105,13 +110,14 @@ export class Home {
       this.session.set(this.engine.createSession(this.gameHost().nativeElement));
       this.observeCardLifecycle();
       this.next();
-      // The mascot is decoration; without it the result screen still works
-      this.zombie.load().catch(() => {});
     });
     effect(() => {
       const result = this.session()?.result();
-      const current = untracked(this.item);
-      if (result && current?.type === 'game') untracked(() => this.submitScore(current, result.score));
+      const current = this.item();
+        if (result === null || result === undefined || current?.type !== 'game' ||
+          this.submittedRoundId === current.round_id) return;
+      this.submittedRoundId = current.round_id;
+      void this.submitScore(current.id, current.round_id, result.score);
     });
     const destroyRef = inject(DestroyRef);
     const onVisibilityChange = () => this.syncGameLifecycle();
@@ -201,7 +207,6 @@ export class Home {
 
   protected onKeydown(event: KeyboardEvent): void {
     if (event.key !== 'ArrowDown') return;
-    if (this.item()?.type === 'game' && this.phase() === 'idle') return;
     event.preventDefault(); // stop the page from scrolling
     this.next();
   }
@@ -253,26 +258,6 @@ export class Home {
     setTimeout(() => this.bursts.update((all) => all.filter((b) => b !== burst)), BURST_MS);
   }
 
-  private async submitScore(game: GameItem, score: number): Promise<void> {
-    try {
-      // The backend rejects negative scores, but the finished game should still count
-      const { newly_unlocked, newly_unlocked_avatars } = await firstValueFrom(
-        this.api.submitScore(game.id, { score: Math.max(0, score), round_id: game.round_id }),
-      );
-      if (newly_unlocked.length === 0 && newly_unlocked_avatars.length === 0) return;
-      await this.zombie.load();
-      if (this.item() === game) {
-        this.unlockedNames.set([
-          ...newly_unlocked_avatars.map((id) => `${this.zombie.avatarName(id)} avatar`),
-          ...newly_unlocked.map((id) => this.zombie.accessoryName(id)),
-        ]);
-      }
-    } catch (err) {
-      // A lost score must not interrupt the feed
-      console.warn('Could not save game score', err);
-    }
-  }
-
   private setLiked(id: string, liked: boolean): void {
     this.likedIds.update((ids) => {
       const next = new Set(ids);
@@ -280,6 +265,33 @@ export class Home {
       else next.delete(id);
       return next;
     });
+  }
+
+  private async submitScore(gameId: string, roundId: string, score: number): Promise<void> {
+    this.scoreSubmissionStatus.set('uploading');
+    try {
+      await firstValueFrom(this.api.submitScore(gameId, {
+        score: Math.max(0, score),
+        round_id: roundId,
+      }));
+      this.scoreSubmissionStatus.set('saved');
+      await this.loadLeaderboard(gameId);
+    } catch (error) {
+      console.warn('Could not save game score', error);
+      this.scoreSubmissionStatus.set('failed');
+    }
+  }
+
+  private async loadLeaderboard(gameId: string): Promise<void> {
+    this.leaderboardStatus.set('loading');
+    try {
+      const entries = await firstValueFrom(this.api.getLeaderboard(gameId, 100));
+      this.leaderboard.set([...entries].sort((left, right) => right.score - left.score));
+      this.leaderboardStatus.set('loaded');
+    } catch (error) {
+      console.warn('Could not load game leaderboard', error);
+      this.leaderboardStatus.set('failed');
+    }
   }
 
   protected onResize(): void {
@@ -352,7 +364,9 @@ export class Home {
     // Download game code before swapping, so a failed download keeps the current item
     const gameItem = item.type === 'game' ? item : null;
     const gameCode = gameItem === null ? null : await loadGameCode(gameItem.url);
-    if (gameItem !== null) this.username ??= (await firstValueFrom(this.api.getMe())).username;
+    if (gameItem !== null && this.username() === null) {
+      this.username.set((await firstValueFrom(this.api.getMe())).username);
+    }
 
     this.session()?.stop();
     this.clearTimers();
@@ -363,13 +377,16 @@ export class Home {
     this.arePlayerControlsVisible.set(false);
     this.playbackBubble.set(null);
     this.bursts.set([]);
-    this.unlockedNames.set([]);
+    this.scoreSubmissionStatus.set('idle');
+    this.leaderboard.set(null);
+    this.leaderboardStatus.set('idle');
+    this.submittedRoundId = null;
     this.item.set(item);
 
     if (gameCode !== null && item.type === 'game') {
       const host = this.gameHost().nativeElement;
       this.session()?.start(gameCode, {
-        username: this.username ?? '',
+        username: this.username() ?? '',
         data: gameItem?.data ?? {
           context: `"${item.title}", a short game in a learning feed.`,
         },

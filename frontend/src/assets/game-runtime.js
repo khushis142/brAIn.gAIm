@@ -417,6 +417,10 @@
         fail(new Error('Result exceeds the size budget'));
         return;
       }
+      // A submitted result ends gameplay. Do not let the execution budget
+      // turn a long-lived result screen into a timeout error.
+      clearTimeout(executionTimer);
+      executionTimer = undefined;
       post({ type: 'result', result });
     },
     setUiDesign(design) {
@@ -957,7 +961,11 @@
         REGISTER_TIMEOUT_MS / 1000 + 's'));
     }
   }, REGISTER_TIMEOUT_MS);
-  executionTimer = setTimeout(() => fail(new Error('Execution time budget exceeded')), EXECUTION_TIME_MS);
+  executionTimer = setTimeout(() => {
+    if (game && !stopped && !failed && resultSubmissions === 0) {
+      fail(new Error('Execution time budget exceeded'));
+    }
+  }, EXECUTION_TIME_MS);
 
   // ---------------------------------------------------------------- heartbeat
   // Only sent while things are healthy. If the loop should be running but no

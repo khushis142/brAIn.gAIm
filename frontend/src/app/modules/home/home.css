@@ -211,6 +211,32 @@
   margin: 0;
 }
 
+.leaderboard {
+  display: grid;
+  gap: 4px;
+  min-width: min(240px, 72vw);
+}
+
+.leaderboard-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 6px 0 2px;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.leaderboard-row {
+  display: flex;
+  font-size: 0.9rem;
+  gap: 18px;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.current-player {
+  color: var(--accent);
+}
+
 .info {
   align-items: center;
   background: var(--control);
