@@ -52,7 +52,7 @@ function toFile(attachment: AttachmentRead): UploadedFile {
 export class Upload implements OnInit {
   private readonly api = inject(ApiService);
   private readonly userService = inject(UserService);
-  protected readonly extractingLabel = [...'Wissen wird extrahiert'];
+  protected readonly extractingLabel = [...'Extracting knowledge'];
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly selectedId = signal<string | null>(null);
@@ -88,7 +88,7 @@ export class Upload implements OnInit {
           this.loadFlashcards(user.active_project_id);
         }
       },
-      error: () => this.error.set('Knowledge konnte nicht geladen werden.'),
+      error: () => this.error.set('Knowledge could not be loaded.'),
     });
   }
 
@@ -116,7 +116,7 @@ export class Upload implements OnInit {
 
     if (dialog.mode === 'create') {
       let createdId: string | null = null;
-      await this.run('Projekt konnte nicht erstellt werden.', async () => {
+      await this.run('Project could not be created.', async () => {
         const created = await firstValueFrom(this.api.createProject(name));
         createdId = created.id;
         this.projects.update((projects) => [...projects, this.toProject(created)]);
@@ -132,7 +132,7 @@ export class Upload implements OnInit {
       this.nameDialog.set(null);
       return;
     }
-    await this.run('Projekt konnte nicht umbenannt werden.', async () => {
+    await this.run('Project could not be renamed.', async () => {
       const updated = await firstValueFrom(this.api.updateProject(dialog.projectId, { name }));
       this.patchProject(dialog.projectId, { name: updated.name });
       this.nameDialog.set(null);
@@ -143,7 +143,7 @@ export class Upload implements OnInit {
     if (this.busy()) {
       return;
     }
-    await this.run('Ordnerfarbe konnte nicht gespeichert werden.', async () => {
+    await this.run('Folder color could not be saved.', async () => {
       const updated = await firstValueFrom(this.api.updateProject(id, { color }));
       this.patchProject(id, { color: updated.color ?? color });
     });
@@ -153,7 +153,7 @@ export class Upload implements OnInit {
     if (id === this.selectedId() || this.busy()) {
       return;
     }
-    await this.run('Projekt konnte nicht gewechselt werden.', async () => {
+    await this.run('Project could not be selected.', async () => {
       await firstValueFrom(this.userService.setActiveProject(id));
       this.selectedId.set(id);
       this.loadFlashcards(id);
@@ -161,7 +161,7 @@ export class Upload implements OnInit {
   }
 
   protected async removeProject(id: string): Promise<void> {
-    await this.run('Projekt konnte nicht gelöscht werden.', async () => {
+    await this.run('Project could not be deleted.', async () => {
       await firstValueFrom(this.api.deleteProject(id));
       this.projects.update((projects) => projects.filter((project) => project.id !== id));
       if (this.selectedId() === id) {
@@ -175,7 +175,7 @@ export class Upload implements OnInit {
     if (!projectId) {
       return;
     }
-    await this.run('Upload fehlgeschlagen.', async () => {
+    await this.run('Upload failed.', async () => {
       for (const file of files) {
         const uploaded = await firstValueFrom(this.api.uploadToCdn(file));
         const attachment = await firstValueFrom(this.api.addAttachment(projectId, uploaded));
@@ -193,7 +193,7 @@ export class Upload implements OnInit {
     }
     this.flashcardsRequested.set(true);
     this.processingFlashcards.set(true);
-    await this.run('Wissen konnte nicht verarbeitet werden.', async () => {
+    await this.run('Knowledge could not be processed.', async () => {
       this.flashcards.set(await firstValueFrom(this.api.processProjectFlashcards(projectId)));
       this.flashcardsLoading.set(false);
     });
@@ -221,7 +221,7 @@ export class Upload implements OnInit {
       error: () => {
         if (this.selectedId() === projectId) {
           this.flashcardsLoading.set(false);
-          this.error.set('Extrahiertes Wissen konnte nicht geladen werden.');
+          this.error.set('Extracted knowledge could not be loaded.');
         }
       },
     });
@@ -232,7 +232,7 @@ export class Upload implements OnInit {
     if (!projectId) {
       return;
     }
-    await this.run('Datei konnte nicht gelöscht werden.', async () => {
+    await this.run('File could not be deleted.', async () => {
       await firstValueFrom(this.api.deleteAttachment(projectId, file.id));
       this.patchProject(projectId, {
         files: (this.findProject(projectId)?.files ?? []).filter((item) => item.id !== file.id),

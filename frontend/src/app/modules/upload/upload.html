@@ -7,11 +7,11 @@
     <div class="knowledge-subview card">
       <button class="back-button" type="button" (click)="closeKnowledgeView()">
         <span aria-hidden="true">←</span>
-        Zurück
+        Back
       </button>
-      <h2>Extrahiertes Wissen</h2>
+      <h2>Extracted knowledge</h2>
       @if (flashcardsLoading()) {
-        <p class="hint">Wissen wird geladen…</p>
+        <p class="hint">Loading knowledge…</p>
       }
       @for (flashcard of flashcards(); track flashcard.id) {
         <article class="flashcard">
@@ -20,7 +20,7 @@
         </article>
       } @empty {
         @if (!flashcardsLoading()) {
-          <p class="hint">Noch kein Wissen extrahiert.</p>
+          <p class="hint">No knowledge extracted yet.</p>
         }
       }
     </div>
@@ -35,7 +35,7 @@
     </header>
 
     <div class="card">
-      <div class="projects" role="list" aria-label="Projekte">
+      <div class="projects" role="list" aria-label="Projects">
         <app-project-folder [isNew]="true" (pressed)="openCreateProject()" />
         @for (project of projects(); track project.id) {
           <app-project-folder
@@ -55,7 +55,7 @@
 
       @if (selected()) {
         <button class="knowledge-link" type="button" (click)="openKnowledgeView()">
-          <span>Extrahiertes Wissen</span>
+          <span>Extracted knowledge</span>
           <span class="knowledge-count">{{ flashcards().length }}</span>
         </button>
       }
@@ -65,10 +65,10 @@
           @for (file of project.files; track file.id) {
             <app-file-item [file]="file" (remove)="removeFile(file)" />
           } @empty {
-            <p class="hint">Noch keine Dateien in diesem Projekt.</p>
+            <p class="hint">No files in this project yet.</p>
           }
         } @else {
-          <p class="hint">Wähle oder erstelle ein Projekt.</p>
+          <p class="hint">Select or create a project.</p>
         }
       </div>
 
@@ -82,7 +82,7 @@
               [class.processing]="processingFlashcards()"
               [class.requested]="flashcardsRequested()"
               [attr.aria-label]="
-            processingFlashcards() ? 'Wissen wird extrahiert' : 'Wissen extrahieren'
+            processingFlashcards() ? 'Extracting knowledge' : 'Extract knowledge'
           "
               (click)="processKnowledge()"
           >
@@ -94,7 +94,7 @@
               }
             </span>
             } @else {
-              <span>Wissen extrahieren</span>
+              <span>Extract knowledge</span>
             }
           </button>
         </div>
@@ -113,9 +113,9 @@
           (submit)="$event.preventDefault(); saveProjectName()"
       >
         <h2 id="project-name-title">
-          {{ dialog.mode === 'create' ? 'Neues Projekt' : 'Projekt umbenennen' }}
+          {{ dialog.mode === 'create' ? 'New project' : 'Rename project' }}
         </h2>
-        <label for="project-name">Projektname</label>
+        <label for="project-name">Project name</label>
         <input
             id="project-name"
             type="text"
@@ -128,10 +128,10 @@
         />
         <div class="dialog-actions">
           <button type="button" class="cancel" [disabled]="busy()" (click)="nameDialog.set(null)">
-            Abbrechen
+            Cancel
           </button>
           <button type="submit" [disabled]="busy() || !dialog.name.trim()">
-            {{ busy() ? 'Speichert…' : 'Speichern' }}
+            {{ busy() ? 'Saving…' : 'Save' }}
           </button>
         </div>
       </form>

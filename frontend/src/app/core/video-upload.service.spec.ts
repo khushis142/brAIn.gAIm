@@ -31,12 +31,12 @@ describe('VideoUploadService', () => {
 
     it('rejects a non-mp4 file', () => {
       const file = new File(['x'], 'clip.mov', { type: 'video/quicktime' });
-      expect(service.validateFile(file)).toBe('Nur .mp4-Dateien werden unterstützt.');
+      expect(service.validateFile(file)).toBe('Only .mp4 files are supported.');
     });
 
     it('rejects a file larger than the size limit', () => {
       const file = mp4File('clip.mp4', MAX_VIDEO_SIZE_BYTES + 1);
-      expect(service.validateFile(file)).toContain('zu groß');
+      expect(service.validateFile(file)).toContain('too large');
     });
   });
 

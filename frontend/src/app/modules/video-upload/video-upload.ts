@@ -68,7 +68,7 @@ export class VideoUpload {
       },
       error: () => {
         this.status.set('error');
-        this.error.set('Video konnte nicht hochgeladen werden.');
+        this.error.set('Video could not be uploaded.');
       },
     });
   }
