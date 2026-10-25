@@ -1,5 +1,5 @@
 import { GAME_BUDGETS, GAME_KEYS, GAME_PROTOCOL_VERSION, GameApi, GameModule, HostCommand, InputState, TouchPhase, TouchPoint } from './gameProtocol';
-import { GAME_RUNTIME_SCRIPT } from './gameRuntime';
+import { GAME_RUNTIME_SCRIPT } from './gameRuntimeScript';
 
 const RUNTIME_SOURCE = GAME_RUNTIME_SCRIPT;
 const CANVAS_WIDTH = 200;

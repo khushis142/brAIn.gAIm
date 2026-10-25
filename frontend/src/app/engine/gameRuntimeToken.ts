@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { InjectionToken, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { GAME_RUNTIME_SCRIPT } from './gameRuntime';
+import { GAME_RUNTIME_SCRIPT } from './gameRuntimeScript';
 
 /** The runtime script injected into every game iframe; built from gameRuntime.ts. */
 export const GAME_RUNTIME_SOURCE = new InjectionToken<string>('GAME_RUNTIME_SOURCE', {
