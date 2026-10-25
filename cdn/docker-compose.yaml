@@ -1,6 +1,6 @@
 services:
   cdn:
-    image: ghcr.io/brain-gaim/cdn:0.0.8
+    image: ghcr.io/brain-gaim/cdn:0.0.9
     container_name: cdn
     restart: unless-stopped
     ports:
