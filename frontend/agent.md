@@ -17,7 +17,8 @@ npm test -- --watch=false  # run Vitest unit tests
 - **API & CDN communication (`src/app/core/`)**:
   - `ApiService` (`src/app/core/api.service.ts`) handles Backend REST calls (`environment.apiUrl`) and attaches `Authorization: Bearer <token>` from `localStorage` (`braingain-token`).
   - `VideoUploadService` (`src/app/core/video-upload.service.ts`) validates `.mp4` files (max 500 MB), uploads binary files to the CDN (`POST /api/v1/files`), and registers metadata on the Backend (`POST /content`).
-- **Sandboxed Game Runtime (`src/app/engine/` & `src/assets/game-runtime.js`)**:
+- **Sandboxed Game Runtime (`src/app/engine/`)**:
+  - The in-iframe runtime is `gameRuntime.ts`, serialized with `toString()` into `GAME_RUNTIME_SCRIPT`. Keep that function self-contained: only type imports and browser globals; shared values (budgets, keys, protocol version) arrive through its `config` argument.
   - Untrusted/LLM-seeded game JS runs inside `<iframe sandbox="allow-scripts">` via `GameEngineService` and `GameSession` (protocol v2, `docs/game-authoring.md`).
   - Never add `allow-same-origin` to the game iframe sandbox.
   - `input.keys[code]` provides `KeyState` objects (`{ held, justPressed, justReleased }`) for `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, and `Space`.

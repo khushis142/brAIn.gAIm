@@ -1,15 +1,14 @@
-// @ts-ignore -- Node built-in, available in the test runner; @types/node is not installed
-import { readFileSync } from 'node:fs';
-import { GameModule, InputState, TouchPhase, TouchPoint } from './gameProtocol';
+import { GAME_KEYS, GAME_PROTOCOL_VERSION, GameModule, InputState, TouchPhase, TouchPoint } from './gameProtocol';
+import { GAME_RUNTIME_SCRIPT } from './gameRuntime';
 
-const RUNTIME_SOURCE: string = readFileSync('src/assets/game-runtime.js', 'utf8');
+const RUNTIME_SOURCE = GAME_RUNTIME_SCRIPT;
 const CANVAS_WIDTH = 200;
 const CANVAS_HEIGHT = 100;
 
 type TouchSnapshot = Pick<TouchPoint, 'id' | 'x' | 'y' | 'justStarted' | 'justEnded' | 'cancelled'>;
 
 /**
- * Runs game-runtime.js against a fake window so each test gets a fresh runtime
+ * Runs the runtime script against a fake window so each test gets a fresh runtime
  * and drives frames by hand. Touches are given in canvas pixels (rect is 1:1).
  */
 function startRuntime() {
@@ -28,7 +27,7 @@ function startRuntime() {
   const frames: FrameRequestCallback[] = [];
   const posted: { type: string; message?: string }[] = [];
   const fakeWindow: Record<string, unknown> = {
-    __GAME_INPUT__: { protocolVersion: 2, username: 'tester', data: { context: 'test' } },
+    __GAME_INPUT__: { protocolVersion: GAME_PROTOCOL_VERSION, username: 'tester', data: { context: 'test' } },
     devicePixelRatio: 1,
     focus: noop,
   };
@@ -266,5 +265,21 @@ describe('game runtime touches forwarded by the host', () => {
       { id: 1, x: 180, y: 50, justStarted: true, justEnded: false, cancelled: false },
     ]);
     expect(runtime.input()!.keys['ArrowLeft'].held).toBe(false);
+  });
+});
+
+describe('game runtime script', () => {
+  it('can be inlined into a script tag', () => {
+    expect(RUNTIME_SOURCE).not.toMatch(/<\/script/i);
+  });
+
+  it('offers exactly the shared game keys', () => {
+    vi.useFakeTimers();
+    const runtime = startRuntime();
+    runtime.frame();
+    expect(Object.keys(runtime.input()!.keys).sort()).toEqual([...GAME_KEYS].sort());
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    runtime.canvas.remove();
   });
 });

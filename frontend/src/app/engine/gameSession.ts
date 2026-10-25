@@ -10,6 +10,8 @@ import {
   HostCommand,
   isSandboxEvent,
   GAME_BUDGETS,
+  GAME_KEYS,
+  GAME_PROTOCOL_VERSION,
 } from './gameProtocol';
 
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'error';
@@ -24,18 +26,7 @@ const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
 const GAME_ASSET_CDN_ORIGIN = 'https://192.168.188.67:8444';
 const GAME_MODULE_ORIGIN = 'https://esm.sh';
-const GAME_KEYS = new Set([
-  'ArrowLeft',
-  'ArrowRight',
-  'ArrowUp',
-  'ArrowDown',
-  'KeyA',
-  'KeyD',
-  'KeyW',
-  'KeyS',
-  'Space',
-  'Enter',
-]);
+const FORWARDED_KEYS = new Set(GAME_KEYS);
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -228,7 +219,7 @@ export class GameSession {
     ) {
       return;
     }
-    if (GAME_KEYS.has(event.code)) {
+    if (FORWARDED_KEYS.has(event.code)) {
       event.preventDefault();
       this.send({ type: 'key', code: event.code, pressed: true });
     }
@@ -244,7 +235,7 @@ export class GameSession {
     ) {
       return;
     }
-    if (GAME_KEYS.has(event.code)) {
+    if (FORWARDED_KEYS.has(event.code)) {
       event.preventDefault();
       this.send({ type: 'key', code: event.code, pressed: false });
     }
@@ -384,7 +375,7 @@ export class GameSession {
       .replace(/<\/script/gi, '<\\/script')
       .replace(/<!--/g, '<\\!--');
     const serializedInput = JSON.stringify({
-      protocolVersion: 2,
+      protocolVersion: GAME_PROTOCOL_VERSION,
       username: options.username,
       data: options.data,
       performance: {

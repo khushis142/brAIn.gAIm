@@ -13,6 +13,15 @@ export const GAME_BUDGETS = Object.freeze({
   maxResultSubmissions: 3,
 });
 
+/** Key codes a game sees in input.keys; the host forwards only these. */
+export const GAME_KEYS: readonly string[] = Object.freeze([
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Space',
+]);
+
 export type GameRenderer = '2d' | 'webgl';
 
 export type GameLifecycleState =

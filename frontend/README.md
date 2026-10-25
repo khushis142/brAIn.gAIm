@@ -15,7 +15,7 @@ All application routes (except `/login` and `/register`) are protected by the `r
 | `/login` | `Login` (`src/app/modules/user/login/`) | OAuth2 password login returning a bearer JWT stored in `localStorage` (`braingain-token`). |
 | `/register` | `Register` (`src/app/modules/user/register/`) | Account registration and automatic login. |
 
-## Sandboxed Game Engine (`src/app/engine/` & `src/assets/game-runtime.js`)
+## Sandboxed Game Engine (`src/app/engine/`)
 
 Games run inside an isolated `<iframe sandbox="allow-scripts">` (opaque origin, strict Content-Security-Policy, heartbeat watchdog). Games call `registerGame()` and implement `init(api)`, `update(dt, input)`, and `render(ctx)` (with optional `resize`, `contextLost`, `contextRestored`, and `destroy` hooks).
 
