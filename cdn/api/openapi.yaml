@@ -5,10 +5,12 @@ info:
     Lean, high-performance CDN service for uploading, updating, delivering,
     and deleting static mp4, audio, 3D models (glb, gltf, etc), js, and doc files (pdf, text, images) using
     S3/RustFS object storage. Metadata is managed externally by the Backend.
-  version: 0.0.7
+  version: 0.0.8
 servers:
   - url: http://localhost:8080
-    description: Local development server
+    description: Local development server (HTTP)
+  - url: https://localhost:8443
+    description: Local development server (HTTPS)
 paths:
   /healthz:
     get:

@@ -6,7 +6,7 @@ Go static asset CDN service for brAIn.gAIn (`github.com/brAIn-gAIm/CDN`), backed
 
 ```sh
 docker compose -f docker-compose.dev.yaml up -d   # local RustFS on :9000/:9001
-go run ./cmd/server                               # run server on :8080
+go run ./cmd/server                               # run server on :8080 (HTTP) and :8443 (HTTPS)
 go vet ./...                                      # static analysis
 go test -race -v ./...                            # run unit tests
 ```
@@ -14,6 +14,7 @@ go test -race -v ./...                            # run unit tests
 ## Architecture & Rules
 
 - **Stateless binary delivery**: The CDN stores and streams files (`video/mp4`, `audio/*`, `model/*`, `application/javascript`, `application/pdf`, `text/*`, `image/*`) in S3 under `<uuid>/<filename>`. All domain metadata (owners, tags, projects, content records) lives in the Backend Postgres database.
+- **HTTPS & TLS support**: Supports direct HTTPS via built-in self-signed certificate or custom certificates (`TLS_CERT_FILE`, `TLS_KEY_FILE`), and reverse-proxy HTTPS headers (`X-Forwarded-Proto`, `X-Forwarded-Scheme`, `X-Forwarded-Ssl`). Returned asset delivery URLs dynamically adapt to `https://`.
 - **No arbitrary file execution or HTML**: `validateAssetType` in `internal/handler/handler.go` strictly whitelists permitted extensions and MIME categories.
 - **Upload limits & cleanup**: Request bodies are bounded by `MAX_UPLOAD_SIZE_MB` via `http.MaxBytesReader`. Multipart form overflow files and temporary upload buffers are always cleaned up on request completion.
 - **Immutable caching & byte-range support**: `GET /files/{id}` and `GET /files/{id}/{filename}` support `Range` requests (`206 Partial Content`), `ETag` (`If-None-Match` -> `304 Not Modified`), and set `Cache-Control: public, max-age=31536000, immutable`.
@@ -21,8 +22,9 @@ go test -race -v ./...                            # run unit tests
 
 ## Key Files
 
-- `cmd/server/main.go`: Entrypoint, HTTP server setup, graceful shutdown, CORS/logging/recovery middleware.
-- `internal/config/config.go`: Environment variable configuration (`PORT`, `CDN_BASE_URL`, `MAX_UPLOAD_SIZE_MB`, `S3_*`).
+- `cmd/server/main.go`: Entrypoint, HTTP & HTTPS server setup, graceful shutdown, CORS/logging/recovery middleware.
+- `internal/config/config.go`: Environment variable configuration (`PORT`, `TLS_*`, `CDN_BASE_URL`, `MAX_UPLOAD_SIZE_MB`, `S3_*`).
+- `internal/tlsutil/tlsutil.go`: In-memory self-signed certificate generation and TLS configuration loader.
 - `internal/storage/s3.go`: AWS SDK v2 S3 client wrapper (`Upload`, `Get`, `Delete`, `FindKeyByID`, `DeleteByID`, auto-bucket creation).
 - `internal/handler/handler.go`: HTTP route handlers (`UploadFiles`, `UpdateFile`, `DeleteFile`, `DeliverFile`, `HealthCheck`, Swagger UI).
 - `internal/model/asset.go`: JSON response models (`FileUploadResult`, `UploadResponse`).

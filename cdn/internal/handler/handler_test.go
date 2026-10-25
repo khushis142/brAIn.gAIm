@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -266,4 +267,105 @@ func TestUpload3DFile(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected 201 Created for .glb, got %d: %s", rec.Code, rec.Body.String())
 	}
+}
+
+func TestUploadFiles_HTTPS(t *testing.T) {
+	t.Run("direct TLS request", func(t *testing.T) {
+		h, _ := setupTestServer()
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "video.mp4")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = part.Write([]byte("https test data"))
+		_ = writer.Close()
+
+		req := httptest.NewRequest("POST", "/api/v1/files", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.TLS = &tls.ConnectionState{} // Simulate incoming TLS connection
+		req.Host = "cdn.internal:8443"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(res["url"], "https://") {
+			t.Fatalf("expected https:// scheme, got %q", res["url"])
+		}
+	})
+
+	t.Run("reverse proxy X-Forwarded-Proto header", func(t *testing.T) {
+		h, _ := setupTestServer()
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "track.mp3")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = part.Write([]byte("audio mock data"))
+		_ = writer.Close()
+
+		req := httptest.NewRequest("POST", "/api/v1/files", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Host = "cdn.example.org"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(res["url"], "https://cdn.example.org/files/") {
+			t.Fatalf("expected https://cdn.example.org/files/... URL, got %q", res["url"])
+		}
+	})
+
+	t.Run("configured https CDN_BASE_URL", func(t *testing.T) {
+		cfg := &config.Config{
+			Port:          "8080",
+			CDNBaseURL:    "https://cdn.custom.net",
+			MaxUploadSize: 50 * 1024 * 1024,
+		}
+		mockStore := newMockS3()
+		h := New(cfg, mockStore)
+		mux := http.NewServeMux()
+		h.RegisterRoutes(mux)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("file", "document.pdf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = part.Write([]byte("pdf content"))
+		_ = writer.Close()
+
+		req := httptest.NewRequest("POST", "/api/v1/files", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(res["url"], "https://cdn.custom.net/files/") {
+			t.Fatalf("expected https://cdn.custom.net/files/... URL, got %q", res["url"])
+		}
+	})
 }

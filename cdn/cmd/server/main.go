@@ -13,11 +13,12 @@ import (
 	"github.com/brAIn-gAIm/CDN/internal/config"
 	"github.com/brAIn-gAIm/CDN/internal/handler"
 	"github.com/brAIn-gAIm/CDN/internal/storage"
+	"github.com/brAIn-gAIm/CDN/internal/tlsutil"
 )
 
 func main() {
 	cfg := config.Load()
-	log.Printf("[CDN] Starting server on port :%s", cfg.Port)
+	log.Printf("[CDN] Starting server (HTTP Port: %s, TLS: %v, TLS Port: %s)", cfg.Port, cfg.TLSEnabled, cfg.TLSPort)
 	log.Printf("[CDN] S3 Endpoint: %s (Bucket: %s, PathStyle: %v)", cfg.S3Endpoint, cfg.S3Bucket, cfg.S3UsePathStyle)
 
 	// S3 / RustFS
@@ -38,23 +39,51 @@ func main() {
 	// Top-level middleware: CORS, logging, recovery
 	srvHandler := withCORS(withLogging(withRecovery(mux)))
 
-	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      srvHandler,
-		ReadTimeout:  30 * time.Minute,
-		WriteTimeout: 30 * time.Minute,
-		IdleTimeout:  60 * time.Second,
-	}
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("[CDN] Server failed: %v", err)
+	var srvHTTP *http.Server
+	var srvTLS *http.Server
+
+	if cfg.Port != "" && cfg.Port != "none" && cfg.Port != "0" {
+		srvHTTP = &http.Server{
+			Addr:         ":" + cfg.Port,
+			Handler:      srvHandler,
+			ReadTimeout:  30 * time.Minute,
+			WriteTimeout: 30 * time.Minute,
+			IdleTimeout:  60 * time.Second,
 		}
-	}()
-	log.Printf("[CDN] Server ready to receive requests at http://localhost:%s", cfg.Port)
+
+		go func() {
+			if err := srvHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("[CDN] HTTP server failed: %v", err)
+			}
+		}()
+		log.Printf("[CDN] Server ready to receive HTTP requests at http://localhost:%s", cfg.Port)
+	}
+
+	if cfg.TLSEnabled {
+		tlsConfig, err := tlsutil.LoadTLSConfig(cfg.TLSCertFile, cfg.TLSKeyFile)
+		if err != nil {
+			log.Fatalf("[CDN] TLS setup failed: %v", err)
+		}
+
+		srvTLS = &http.Server{
+			Addr:         ":" + cfg.TLSPort,
+			Handler:      srvHandler,
+			TLSConfig:    tlsConfig,
+			ReadTimeout:  30 * time.Minute,
+			WriteTimeout: 30 * time.Minute,
+			IdleTimeout:  60 * time.Second,
+		}
+
+		go func() {
+			if err := srvTLS.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("[CDN] HTTPS server failed: %v", err)
+			}
+		}()
+		log.Printf("[CDN] Server ready to receive HTTPS requests at https://localhost:%s", cfg.TLSPort)
+	}
 
 	<-stop
 	log.Printf("[CDN] Shutting down gracefully...")
@@ -62,8 +91,15 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("[CDN] Shutdown error: %v", err)
+	if srvHTTP != nil {
+		if err := srvHTTP.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[CDN] HTTP shutdown error: %v", err)
+		}
+	}
+	if srvTLS != nil {
+		if err := srvTLS.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[CDN] HTTPS shutdown error: %v", err)
+		}
 	}
 	log.Printf("[CDN] Server stopped")
 }

@@ -51,8 +51,8 @@ flowchart TD
 ## API Endpoints
 
 ### Interactive Swagger UI
-- **Swagger UI**: `http://localhost:8080/swagger/` (aliases: `/docs`, `/swagger`)
-- **Raw OpenAPI 3.0 Spec**: `http://localhost:8080/swagger/openapi.yaml`
+- **Swagger UI**: `http://localhost:8080/swagger/` or `https://localhost:8443/swagger/` (aliases: `/docs`, `/swagger`)
+- **Raw OpenAPI 3.0 Spec**: `http://localhost:8080/swagger/openapi.yaml` or `https://localhost:8443/swagger/openapi.yaml`
 
 ---
 
@@ -164,8 +164,12 @@ All configuration is managed via environment variables (see `.env.example`):
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `8080` | HTTP listening port |
-| `CDN_BASE_URL` | `http://localhost:8080` | Base URL used to construct returned `url` static links |
+| `PORT` | `8080` | HTTP listening port (set to `none` or `0` to disable HTTP) |
+| `TLS_ENABLED` | `true` | Enable HTTPS / TLS server |
+| `TLS_PORT` | `8443` | HTTPS listening port (alias: `HTTPS_PORT`) |
+| `TLS_CERT_FILE` | _(empty)_ | Path to TLS certificate PEM (auto self-signed if empty) |
+| `TLS_KEY_FILE` | _(empty)_ | Path to TLS private key PEM (auto self-signed if empty) |
+| `CDN_BASE_URL` | `http://localhost:8080` | Base URL used to construct returned `url` static links (supports `http://` and `https://`) |
 | `MAX_UPLOAD_SIZE_MB` | `500` | Maximum allowed upload size in megabytes |
 | `S3_ENDPOINT` | `http://localhost:9000` | RustFS / S3 endpoint URL |
 | `S3_REGION` | `us-east-1` | S3 signing region |

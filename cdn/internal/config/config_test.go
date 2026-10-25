@@ -43,3 +43,40 @@ func TestLoadCDNBaseURL(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadTLSConfig(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		cfg := Load()
+		if !cfg.TLSEnabled {
+			t.Errorf("expected TLSEnabled to default to true, got false")
+		}
+		if cfg.TLSPort != "8443" {
+			t.Errorf("expected default TLSPort 8443, got %q", cfg.TLSPort)
+		}
+	})
+
+	t.Run("explicitly disabled", func(t *testing.T) {
+		t.Setenv("TLS_ENABLED", "false")
+		cfg := Load()
+		if cfg.TLSEnabled {
+			t.Errorf("expected TLSEnabled to be false, got true")
+		}
+	})
+
+	t.Run("custom cert and port", func(t *testing.T) {
+		t.Setenv("TLS_PORT", "9443")
+		t.Setenv("TLS_CERT_FILE", "/path/to/cert.pem")
+		t.Setenv("TLS_KEY_FILE", "/path/to/key.pem")
+
+		cfg := Load()
+		if cfg.TLSPort != "9443" {
+			t.Errorf("expected TLSPort 9443, got %q", cfg.TLSPort)
+		}
+		if cfg.TLSCertFile != "/path/to/cert.pem" {
+			t.Errorf("expected cert file /path/to/cert.pem, got %q", cfg.TLSCertFile)
+		}
+		if cfg.TLSKeyFile != "/path/to/key.pem" {
+			t.Errorf("expected key file /path/to/key.pem, got %q", cfg.TLSKeyFile)
+		}
+	})
+}

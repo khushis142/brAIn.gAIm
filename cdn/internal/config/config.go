@@ -8,6 +8,10 @@ import (
 
 type Config struct {
 	Port           string
+	TLSEnabled     bool
+	TLSPort        string
+	TLSCertFile    string
+	TLSKeyFile     string
 	S3Endpoint     string
 	S3Region       string
 	S3Bucket       string
@@ -20,6 +24,11 @@ type Config struct {
 
 func Load() *Config {
 	port := getEnv("PORT", "8080")
+	tlsCertFile := getEnv("TLS_CERT_FILE", getEnv("SSL_CERT_FILE", ""))
+	tlsKeyFile := getEnv("TLS_KEY_FILE", getEnv("SSL_KEY_FILE", ""))
+	tlsPort := getEnv("TLS_PORT", getEnv("HTTPS_PORT", "8443"))
+	tlsEnabled := getEnvBool("TLS_ENABLED", true)
+
 	s3Endpoint := getEnv("S3_ENDPOINT", "http://localhost:9000")
 	s3Region := getEnv("S3_REGION", "us-east-1")
 	s3Bucket := getEnv("S3_BUCKET", "braingain")
@@ -38,6 +47,10 @@ func Load() *Config {
 
 	return &Config{
 		Port:           port,
+		TLSEnabled:     tlsEnabled,
+		TLSPort:        tlsPort,
+		TLSCertFile:    tlsCertFile,
+		TLSKeyFile:     tlsKeyFile,
 		S3Endpoint:     s3Endpoint,
 		S3Region:       s3Region,
 		S3Bucket:       s3Bucket,

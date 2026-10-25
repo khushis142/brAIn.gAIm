@@ -125,10 +125,9 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	var results []model.FileUploadResult
 	var ids []string
-	ctx := r.Context()
 
 	for i, header := range fileHeaders {
-		res, status, err := h.uploadSingleHeader(ctx, uuid.New().String(), header, contentTypes[i])
+		res, status, err := h.uploadSingleHeader(r, uuid.New().String(), header, contentTypes[i])
 		if err != nil {
 			writeError(w, status, err.Error())
 			return
@@ -154,7 +153,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) uploadSingleHeader(ctx context.Context, fileID string, header *multipart.FileHeader, contentType string) (model.FileUploadResult, int, error) {
+func (h *Handler) uploadSingleHeader(r *http.Request, fileID string, header *multipart.FileHeader, contentType string) (model.FileUploadResult, int, error) {
 	file, err := header.Open()
 	if err != nil {
 		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to read file: %w", err)
@@ -185,12 +184,14 @@ func (h *Handler) uploadSingleHeader(ctx context.Context, fileID string, header 
 		"filename": sanitizedName,
 	}
 
+	ctx := r.Context()
 	_ = h.storage.DeleteByID(ctx, fileID)
 	if err := h.storage.Upload(ctx, s3Key, tempFile, fileSize, contentType, meta); err != nil {
 		return model.FileUploadResult{}, http.StatusInternalServerError, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	staticURL := fmt.Sprintf("%s/files/%s/%s", h.cfg.CDNBaseURL, fileID, sanitizedName)
+	baseURL := h.getBaseURL(r)
+	staticURL := fmt.Sprintf("%s/files/%s/%s", baseURL, fileID, sanitizedName)
 	return model.FileUploadResult{
 		ID:          fileID,
 		Filename:    sanitizedName,
@@ -198,6 +199,26 @@ func (h *Handler) uploadSingleHeader(ctx context.Context, fileID string, header 
 		FileSize:    fileSize,
 		URL:         staticURL,
 	}, http.StatusOK, nil
+}
+
+func (h *Handler) getBaseURL(r *http.Request) string {
+	isHTTPS := r != nil && (r.TLS != nil ||
+		strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") ||
+		strings.EqualFold(r.Header.Get("X-Forwarded-Scheme"), "https") ||
+		strings.EqualFold(r.Header.Get("X-Forwarded-Ssl"), "on"))
+
+	defaultBaseURL := "http://localhost:" + h.cfg.Port
+	if isHTTPS {
+		// If using default base URL and request has Host, use request Host with https
+		if h.cfg.CDNBaseURL == defaultBaseURL && r != nil && r.Host != "" {
+			return "https://" + r.Host
+		}
+		if strings.HasPrefix(h.cfg.CDNBaseURL, "http://") {
+			return "https://" + strings.TrimPrefix(h.cfg.CDNBaseURL, "http://")
+		}
+	}
+
+	return h.cfg.CDNBaseURL
 }
 
 func (h *Handler) UpdateFile(w http.ResponseWriter, r *http.Request) {
@@ -231,8 +252,7 @@ func (h *Handler) UpdateFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
-	res, status, err := h.uploadSingleHeader(ctx, id, header, contentType)
+	res, status, err := h.uploadSingleHeader(r, id, header, contentType)
 	if err != nil {
 		writeError(w, status, err.Error())
 		return
