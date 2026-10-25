@@ -19,6 +19,7 @@ const WATCHDOG_INTERVAL_MS = 1000;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
+const GAME_ASSET_CDN_ORIGIN = 'https://192.168.188.67:8444';
 
 export interface GameSessionOptions<CustomData extends GameCustomData = GameCustomData>
   extends GameStartInput<CustomData> {
@@ -350,7 +351,7 @@ export class GameSession {
   }
 
   private assetOrigins(assets: GameAssetManifest | undefined): string[] {
-    const origins = new Set<string>();
+    const origins = new Set<string>([GAME_ASSET_CDN_ORIGIN]);
     for (const asset of Object.values(assets ?? {})) {
       try {
         const url = new URL(asset.url);
