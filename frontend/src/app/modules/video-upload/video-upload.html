@@ -11,18 +11,48 @@
   <div class="card">
     <form (submit)="submit($event)">
       <label for="video-file">Video file (.mp4)</label>
-      <input
-        #fileInput
-        id="video-file"
-        type="file"
-        accept=".mp4,video/mp4"
-        [disabled]="status() === 'uploading'"
-        (change)="onFileSelected($event)"
-      />
-
-      @if (file(); as selectedFile) {
-        <p class="hint">{{ selectedFile.name }} ({{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB)</p>
-      }
+      <div class="file-field">
+        <label
+          class="file-drop"
+          [class.dragging]="dragging()"
+          [class.has-file]="file() !== null"
+          [class.disabled]="status() === 'uploading'"
+          (dragover)="onDragOver($event)"
+          (dragleave)="dragging.set(false)"
+          (drop)="onDrop($event)"
+        >
+          @if (file(); as selectedFile) {
+            <span class="file-icon">
+              <svg lucideFileVideo></svg>
+            </span>
+            <span class="file-text">
+              <span class="file-name">{{ selectedFile.name }}</span>
+              <span class="file-meta">{{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB · Tap to replace</span>
+            </span>
+          } @else {
+            <span class="file-icon">
+              <svg lucideCloudUpload></svg>
+            </span>
+            <span class="file-text">
+              <span class="file-name">Choose a video</span>
+              <span class="file-meta">or drag it here · MP4 up to {{ maxSizeMb }} MB</span>
+            </span>
+          }
+          <input
+            #fileInput
+            id="video-file"
+            type="file"
+            accept=".mp4,video/mp4"
+            [disabled]="status() === 'uploading'"
+            (change)="onFileSelected($event)"
+          />
+        </label>
+        @if (file() && status() !== 'uploading') {
+          <button type="button" class="file-remove" aria-label="Remove video" (click)="clearFile()">
+            <svg lucideX></svg>
+          </button>
+        }
+      </div>
 
       <label for="video-title">Title</label>
       <input

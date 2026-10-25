@@ -1,11 +1,11 @@
 import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
-import {LucideSkull, LucideUpload} from '@lucide/angular';
-import { VideoUploadService } from '../../core/video-upload.service';
+import { LucideCloudUpload, LucideFileVideo, LucideUpload, LucideX } from '@lucide/angular';
+import { MAX_VIDEO_SIZE_BYTES, VideoUploadService } from '../../core/video-upload.service';
 
 type Status = 'idle' | 'uploading' | 'success' | 'error';
 
 @Component({
-  imports: [LucideUpload],
+  imports: [LucideCloudUpload, LucideFileVideo, LucideUpload, LucideX],
   selector: 'app-video-upload',
   styleUrl: './video-upload.css',
   templateUrl: './video-upload.html',
@@ -15,11 +15,13 @@ export class VideoUpload {
 
   @ViewChild('fileInput') private readonly fileInput?: ElementRef<HTMLInputElement>;
 
+  protected readonly maxSizeMb = MAX_VIDEO_SIZE_BYTES / 1024 / 1024;
   protected readonly file = signal<File | null>(null);
   protected readonly title = signal('');
   protected readonly tagsInput = signal('');
   protected readonly status = signal<Status>('idle');
   protected readonly error = signal<string | null>(null);
+  protected readonly dragging = signal(false);
 
   protected readonly canSubmit = computed(
     () => this.file() !== null && this.title().trim().length > 0 && this.status() !== 'uploading',
@@ -27,20 +29,32 @@ export class VideoUpload {
 
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const selected = input.files?.[0] ?? null;
-    this.error.set(null);
-    this.status.set('idle');
-
-    if (selected) {
-      const validationError = this.uploadService.validateFile(selected);
-      if (validationError) {
-        this.error.set(validationError);
-        this.file.set(null);
-        input.value = '';
-        return;
-      }
+    if (!this.selectFile(input.files?.[0] ?? null)) {
+      input.value = '';
     }
-    this.file.set(selected);
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    if (this.status() !== 'uploading') {
+      this.dragging.set(true);
+    }
+  }
+
+  protected onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(false);
+    const dropped = event.dataTransfer?.files?.[0];
+    if (dropped && this.status() !== 'uploading') {
+      this.clearFileInput();
+      this.selectFile(dropped);
+    }
+  }
+
+  protected clearFile(): void {
+    this.file.set(null);
+    this.error.set(null);
+    this.clearFileInput();
   }
 
   protected onTitleInput(event: Event): void {
@@ -73,6 +87,23 @@ export class VideoUpload {
     });
   }
 
+  /** Validates and stores the file; returns false when it was rejected. */
+  private selectFile(selected: File | null): boolean {
+    this.error.set(null);
+    this.status.set('idle');
+
+    if (selected) {
+      const validationError = this.uploadService.validateFile(selected);
+      if (validationError) {
+        this.error.set(validationError);
+        this.file.set(null);
+        return false;
+      }
+    }
+    this.file.set(selected);
+    return true;
+  }
+
   private parseTags(): string[] {
     return this.tagsInput()
       .split(',')
@@ -80,12 +111,16 @@ export class VideoUpload {
       .filter((tag) => tag.length > 0);
   }
 
+  private clearFileInput(): void {
+    if (this.fileInput) {
+      this.fileInput.nativeElement.value = '';
+    }
+  }
+
   private resetForm(): void {
     this.file.set(null);
     this.title.set('');
     this.tagsInput.set('');
-    if (this.fileInput) {
-      this.fileInput.nativeElement.value = '';
-    }
+    this.clearFileInput();
   }
 }
