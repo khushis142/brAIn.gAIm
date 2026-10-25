@@ -1,5 +1,5 @@
 // collect-men/game.js: answer questions by choosing one of three lanes.
-let THREE, GLTFLoader, cloneModel, renderer, scene, camera, playerModel, playerModels, playerMixers, playerAnimation, sideDecorations, treeMixers, treeAnimation, laneModels, groundStripes, clock, api;
+let THREE, cloneModel, renderer, scene, camera, playerModel, playerModels, playerMixers, playerAnimation, sideDecorations, treeMixers, treeAnimation, laneModels, groundStripes, clock, api;
 let gl, program, positionBuffer, colorBuffer, canvas, W, H;
 let playerLane, previousKeys, worldZ, wallTimer, walls, score, gameOver;
 let username, context, difficulty;
@@ -7,12 +7,12 @@ let elapsedTime;
 let questionBank, questions, questionIndex, activeQuestion, feedback, feedbackTimer, ui, styleEl;
 const WORLD_SPEED = 4;
 
-const negx_url = 'http://192.168.188.67:8081/files/abd1ef2f-630b-4ee4-9d72-237bca6397cd/negx.jpg';
-const negy_url = 'http://192.168.188.67:8081/files/324c958f-1d39-464a-9587-b11152362be4/negy.jpg';
-const negz_url = 'http://192.168.188.67:8081/files/19d01af5-9e6e-4c4b-a772-8983c42fc498/negz.jpg';
-const posx_url = 'http://192.168.188.67:8081/files/238ede00-760a-45bc-8b5c-dc8b0cc841f4/posx.jpg';
-const posy_url = 'http://192.168.188.67:8081/files/26fafcc4-eab7-4bb7-bd26-1d7678b6cefc/posy.jpg';
-const posz_url = 'http://192.168.188.67:8081/files/a8b053d4-8b46-470e-8ec4-d46c6620300c/posz.jpg';
+const negx_url = 'https://192.168.188.67:8444/files/abd1ef2f-630b-4ee4-9d72-237bca6397cd/negx.jpg';
+const negy_url = 'https://192.168.188.67:8444/files/324c958f-1d39-464a-9587-b11152362be4/negy.jpg';
+const negz_url = 'https://192.168.188.67:8444/files/19d01af5-9e6e-4c4b-a772-8983c42fc498/negz.jpg';
+const posx_url = 'https://192.168.188.67:8444/files/238ede00-760a-45bc-8b5c-dc8b0cc841f4/posx.jpg';
+const posy_url = 'https://192.168.188.67:8444/files/26fafcc4-eab7-4bb7-bd26-1d7678b6cefc/posy.jpg';
+const posz_url = 'https://192.168.188.67:8444/files/a8b053d4-8b46-470e-8ec4-d46c6620300c/posz.jpg';
 const SKYBOX_URLS = [posx_url, negx_url, posy_url, negy_url, posz_url, negz_url];
 
 function isPressed(keyState) {
@@ -87,10 +87,7 @@ function update(dt, input) {
         playerLane = Math.min(1, playerLane + 1);
         updateUi();
     }
-    const targetX = laneX(playerLane);
-    playerX += (targetX - playerX) * Math.min(1, dt * 12);
-
-    worldZ += WORLD_SPEED * dt;
+  worldZ += WORLD_SPEED * dt;
 
   if (feedbackTimer > 0) {
     feedbackTimer -= dt;
@@ -256,6 +253,7 @@ function setupThree(context3d) {
 async function loadSkybox() {
   const images = await Promise.all(SKYBOX_URLS.map((url) => new Promise((resolve, reject) => {
     const image = new Image();
+    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error(`Could not decode skybox image: ${url}`));
     image.src = url;
@@ -550,11 +548,8 @@ function animateThree(dt) {
 
 async function bootstrapThree() {
   const three = await import('https://esm.sh/three@0.180.0');
-  const loader = await import('https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js');
-  const skeletonUtils = await import('https://esm.sh/three@0.180.0/examples/jsm/utils/SkeletonUtils.js');
   THREE = three;
-  GLTFLoader = loader.GLTFLoader;
-  cloneModel = skeletonUtils.clone;
+  cloneModel = (model) => model.clone(true);
   registerGame({
     renderer: 'webgl',
     init,
@@ -603,17 +598,6 @@ function destroy() {
   laneModels = [];
   groundStripes = [];
 }
-
-registerGame({
-  renderer: 'webgl',
-  init,
-  update,
-  render,
-  resize,
-  contextLost,
-  contextRestored,
-  destroy,
-});
 
 bootstrapThree().catch((error) => {
   throw new Error(`Three.js could not load: ${error.message}`);

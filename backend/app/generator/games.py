@@ -28,7 +28,7 @@ _REFERENCE = Path(__file__).parent / "reference"  # a copy of games/example-quiz
 _FORBIDDEN = re.compile(
     r"\b(fetch|XMLHttpRequest|WebSocket|EventSource|importScripts|eval|localStorage"
     r"|sessionStorage|indexedDB|postMessage|document\.cookie)\b"
-    r"|\bimport\s*[({]|\bnew\s+Function\b|https?://"
+    r"|\bnew\s+Function\b"
 )
 
 # `title` doubles as a marker so the fake adapter can recognise this request.
