@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GameSession } from './gameSession';
 
+const CDN_URL = 'https://app.example.test/cdn/';
 const gameCode = 'registerGame({init(){},update(){},render(){}});';
 const options = {
   username: 'alex',
@@ -18,7 +19,7 @@ describe('GameSession', () => {
 
   it('creates a sandboxed iframe with the game input embedded', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
 
     session.start(gameCode, options);
 
@@ -37,7 +38,7 @@ describe('GameSession', () => {
 
   it('focuses the iframe when the game loads so it receives keyboard controls', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     const focus = vi.spyOn(iframe, 'focus');
@@ -50,7 +51,7 @@ describe('GameSession', () => {
 
   it('embeds the configured mobile performance profile', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
 
     session.start(gameCode, {
       ...options,
@@ -73,7 +74,7 @@ describe('GameSession', () => {
 
   it('embeds the approved asset manifest', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
 
     session.start(gameCode, {
       ...options,
@@ -90,14 +91,36 @@ describe('GameSession', () => {
     const iframe = container.querySelector('iframe');
     expect(iframe?.srcdoc).toContain('"player"');
     expect(iframe?.srcdoc).toContain('https://cdn.example.test/games/player.png');
-    expect(iframe?.srcdoc).toContain('connect-src https://cdn.example.test');
+    expect(iframe?.srcdoc).toContain(`connect-src ${CDN_URL} https://cdn.example.test https://esm.sh`);
+    expect(iframe?.srcdoc).not.toContain('192.168.');
 
     session.destroy();
   });
 
+  it('relays asset requests only for paths under the CDN base URL', () => {
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal('fetch', fetchSpy);
+    const container = document.createElement('div');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
+    session.start(gameCode, options);
+
+    for (const path of [
+      `${CDN_URL}games/player.png`,
+      'https://app.example.test/api/v1/me',
+      `${CDN_URL}../api/v1/me`,
+      'https://app.example.test/cdnx/file.png',
+    ]) {
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'asset-request', path } }));
+    }
+    expect(fetchSpy.mock.calls).toEqual([[`${CDN_URL}games/player.png`]]);
+
+    session.destroy();
+    vi.unstubAllGlobals();
+  });
+
   it('updates status, UI design, and result only from the active iframe', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
 
@@ -137,7 +160,7 @@ describe('GameSession', () => {
 
   it('sends pause, resume, and resize commands to the active iframe', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     session.pause();
@@ -152,7 +175,7 @@ describe('GameSession', () => {
 
   it('tracks lifecycle states and only resumes while playing', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
 
     session.setLifecycle('partially visible');
@@ -170,7 +193,7 @@ describe('GameSession', () => {
 
   it('replays the requested lifecycle after the runtime starts', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     const send = vi.spyOn(session as never, 'send');
@@ -190,7 +213,7 @@ describe('GameSession', () => {
   it('forwards touches on the iframe element to the game', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
@@ -212,7 +235,7 @@ describe('GameSession', () => {
   it('forwards game keys from host window to iframe while playing', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     const post = vi.spyOn(iframe.contentWindow!, 'postMessage');
@@ -237,7 +260,7 @@ describe('GameSession', () => {
 
   it('rejects oversized or unsafe game code before creating an iframe', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
 
     expect(() => session.start('</script>', options)).toThrow('closing script tag');
     expect(() => session.start('x'.repeat(200 * 1024 + 1), options)).toThrow('200 KB');
@@ -246,7 +269,7 @@ describe('GameSession', () => {
 
   it('rejects canvas dimensions outside the resource budget', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
 
     expect(() => session.start(gameCode, { ...options, width: 4097 })).toThrow('Canvas dimensions');
     expect(() => session.start(gameCode, { ...options, width: 4096, height: 4097 })).toThrow('Canvas dimensions');
@@ -255,7 +278,7 @@ describe('GameSession', () => {
 
   it('stops after too many result submissions', () => {
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     const result = { type: 'result', result: { score: 1 } };
@@ -272,7 +295,7 @@ describe('GameSession', () => {
   it('tolerates up to three missed heartbeats in a row', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
 
     vi.advanceTimersByTime(3000); // three watchdog checks without a heartbeat
@@ -287,7 +310,7 @@ describe('GameSession', () => {
   it('does not fail when a throttled phone delays the watchdog itself', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
 
     // The device stalls for 10 s, then the late check runs once: one miss, not a hang
@@ -301,7 +324,7 @@ describe('GameSession', () => {
   it('starts counting missed heartbeats again after one arrives', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
 
@@ -316,7 +339,7 @@ describe('GameSession', () => {
   it('removes the iframe after stopping and lets the runtime shut down first', () => {
     vi.useFakeTimers();
     const container = document.createElement('div');
-    const session = new GameSession(document, container, 'runtime-source');
+    const session = new GameSession(document, container, 'runtime-source', CDN_URL);
     session.start(gameCode, options);
     const iframe = container.querySelector('iframe') as HTMLIFrameElement;
     session.stop();

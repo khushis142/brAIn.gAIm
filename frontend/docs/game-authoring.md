@@ -301,7 +301,10 @@ assets: {
 ```
 
 Kinds are `image`, `audio`, `font`, and `model`. URLs must be approved HTTPS
-origins. Load by ID:
+origins. The iframe's Content Security Policy allows the origins listed in the
+manifest plus the app's CDN, which is limited to its base path (`cdnBaseUrl` in
+the environment, e.g. `https://<app-host>/cdn/` in production), not the whole
+host. Load by ID:
 
 ```js
 const image = await api.assets.loadImage('player');

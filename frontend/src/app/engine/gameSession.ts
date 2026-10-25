@@ -24,7 +24,6 @@ const MAX_MISSED_HEARTBEATS = 3;
 const IFRAME_REMOVE_DELAY_MS = 100; // gives the runtime time to call game.destroy()
 const MAX_ERROR_LENGTH = 500;
 const MAX_GAME_CODE_BYTES = 200 * 1024;
-const GAME_ASSET_CDN_ORIGIN = 'https://192.168.188.67:8444';
 const GAME_MODULE_ORIGIN = 'https://esm.sh';
 const FORWARDED_KEYS = new Set(GAME_KEYS);
 
@@ -66,6 +65,8 @@ export class GameSession {
     private readonly doc: Document,
     private readonly container: HTMLElement,
     private readonly runtimeSource: string,
+    /** Absolute CDN base URL ending in '/'; see GAME_ASSET_CDN_URL */
+    private readonly assetBaseUrl: string,
   ) {
     doc.defaultView?.addEventListener('message', this.onMessage);
     doc.defaultView?.addEventListener('keydown', this.onHostKeyDown);
@@ -364,10 +365,10 @@ export class GameSession {
       "default-src 'none'",
       "script-src 'unsafe-inline' https://esm.sh",
       "style-src 'unsafe-inline'",
-      `img-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
-      `media-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
-      `font-src data: blob: ${this.assetOrigins(options.assets).join(' ')}`,
-      `connect-src ${[...this.assetOrigins(options.assets), GAME_MODULE_ORIGIN].join(' ')}`,
+      `img-src data: blob: ${this.assetSources(options.assets).join(' ')}`,
+      `media-src data: blob: ${this.assetSources(options.assets).join(' ')}`,
+      `font-src data: blob: ${this.assetSources(options.assets).join(' ')}`,
+      `connect-src ${[...this.assetSources(options.assets), GAME_MODULE_ORIGIN].join(' ')}`,
     ].join('; ');
 
     // Stop generated code from closing the script tag or opening an HTML comment
@@ -406,8 +407,9 @@ export class GameSession {
 </html>`;
   }
 
-  private assetOrigins(assets: GameAssetManifest | undefined): string[] {
-    const origins = new Set<string>([GAME_ASSET_CDN_ORIGIN]);
+  /** CSP sources for assets: the CDN path (not its whole origin) plus the manifest's origins. */
+  private assetSources(assets: GameAssetManifest | undefined): string[] {
+    const origins = new Set<string>([this.assetBaseUrl]);
     for (const asset of Object.values(assets ?? {})) {
       try {
         const url = new URL(asset.url);
@@ -422,7 +424,8 @@ export class GameSession {
   private isAllowedAssetPath(path: string): boolean {
     if (path.startsWith('/assets/')) return true;
     try {
-      return new URL(path).origin === GAME_ASSET_CDN_ORIGIN;
+      // new URL() resolves '..' segments, so a path cannot climb out of the CDN prefix
+      return new URL(path).href.startsWith(this.assetBaseUrl);
     } catch {
       return false;
     }
