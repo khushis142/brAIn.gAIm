@@ -1,0 +1,281 @@
+services:
+  postgres:
+    image: postgres:18.6-alpine3.24
+    container_name: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: braingain
+      POSTGRES_PASSWORD: braingain
+      POSTGRES_DB: braingain
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U braingain -d braingain"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    container_name: rustfs
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: braingain
+      RUSTFS_SECRET_KEY: braingain-secret
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_VOLUMES: "/data"
+    volumes:
+      - rustfs_data:/data
+
+  s3-init:
+    image: amazon/aws-cli:latest
+    container_name: s3-init
+    restart: "no"
+    depends_on:
+      - rustfs
+    environment:
+      AWS_ACCESS_KEY_ID: braingain
+      AWS_SECRET_ACCESS_KEY: braingain-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        until aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket braingain 2>/dev/null
+        || aws --endpoint-url http://rustfs:9000 s3 mb s3://braingain; do sleep 1; done
+
+  piper:
+    # Not published to a registry: always build on deploy instead of pulling.
+    pull_policy: build
+    build:
+      context: ./piper
+      args:
+        VOICE: en_US-hfc_female-medium
+    image: braingain/piper:1.8.0-en_US-hfc_female-medium
+    container_name: piper
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server-b11515
+    container_name: llama
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      LLAMA_ARG_HF_REPO: unsloth/Qwen3-1.7B-GGUF:Q4_K_M
+      LLAMA_CACHE: /models
+      LLAMA_ARG_CTX_SIZE: 8192
+      LLAMA_ARG_N_PARALLEL: 1
+      LLAMA_ARG_THREADS: 3
+      LLAMA_ARG_REASONING: "off"
+    volumes:
+      - llama_models:/models
+    mem_limit: 5g
+
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    restart: unless-stopped
+    pid: host
+    ports:
+      - "61208:61208"
+    environment:
+      GLANCES_OPT: "-w"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  cdn:
+    image: ghcr.io/brain-gaim/cdn:latest
+    container_name: cdn
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+      - "8444:8443"
+    depends_on:
+      rustfs:
+        condition: service_started
+      s3-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8080"
+      TLS_PORT: "8443"
+      TLS_ENABLED: "true"
+      CDN_BASE_URL: ${CDN_BASE_URL:-http://localhost:8081}
+      MAX_UPLOAD_SIZE_MB: "500"
+      S3_ENDPOINT: "http://rustfs:9000"
+      S3_REGION: "us-east-1"
+      S3_BUCKET: "braingain"
+      S3_ACCESS_KEY_ID: "braingain"
+      S3_SECRET_ACCESS_KEY: "braingain-secret"
+      S3_USE_PATH_STYLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: ghcr.io/brain-gaim/backend:latest
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "3000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cdn:
+        condition: service_healthy
+      piper:
+        condition: service_started
+      llama:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://braingain:braingain@postgres:5432/braingain
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters-for-local-dev}
+      CDN_BASE_URL: ${CDN_BASE_URL:-http://localhost:8081}
+      TTS_URL: http://piper:5000
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://llama:8080/v1}
+      LLM_MODEL: ${LLM_MODEL:-unsloth/Qwen3-1.7B-GGUF:Q4_K_M}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    command:
+      - sh
+      - -c
+      - |
+        python -c "
+        import asyncio
+        async def pipe(r, w):
+            try:
+                while d := await r.read(65536):
+                    w.write(d)
+                    await w.drain()
+            finally:
+                w.close()
+        async def handle(cr, cw):
+            sr, sw = await asyncio.open_connection('cdn', 8080)
+            await asyncio.gather(pipe(cr, sw), pipe(sr, cw))
+        async def main():
+            async with await asyncio.start_server(handle, '127.0.0.1', 8081) as s:
+                await s.serve_forever()
+        asyncio.run(main())
+        " &
+        alembic upgrade head &&
+        exec fastapi run app/main.py --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  seed:
+    image: ghcr.io/brain-gaim/backend:latest
+    container_name: seed
+    restart: "no"
+    depends_on:
+      backend:
+        condition: service_healthy
+      cdn:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://braingain:braingain@postgres:5432/braingain
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters-for-local-dev}
+      CDN_BASE_URL: http://cdn:8080
+      SEED_USER: ${SEED_USER:-braingain}
+      SEED_PASSWORD: ${SEED_PASSWORD:-braingain}
+      GAMES_TARBALL_URL: ${GAMES_TARBALL_URL:-https://codeload.github.com/brAIn-gAIm/Backend/tar.gz/main}
+    command:
+      - python
+      - -c
+      - |
+        import asyncio, io, json, os, tarfile, tempfile, urllib.request
+        from pathlib import Path
+        from sqlalchemy import select
+        from app.db import SessionLocal, engine
+        from app.models import Content, User
+        from app.security import hash_password
+        from app.seed_game import seed_game, update_game
+
+        TITLES = {
+            "bounce-climber": "Bounce Climber",
+            "chain-snake": "Chain Snake",
+            "collect-men": "Collect Men",
+            "dodge": "Dodge",
+            "dodge3d": "Dodge 3D",
+            "example-quiz": "Example Quiz",
+            "glass-bridge": "Glass Bridge",
+        }
+
+        async def main() -> None:
+            username = os.environ["SEED_USER"]
+            password = os.environ["SEED_PASSWORD"]
+            tarball_url = os.environ["GAMES_TARBALL_URL"]
+
+            print(f"Fetching games from {tarball_url} ...")
+            with urllib.request.urlopen(tarball_url, timeout=60) as resp:
+                raw = resp.read()
+
+            with tempfile.TemporaryDirectory() as tmp:
+                with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
+                    members = [
+                        m for m in tar.getmembers()
+                        if "/games/" in m.name and not m.name.startswith("/") and ".." not in m.name
+                    ]
+                    tar.extractall(path=tmp, members=members, filter="data")
+
+                games_dirs = sorted(Path(tmp).glob("*/games/*"))
+                async with SessionLocal() as session:
+                    user = await session.scalar(select(User).where(User.username == username))
+                    if user is None:
+                        user = User(username=username, password_hash=hash_password(password))
+                        session.add(user)
+                        await session.commit()
+                        print(f"Created seed owner user: {username!r}")
+
+                    for game_dir in games_dirs:
+                        if not (game_dir / "game.js").is_file() or not (game_dir / "config.json").is_file():
+                            continue
+                        title = TITLES.get(game_dir.name, game_dir.name.replace("-", " ").title())
+                        existing = await session.scalar(
+                            select(Content).where(Content.kind == "game", Content.title == title)
+                        )
+                        if existing is None:
+                            game = await seed_game(session, game_dir, title, username)
+                            action = "seeded"
+                        else:
+                            game = await update_game(session, game_dir, title)
+                            action = "updated"
+                        print(json.dumps({"action": action, "id": str(game.id), "title": game.title}))
+
+            await engine.dispose()
+
+        asyncio.run(main())
+
+  frontend:
+    image: ghcr.io/brain-gaim/frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      cdn:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  rustfs_data:
+  llama_models:
+
+networks:
+  default:
+    name: braingain

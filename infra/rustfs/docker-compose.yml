@@ -1,0 +1,40 @@
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    container_name: rustfs
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: braingain
+      RUSTFS_SECRET_KEY: braingain-secret
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_VOLUMES: "/data"
+    volumes:
+      - rustfs_data:/data
+
+  s3-init:
+    image: amazon/aws-cli:latest
+    container_name: s3-init
+    depends_on:
+      - rustfs
+    environment:
+      AWS_ACCESS_KEY_ID: braingain
+      AWS_SECRET_ACCESS_KEY: braingain-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        until aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket braingain 2>/dev/null
+        || aws --endpoint-url http://rustfs:9000 s3 mb s3://braingain; do sleep 1; done
+
+volumes:
+  rustfs_data:
+
+networks:
+  default:
+    name: braingain
+
