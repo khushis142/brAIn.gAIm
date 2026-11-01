@@ -1,0 +1,16 @@
+{
+  "name": "braingain-slides",
+  "private": true,
+  "scripts": {
+    "dev": "slidev --open",
+    "dev:versions": "slidev drafts/all-versions.md --open",
+    "build": "slidev build",
+    "export": "slidev export"
+  },
+  "devDependencies": {
+    "@slidev/cli": "latest",
+    "@slidev/theme-default": "latest",
+    "@svg-maps/germany": "^2.0.0",
+    "playwright": "^1.64.1"
+  }
+}

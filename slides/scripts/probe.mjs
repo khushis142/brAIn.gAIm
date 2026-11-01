@@ -1,0 +1,15 @@
+import { chromium } from 'playwright'
+
+const browser = await chromium.launch()
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } })
+await page.goto('http://localhost:3031/', { waitUntil: 'networkidle' })
+await page.waitForTimeout(1000)
+console.log('URL:', page.url())
+console.log('BODY:', (await page.locator('body').innerText()).slice(0, 300))
+console.log('slides:', await page.locator('.slidev-page').count())
+await page.keyboard.press('ArrowRight')
+await page.waitForTimeout(1200)
+console.log('URL after right:', page.url())
+console.log('BODY after right:', (await page.locator('body').innerText()).slice(0, 500))
+await page.screenshot({ path: 'review/probe-after-right.png' })
+await browser.close()
