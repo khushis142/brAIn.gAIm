@@ -1,0 +1,24 @@
+services:
+  cdn:
+    image: ghcr.io/brain-gaim/cdn:0.0.46
+    container_name: cdn
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+      - "8444:8443"
+    environment:
+      PORT: "8080"
+      TLS_PORT: "8443"
+      TLS_ENABLED: "true"
+      CDN_BASE_URL: ${CDN_BASE_URL:-http://192.168.188.67:8081}
+      MAX_UPLOAD_SIZE_MB: "500"
+      S3_ENDPOINT: "http://rustfs:9000"
+      S3_REGION: "us-east-1"
+      S3_BUCKET: "braingain"
+      S3_ACCESS_KEY_ID: "braingain"
+      S3_SECRET_ACCESS_KEY: "braingain-secret"
+      S3_USE_PATH_STYLE: "true"
+
+networks:
+  default:
+    name: braingain

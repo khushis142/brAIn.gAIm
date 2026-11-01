@@ -1,0 +1,16 @@
+# Binaries
+bin/
+main
+cdn-server
+
+# Env files
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

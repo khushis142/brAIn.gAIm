@@ -1,0 +1,140 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/brAIn-gAIm/CDN/internal/config"
+	"github.com/brAIn-gAIm/CDN/internal/handler"
+	"github.com/brAIn-gAIm/CDN/internal/storage"
+	"github.com/brAIn-gAIm/CDN/internal/tlsutil"
+)
+
+func main() {
+	cfg := config.Load()
+	log.Printf("[CDN] Starting server (HTTP Port: %s, TLS: %v, TLS Port: %s)", cfg.Port, cfg.TLSEnabled, cfg.TLSPort)
+	log.Printf("[CDN] S3 Endpoint: %s (Bucket: %s, PathStyle: %v)", cfg.S3Endpoint, cfg.S3Bucket, cfg.S3UsePathStyle)
+
+	// S3 / RustFS
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	s3Store, err := storage.New(ctx, cfg)
+	if err != nil {
+		log.Fatalf("[CDN] S3/RustFS storage initialization failed: %v", err)
+	}
+	log.Printf("[CDN] Storage connected to bucket: %s", cfg.S3Bucket)
+
+	// Router
+	mux := http.NewServeMux()
+	h := handler.New(cfg, s3Store)
+	h.RegisterRoutes(mux)
+
+	// Top-level middleware: CORS, logging, recovery
+	srvHandler := withCORS(withLogging(withRecovery(mux)))
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	var srvHTTP *http.Server
+	var srvTLS *http.Server
+
+	if cfg.Port != "" && cfg.Port != "none" && cfg.Port != "0" {
+		srvHTTP = &http.Server{
+			Addr:         ":" + cfg.Port,
+			Handler:      srvHandler,
+			ReadTimeout:  30 * time.Minute,
+			WriteTimeout: 30 * time.Minute,
+			IdleTimeout:  60 * time.Second,
+		}
+
+		go func() {
+			if err := srvHTTP.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("[CDN] HTTP server failed: %v", err)
+			}
+		}()
+		log.Printf("[CDN] Server ready to receive HTTP requests at http://localhost:%s", cfg.Port)
+	}
+
+	if cfg.TLSEnabled {
+		tlsConfig, err := tlsutil.LoadTLSConfig(cfg.TLSCertFile, cfg.TLSKeyFile)
+		if err != nil {
+			log.Fatalf("[CDN] TLS setup failed: %v", err)
+		}
+
+		srvTLS = &http.Server{
+			Addr:         ":" + cfg.TLSPort,
+			Handler:      srvHandler,
+			TLSConfig:    tlsConfig,
+			ReadTimeout:  30 * time.Minute,
+			WriteTimeout: 30 * time.Minute,
+			IdleTimeout:  60 * time.Second,
+		}
+
+		go func() {
+			if err := srvTLS.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("[CDN] HTTPS server failed: %v", err)
+			}
+		}()
+		log.Printf("[CDN] Server ready to receive HTTPS requests at https://localhost:%s", cfg.TLSPort)
+	}
+
+	<-stop
+	log.Printf("[CDN] Shutting down gracefully...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if srvHTTP != nil {
+		if err := srvHTTP.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[CDN] HTTP shutdown error: %v", err)
+		}
+	}
+	if srvTLS != nil {
+		if err := srvTLS.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[CDN] HTTPS shutdown error: %v", err)
+		}
+	}
+	log.Printf("[CDN] Server stopped")
+}
+
+func withRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("[CDN] Panic recovered: %v", rec)
+				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func withLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Range, If-None-Match")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, ETag, Accept-Ranges")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
