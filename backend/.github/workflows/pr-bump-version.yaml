@@ -1,0 +1,17 @@
+name: Bump Version Renovate
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump-version:
+    if: github.actor == 'renovate[bot]'
+    permissions:
+      contents: write
+    uses: Swaggeroo/ci-workflows/.github/workflows/pr-bump-version.yaml@v1.1.0
+    with:
+      version_file: version.txt
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

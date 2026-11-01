@@ -1,0 +1,22 @@
+meta {
+  name: Add attachment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{api}}/projects/{{projectId}}/attachments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id": "{{fileId}}",
+    "filename": "{{filename}}"
+  }
+}
+
+docs {
+  Upload the file with **cdn/Upload file** first.
+}

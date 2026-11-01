@@ -1,0 +1,18 @@
+# Local dev stand-in for the externally provided Postgres.
+# Deployment uses docker-compose.yaml.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: braingain
+      POSTGRES_PASSWORD: braingain
+      POSTGRES_DB: braingain
+    ports: ["5432:5432"]
+    volumes: [postgres-data:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "braingain"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  postgres-data:

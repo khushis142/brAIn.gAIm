@@ -1,0 +1,15 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  Run **auth/Login** first; it stores the token that every other request inherits.
+  Credentials come from `bruno/.env` (copy `.env.example`, never committed).
+
+  Chained variables: **cdn/Upload file** sets `fileId` and `filename`,
+  **projects/Create** sets `projectId`.
+}

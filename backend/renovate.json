@@ -1,0 +1,13 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"reviewers": ["Swaggeroo"],
+	"extends": ["config:recommended"],
+	"ignoreDeps": ["ghcr.io/brain-gaim/backend"],
+	"packageRules": [
+		{
+			"matchUpdateTypes": ["patch", "minor"],
+			"automerge": true,
+			"ignoreTests": true
+		}
+	]
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{api}}/auth/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  username: {{process.env.BRUNO_USERNAME}}
+  password: {{process.env.BRUNO_PASSWORD}}
+}
+
+script:post-response {
+  bru.setVar("token", res.body.access_token);
+}

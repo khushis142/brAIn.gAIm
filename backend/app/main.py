@@ -1,0 +1,44 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.db import engine
+from app.generator.llm import get_llm
+from app.routers import auth, content, feed, games, projects, users, zombie
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    if get_llm.cache_info().currsize:
+        await get_llm().aclose()
+    await engine.dispose()
+
+
+app = FastAPI(title="brAIn.gAIn", lifespan=lifespan)
+# Any origin is fine: auth is a bearer header the client sets explicitly, never a
+# cookie the browser attaches on its own, so cross-site requests carry no credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+for router in (
+    auth.router,
+    users.router,
+    content.router,
+    projects.router,
+    feed.router,
+    games.router,
+    zombie.router,
+):
+    app.include_router(router)
+
+
+@app.get("/health", tags=["meta"])
+async def health() -> dict[str, str]:
+    return {"status": "ok"}

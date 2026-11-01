@@ -1,0 +1,37 @@
+{
+  "context": "Quiz Tetris: a 60-second Tetris sprint. Clearing lines (and every 15 seconds without a question) pauses the falling pieces for one multiple-choice question; a right answer earns bonus points and slows the pieces down, a wrong one speeds them up, and the correct answer is shown either way. Write 6 to 8 questions so the player rarely sees one twice. `question` is a concise question (at most 90 characters). `options` are 2 to 4 short answers (1 to 4 words, at most 28 characters each), all distinct and plausible, with exactly one correct. `answer` is the index of the only correct option in `options` and must be smaller than the number of options. The game shuffles the options, so the correct option may be at any index. `context` is a short phrase naming the topic (at most 40 characters); it is shown to the player. Use only facts from the study material and prefer questions about different parts of it.",
+  "renderer": "2d",
+  "orientation": "portrait",
+  "minDurationSeconds": 20,
+  "maxDurationSeconds": 60,
+  "input": ["touch", "keyboard"],
+  "assets": [],
+  "input_schema": {
+    "type": "object",
+    "required": ["context", "questions"],
+    "additionalProperties": false,
+    "properties": {
+      "context": { "type": "string", "minLength": 1, "maxLength": 60 },
+      "questions": {
+        "type": "array",
+        "minItems": 4,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "required": ["question", "options", "answer"],
+          "additionalProperties": false,
+          "properties": {
+            "question": { "type": "string", "minLength": 1, "maxLength": 90 },
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": { "type": "string", "minLength": 1, "maxLength": 28 }
+            },
+            "answer": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        }
+      }
+    }
+  }
+}
