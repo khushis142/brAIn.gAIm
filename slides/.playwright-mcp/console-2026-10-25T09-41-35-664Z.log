@@ -1,9 +1,0 @@
-[     542ms] [ERROR] Failed to patch FloatingVue TypeError: Cannot read properties of undefined (reading 'Popper')
-    at app.component (http://192.168.188.22:3110/node_modules/@shikijs/vitepress-twoslash/dist/client.mjs?v=ada13db1:27:42)
-    at Object.install (http://192.168.188.22:3110/node_modules/floating-vue/dist/floating-vue.mjs?v=ada13db1:1683:9)
-    at Object.use (http://192.168.188.22:3110/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js?v=ada13db1:3772:13)
-    at Object.install (http://192.168.188.22:3110/node_modules/@shikijs/vitepress-twoslash/dist/client.mjs?v=ada13db1:43:6)
-    at Object.use (http://192.168.188.22:3110/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js?v=ada13db1:3772:13)
-    at setupMain (http://192.168.188.22:3110/node_modules/@slidev/client/setup/main.ts?t=1792921278256&v=ada13db1:30:6)
-    at main (http://192.168.188.22:3110/@fs/C:/Users/Justin/Documents/Hackathon/Slides/node_modules/@slidev/client/main.ts:7:8)
-    at http://192.168.188.22:3110/@fs/C:/Users/Justin/Documents/Hackathon/Slides/node_modules/@slidev/client/main.ts:10:1 @ http://192.168.188.22:3110/@vite/client:367
