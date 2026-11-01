@@ -9,7 +9,7 @@ LLM-generated mini-games built from your own study material.
 | [backend](backend) | API, feed logic, LLM game/flashcard generation | FastAPI, Postgres |
 | [cdn](cdn) | Static asset/video delivery | Go, S3 (RustFS) |
 | [infra](infra) | Docker Compose full local stack | Docker, Piper TTS, llama.cpp |
-| [slides](slides) | Hackathon presentation | |
+| [slides](slides) | LLM generated flashcards for own study material | |
 
 ## Run it locally
 See [infra/README.md](infra/README.md): `docker compose up -d`
