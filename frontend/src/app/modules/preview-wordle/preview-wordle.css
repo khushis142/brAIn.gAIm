@@ -1,0 +1,20 @@
+.preview-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+
+.player-stage {
+  background: #000;
+  border-radius: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}

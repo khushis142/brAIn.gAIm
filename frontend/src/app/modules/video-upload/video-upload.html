@@ -1,0 +1,90 @@
+<section>
+  <header class="page-header">
+    <div class="title-with-icon">
+      <span class="header-icon-bubble">
+        <svg lucideUpload></svg>
+      </span>
+      <h1>Upload Video</h1>
+    </div>
+  </header>
+
+  <div class="card">
+    <form (submit)="submit($event)">
+      <label for="video-file">Video file (.mp4)</label>
+      <div class="file-field">
+        <label
+          class="file-drop"
+          [class.dragging]="dragging()"
+          [class.has-file]="file() !== null"
+          [class.disabled]="status() === 'uploading'"
+          (dragover)="onDragOver($event)"
+          (dragleave)="dragging.set(false)"
+          (drop)="onDrop($event)"
+        >
+          @if (file(); as selectedFile) {
+            <span class="file-icon">
+              <svg lucideFileVideo></svg>
+            </span>
+            <span class="file-text">
+              <span class="file-name">{{ selectedFile.name }}</span>
+              <span class="file-meta">{{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB · Tap to replace</span>
+            </span>
+          } @else {
+            <span class="file-icon">
+              <svg lucideCloudUpload></svg>
+            </span>
+            <span class="file-text">
+              <span class="file-name">Choose a video</span>
+              <span class="file-meta">or drag it here · MP4 up to {{ maxSizeMb }} MB</span>
+            </span>
+          }
+          <input
+            #fileInput
+            id="video-file"
+            type="file"
+            accept=".mp4,video/mp4"
+            [disabled]="status() === 'uploading'"
+            (change)="onFileSelected($event)"
+          />
+        </label>
+        @if (file() && status() !== 'uploading') {
+          <button type="button" class="file-remove" aria-label="Remove video" (click)="clearFile()">
+            <svg lucideX></svg>
+          </button>
+        }
+      </div>
+
+      <label for="video-title">Title</label>
+      <input
+        id="video-title"
+        type="text"
+        maxlength="200"
+        [value]="title()"
+        [disabled]="status() === 'uploading'"
+        (input)="onTitleInput($event)"
+      />
+
+      <label for="video-tags">Tags (comma-separated)</label>
+      <input
+        id="video-tags"
+        type="text"
+        [value]="tagsInput()"
+        [disabled]="status() === 'uploading'"
+        (input)="onTagsInput($event)"
+      />
+
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+
+      @if (status() === 'success') {
+        <p class="success" role="status">Video uploaded successfully.</p>
+      }
+
+      <button type="submit" [disabled]="!canSubmit()">
+        <svg lucideUpload></svg>
+        {{ status() === 'uploading' ? 'Uploading…' : 'Upload' }}
+      </button>
+    </form>
+  </div>
+</section>

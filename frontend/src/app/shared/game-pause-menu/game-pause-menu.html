@@ -1,0 +1,10 @@
+<div class="panel">
+  <h3 class="title" [id]="titleId">{{ menu()?.title || 'Paused' }}</h3>
+  @if (menu()?.message; as message) {
+    <p class="message">{{ message }}</p>
+  }
+  <button #resumeButton class="resume" type="button" (click)="resume.emit()">
+    <svg lucidePlay aria-hidden="true"></svg>
+    {{ menu()?.resumeLabel || 'Resume' }}
+  </button>
+</div>

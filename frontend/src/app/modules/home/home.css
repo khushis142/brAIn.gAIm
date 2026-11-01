@@ -1,0 +1,143 @@
+:host {
+  display: block;
+  /* The page area between the header and the nav (see app.css) */
+  height: 100%;
+}
+
+.feed {
+  height: 100%;
+  perspective: 1200px;
+  position: relative;
+  touch-action: none; /* vertical swipes are handled in home.ts */
+}
+
+/* Cards are stacked; only the current one shows. Hidden ones keep their size, so a
+   paused game does not get resized to nothing. */
+app-feed-card,
+.placeholder,
+.error {
+  inset: 0;
+  position: absolute;
+}
+
+app-feed-card:not(.current) {
+  visibility: hidden;
+}
+
+.placeholder,
+.error {
+  background: rgb(0 0 0 / 0.75);
+  border-radius: 20px;
+  color: #fff;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  place-content: center;
+  text-align: center;
+}
+
+.error button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 16px;
+}
+
+/* Transition: the card flies up and away, the next one rises in; backwards it is mirrored */
+app-feed-card.leaving {
+  animation: card-leave 450ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+
+app-feed-card.entering {
+  animation: card-enter 450ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.back app-feed-card.leaving {
+  animation-name: card-leave-back;
+}
+
+.back app-feed-card.entering {
+  animation-name: card-enter-back;
+}
+
+/* "Neural pulse" overlay shown while switching */
+.warp {
+  border-radius: 20px;
+  inset: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 250ms ease;
+}
+
+.warp.active {
+  opacity: 1;
+}
+
+.warp.active::before {
+  content: '';
+  position: absolute;
+}
+
+/* Light band sweeping upwards, or downwards when going back */
+.warp.active::before {
+  animation: sweep 700ms ease-in forwards;
+  background: linear-gradient(to top, transparent, color-mix(in srgb, var(--accent) 70%, white), transparent);
+  height: 35%;
+  left: 0;
+  right: 0;
+  top: 100%;
+}
+
+.back .warp.active::before {
+  animation-name: sweep-back;
+  top: -35%;
+}
+
+@keyframes card-leave {
+  to { filter: blur(8px); opacity: 0; transform: translateY(-35%) scale(0.85) rotateX(20deg); }
+}
+
+@keyframes card-enter {
+  from { filter: blur(8px); opacity: 0; transform: translateY(35%) scale(0.9) rotateX(-12deg); }
+}
+
+@keyframes card-leave-back {
+  to { filter: blur(8px); opacity: 0; transform: translateY(35%) scale(0.85) rotateX(-20deg); }
+}
+
+@keyframes card-enter-back {
+  from { filter: blur(8px); opacity: 0; transform: translateY(-35%) scale(0.9) rotateX(12deg); }
+}
+
+@keyframes sweep {
+  to { transform: translateY(-400%); }
+}
+
+@keyframes sweep-back {
+  to { transform: translateY(400%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-feed-card.leaving,
+  app-feed-card.entering,
+  .warp.active::before,
+  .warp.active::after {
+    animation: none;
+  }
+
+  app-feed-card.leaving {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .placeholder,
+  .error,
+  .warp {
+    border-radius: 0;
+  }
+}

@@ -1,0 +1,172 @@
+:host {
+  display: block;
+  inset: 0;
+  position: absolute;
+}
+
+.video {
+  height: 100%;
+  inset: 0;
+  object-fit: contain;
+  position: absolute;
+  width: 100%;
+}
+
+.player-controls {
+  align-items: center;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  left: 0;
+  padding: 38px 18px 14px;
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  transition: opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-controls.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.seek-input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.playback-bubble svg {
+  fill: currentColor;
+  height: 22px;
+  width: 22px;
+}
+
+.timeline {
+  flex: 1;
+  height: 28px;
+  position: relative;
+}
+
+.seek-input {
+  appearance: none;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--seek-progress),
+    rgb(255 255 255 / 0.38) var(--seek-progress) 100%
+  );
+  border-radius: 999px;
+  cursor: pointer;
+  height: 4px;
+  margin: 12px 0;
+  width: 100%;
+}
+
+.seek-input::-webkit-slider-thumb {
+  appearance: none;
+  height: 28px;
+  width: 28px;
+}
+
+.seek-input::-moz-range-thumb {
+  background: transparent;
+  border: 0;
+  height: 28px;
+  width: 28px;
+}
+
+.brain-playhead {
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.55));
+  height: 24px;
+  pointer-events: none;
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 24px;
+}
+
+.brain-playhead .material-symbols-outlined {
+  color: #5985e1;
+  font-size: 24px;
+}
+
+.seek-timestamp {
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 999px;
+  color: #fff;
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  left: 50%;
+  padding: 8px 18px;
+  position: absolute;
+  top: 24px;
+  transform: translateX(-50%);
+}
+
+.playback-bubble {
+  align-items: center;
+  animation: playback-bubble 500ms ease-out forwards;
+  background: rgb(0 0 0 / 0.55);
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  height: 86px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 86px;
+}
+
+@keyframes playback-bubble {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+/* Double-tap target sits below the custom timeline. */
+.tap-layer {
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 1;
+}
+
+/* Big brain that pops where the video was double tapped */
+.burst {
+  animation: burst 800ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  color: #fff;
+  fill: var(--like);
+  filter: drop-shadow(0 0 18px var(--like));
+  height: 110px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 110px;
+}
+
+@keyframes burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(-15deg); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(8deg); }
+  45% { transform: translate(-50%, -50%) scale(0.95) rotate(-4deg); }
+  65% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translate(-50%, -160%) scale(0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .burst,
+  .playback-bubble {
+    animation: none;
+  }
+
+  .player-controls {
+    transition: none;
+  }
+}

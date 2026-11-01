@@ -1,0 +1,36 @@
+<section
+  class="feed"
+  [class.back]="direction() === 'back'"
+  (touchstart)="onTouchStart($event)"
+  (touchend)="onTouchEnd($event)"
+>
+  @for (entry of entries(); track entry.key; let i = $index) {
+    <app-feed-card
+      [class.current]="i === index()"
+      [class.leaving]="i === index() && phase() === 'leaving'"
+      [class.entering]="i === index() && phase() === 'entering'"
+      [attr.inert]="i === index() ? null : ''"
+      [entry]="entry"
+      [live]="isLive(i)"
+      [active]="i === index()"
+      [transition]="i === index() ? transition() : null"
+      [hasPrevious]="i > 0"
+      (next)="next()"
+      (previous)="previous()"
+      (likeChanged)="updateLike(entry, $event)"
+    />
+  }
+
+  @if (entries().length === 0 && !error()) {
+    <p class="placeholder">Loading your feed…</p>
+  }
+
+  @if (error(); as message) {
+    <div class="error" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" (click)="next()">Try again</button>
+    </div>
+  }
+
+  <div class="warp" [class.active]="phase() === 'leaving'" aria-hidden="true"></div>
+</section>

@@ -1,0 +1,261 @@
+.dropzone-bar {
+  align-items: stretch;
+  bottom: 0; /* of the page area, which ends above the nav */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+  position: sticky;
+  z-index: 10;
+}
+
+.dropzone-bar app-upload-dropzone {
+  flex: 1;
+  min-width: 0;
+}
+
+.process-button {
+  align-items: center;
+  background: var(--accent);
+  border: 0;
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 16px;
+  transition: background-color 500ms ease, color 500ms ease, opacity 500ms ease;
+}
+
+.process-button:hover {
+  filter: brightness(1.1);
+}
+
+.process-button .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.process-button.processing {
+  background: #2e9c5b;
+}
+
+.bouncing-label {
+  display: inline-flex;
+  white-space: pre;
+}
+
+.bouncing-label > span {
+  animation: letter-bounce 700ms ease-in-out infinite alternate;
+  animation-delay: calc(var(--letter-index) * 45ms);
+}
+
+@keyframes letter-bounce {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bouncing-label > span {
+    animation: none;
+  }
+}
+
+.process-button.requested:not(.processing) {
+  background: var(--control);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.process-button:disabled {
+  cursor: not-allowed;
+}
+
+.projects {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  width: 100%;
+}
+
+.knowledge-link {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.8rem;
+  justify-content: space-between;
+  padding: 10px 0;
+  text-align: left;
+}
+
+.knowledge-link:hover {
+  color: var(--text);
+}
+
+.knowledge-count {
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.knowledge-subview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.knowledge-subview h2 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.back-button {
+  align-items: center;
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0;
+}
+
+.flashcard {
+  background: var(--control);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 14px 16px;
+}
+
+.knowledge-subview .flashcard {
+  margin: 0;
+}
+
+.flashcard h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.flashcard p {
+  line-height: 1.5;
+  border-left: 2px solid var(--border);
+  margin: 0;
+  padding-left: 10px;
+}
+
+.files {
+  flex: 1;
+  min-height: 160px;
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.error {
+  background: var(--control);
+  border-radius: 8px;
+  color: #ef5350;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.dialog-backdrop {
+  align-items: center;
+  background: rgb(0 0 0 / 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 100;
+}
+
+.name-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 100%;
+  max-width: 420px;
+  overflow-y: auto; /* only with the keyboard up on a phone held sideways */
+  padding: 24px;
+  width: 100%;
+}
+
+.name-dialog h2 {
+  font-size: 1.2rem;
+  margin: 0 0 4px;
+}
+
+.name-dialog input {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-height: 48px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.name-dialog input:focus-visible,
+.dialog-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.dialog-actions button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 16px;
+}
+
+.dialog-actions button.cancel {
+  background: var(--control);
+  color: var(--text);
+}
+
+.dialog-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

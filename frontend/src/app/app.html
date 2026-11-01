@@ -1,0 +1,45 @@
+<div class="app-shell">
+  <app-header />
+  @if (isAuthenticated()) {
+
+    <main class="page-content">
+      <router-outlet></router-outlet>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <a
+        class="nav-item"
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <svg lucideHome></svg>
+        <span>Home</span>
+      </a>
+      <a class="nav-item" routerLink="/gamehub" routerLinkActive="active">
+        <svg lucideGamepad2></svg>
+        <span>Games</span>
+      </a>
+      <a class="nav-item" routerLink="/knowledge" routerLinkActive="active">
+        <svg lucideBrain></svg>
+        <span>Knowledge</span>
+      </a>
+      <a class="nav-item" routerLink="/video-upload" routerLinkActive="active">
+        <svg lucideVideo></svg>
+        <span>Video</span>
+      </a>
+      <a class="nav-item" routerLink="/wardrobe" routerLinkActive="active">
+        <svg lucideSkull></svg>
+        <span>Avatar</span>
+      </a>
+      <a class="nav-item" routerLink="/settings" routerLinkActive="active">
+        <svg lucideSettings></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+  } @else {
+    <div class="public-content">
+      <router-outlet></router-outlet>
+    </div>
+  }
+</div>

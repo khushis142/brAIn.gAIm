@@ -1,0 +1,48 @@
+<section>
+  <header class="page-header">
+    <div class="title-with-icon">
+      <span class="header-icon-bubble">
+        <svg lucideSettings></svg>
+      </span>
+      <h1>Settings</h1>
+    </div>
+  </header>
+
+  <div class="card">
+    <h3>User</h3>
+    <div class="user-information" aria-label="User information">
+      <div>
+        <span class="information-label">Username</span>
+        <strong>{{ userService.user()?.username ?? 'Loading...' }}</strong>
+      </div>
+      <div>
+        <span class="information-label">Interests</span>
+        <strong>{{ userService.user()?.interests ?? 'No interests added' }}</strong>
+      </div>
+    </div>
+    <button class="settings-button interest-button" type="button" (click)="openInterestDialog()">
+      <span class="button-icon" aria-hidden="true"><svg lucidePlus></svg></span>
+      <span class="button-copy">
+        <strong>Add Interests</strong>
+        <small>Personalize your learning feed</small>
+      </span>
+      <span class="button-arrow" aria-hidden="true">→</span>
+    </button>
+    <div class="logout-button-container">
+      <button class="settings-button logout-button" type="button" (click)="logout()">
+        <span class="button-icon" aria-hidden="true"><svg lucideLogOut></svg></span>
+        <span class="button-copy">
+          <strong>Logout</strong>
+          <small>Sign out of this account</small>
+        </span>
+      </button>
+    </div>
+  </div>
+</section>
+
+@if (isInterestDialogOpen()) {
+  <app-interests-dialog
+    (closed)="closeInterestDialog()"
+    (saved)="closeInterestDialog()"
+  />
+}

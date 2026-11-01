@@ -1,0 +1,85 @@
+.app-header {
+  align-items: center;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  height: 60px;
+  justify-content: space-between;
+  padding: 0 max(20px, calc((100% - 720px) / 2));
+  position: relative;
+  z-index: 10;
+}
+
+/* The logo gives way first on narrow phones, so the badges never push past the edge */
+.brand {
+  align-items: center;
+  color: var(--text);
+  display: inline-flex;
+  height: 48px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.brand img {
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+@media (max-height: 500px) {
+  .app-header {
+    height: 48px;
+  }
+
+  .brand {
+    height: 36px;
+  }
+}
+
+.brand .logo-dark {
+  display: none;
+}
+
+:host-context(:root.dark) .brand .logo-light {
+  display: none;
+}
+
+:host-context(:root.dark) .brand .logo-dark {
+  display: block;
+}
+
+.theme-toggle {
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  padding: 7px 10px;
+  text-transform: capitalize;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.header-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.sr-only {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+  clip: rect(0, 0, 0, 0);
+}
